@@ -11,6 +11,10 @@ BalanceModel _$BalanceModelFromJson(Map<String, dynamic> json) => BalanceModel(
       shielded: (json['shielded'] as num).toDouble(),
       total: (json['total'] as num).toDouble(),
       unconfirmed: (json['unconfirmed'] as num?)?.toDouble() ?? 0.0,
+      unconfirmedTransparent:
+          (json['unconfirmedTransparent'] as num?)?.toDouble() ?? 0.0,
+      unconfirmedShielded:
+          (json['unconfirmedShielded'] as num?)?.toDouble() ?? 0.0,
       lastUpdated: json['lastUpdated'] == null
           ? null
           : DateTime.parse(json['lastUpdated'] as String),
@@ -22,5 +26,7 @@ Map<String, dynamic> _$BalanceModelToJson(BalanceModel instance) =>
       'shielded': instance.shielded,
       'total': instance.total,
       'unconfirmed': instance.unconfirmed,
+      'unconfirmedTransparent': instance.unconfirmedTransparent,
+      'unconfirmedShielded': instance.unconfirmedShielded,
       'lastUpdated': instance.lastUpdated?.toIso8601String(),
     };

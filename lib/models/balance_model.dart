@@ -9,6 +9,8 @@ class BalanceModel {
   final double shielded;
   final double total;
   final double unconfirmed;
+  final double unconfirmedTransparent;
+  final double unconfirmedShielded;
   final DateTime? lastUpdated;
 
   const BalanceModel({
@@ -16,6 +18,8 @@ class BalanceModel {
     required this.shielded,
     required this.total,
     this.unconfirmed = 0.0,
+    this.unconfirmedTransparent = 0.0,
+    this.unconfirmedShielded = 0.0,
     this.lastUpdated,
   });
 
@@ -30,6 +34,8 @@ class BalanceModel {
       shielded: 0.0,
       total: 0.0,
       unconfirmed: 0.0,
+      unconfirmedTransparent: 0.0,
+      unconfirmedShielded: 0.0,
     );
   }
 
@@ -50,6 +56,12 @@ class BalanceModel {
 
   /// Check if wallet has unconfirmed balance
   bool get hasUnconfirmedBalance => unconfirmed > 0;
+  
+  /// Check if wallet has unconfirmed transparent balance
+  bool get hasUnconfirmedTransparentBalance => unconfirmedTransparent > 0;
+  
+  /// Check if wallet has unconfirmed shielded balance
+  bool get hasUnconfirmedShieldedBalance => unconfirmedShielded > 0;
 
   /// Get balance in zatoshis
   int get totalZatoshis => (total * AppConstants.zatoshisPerBtcz).round();
@@ -63,6 +75,8 @@ class BalanceModel {
   String get formattedTransparent => _formatBalance(transparent);
   String get formattedShielded => _formatBalance(shielded);
   String get formattedUnconfirmed => _formatBalance(unconfirmed);
+  String get formattedUnconfirmedTransparent => _formatBalance(unconfirmedTransparent);
+  String get formattedUnconfirmedShielded => _formatBalance(unconfirmedShielded);
   String get formattedSpendable => _formatBalance(spendable);
 
   /// Check if sufficient balance for amount
@@ -84,6 +98,8 @@ class BalanceModel {
     double? shielded,
     double? total,
     double? unconfirmed,
+    double? unconfirmedTransparent,
+    double? unconfirmedShielded,
     DateTime? lastUpdated,
   }) {
     return BalanceModel(
@@ -91,6 +107,8 @@ class BalanceModel {
       shielded: shielded ?? this.shielded,
       total: total ?? this.total,
       unconfirmed: unconfirmed ?? this.unconfirmed,
+      unconfirmedTransparent: unconfirmedTransparent ?? this.unconfirmedTransparent,
+      unconfirmedShielded: unconfirmedShielded ?? this.unconfirmedShielded,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }

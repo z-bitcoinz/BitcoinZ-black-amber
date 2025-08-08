@@ -7,7 +7,7 @@ import 'wallet/send_screen.dart';
 import 'wallet/receive_screen.dart';
 import 'wallet/paginated_transaction_history_screen.dart';
 import 'settings/settings_screen.dart';
-import '../demo/cli_demo_page.dart';
+// import '../demo/cli_demo_page.dart'; // Removed - CLI demo no longer used
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -27,7 +27,7 @@ class _MainScreenState extends State<MainScreen>
     const SendScreen(),
     const ReceiveScreen(),
     const PaginatedTransactionHistoryScreen(),
-    CliDemoPage(),
+    // CliDemoPage(), // Removed - CLI demo no longer used
     const SettingsScreen(),
   ];
 
@@ -52,11 +52,12 @@ class _MainScreenState extends State<MainScreen>
       activeIcon: Icon(Icons.history),
       label: 'History',
     ),
-    const BottomNavigationBarItem(
-      icon: Icon(Icons.terminal),
-      activeIcon: Icon(Icons.terminal),
-      label: 'CLI Demo',
-    ),
+    // Removed - CLI demo no longer used
+    // const BottomNavigationBarItem(
+    //   icon: Icon(Icons.terminal),
+    //   activeIcon: Icon(Icons.terminal),
+    //   label: 'CLI Demo',
+    // ),
     const BottomNavigationBarItem(
       icon: Icon(Icons.settings),
       activeIcon: Icon(Icons.settings),

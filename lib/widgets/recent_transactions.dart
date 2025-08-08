@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../providers/wallet_provider.dart';
-import '../services/btcz_cli_service.dart';
+// import '../services/btcz_cli_service.dart'; // Removed - CLI no longer used
 import '../utils/responsive.dart';
 
 class RecentTransactions extends StatefulWidget {
@@ -23,7 +23,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
   int? _cachedBlockHeight;
   DateTime? _blockHeightCacheTime;
   final Duration _blockHeightCacheDuration = const Duration(seconds: 30);
-  final BtczCliService _cliService = BtczCliService();
+  // final BtczCliService _cliService = BtczCliService(); // Removed - CLI no longer used
 
   /// Get current block height with caching
   Future<int?> _getCurrentBlockHeight() async {
@@ -38,7 +38,8 @@ class _RecentTransactionsState extends State<RecentTransactions> {
     
     // Fetch new block height
     try {
-      final blockHeight = await _cliService.getCurrentBlockHeight();
+      // CLI service removed - return null for now
+      final int? blockHeight = null; // await _cliService.getCurrentBlockHeight();
       if (blockHeight != null) {
         _cachedBlockHeight = blockHeight;
         _blockHeightCacheTime = now;
@@ -310,9 +311,8 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                 _buildDetailRow('Amount', '${transaction.amount.toStringAsFixed(8)} BTCZ'),
                 _buildDetailRow('Type', transaction.isReceived ? 'Received' : 'Sent'),
                 _buildDetailRow('Date', DateFormat('EEEE, MMMM dd, yyyy at HH:mm:ss').format(transaction.timestamp)),
-                _buildDetailRow('Status', transaction.isPending ? 'Confirming' : 'Confirmed'),
-                if (!transaction.isPending)
-                  _buildConfirmationRow(transaction),
+                _buildDetailRow('Status', transaction.confirmations == 0 ? 'Unconfirmed' : (transaction.confirmations < 6 ? 'Confirming' : 'Confirmed')),
+                _buildConfirmationRow(transaction),
                 if (transaction.fee != null)
                   _buildDetailRow('Fee', '${transaction.fee!.toStringAsFixed(8)} BTCZ'),
                 if (transaction.fromAddress != null)
@@ -389,47 +389,19 @@ class _RecentTransactionsState extends State<RecentTransactions> {
             ),
           ),
           const SizedBox(height: 4),
-          FutureBuilder<int?>(
-            future: _getCurrentBlockHeight(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Row(
-                  children: [
-                    const SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Loading...',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                      ),
-                    ),
-                  ],
-                );
-              }
-
-              final currentBlockHeight = snapshot.data;
-              final realConfirmations = _calculateRealConfirmations(
-                transaction.blockHeight, 
-                currentBlockHeight
-              );
-
+          // Use stored confirmations from transaction (already calculated by Rust service)
+          Builder(
+            builder: (context) {
+              final confirmations = transaction.confirmations ?? 0;
+              
               String confirmationText;
-              if (realConfirmations != null) {
-                confirmationText = 'Confirmed ($realConfirmations)';
+              if (confirmations == 0) {
+                confirmationText = 'Unconfirmed';
+              } else if (confirmations < 6) {
+                confirmationText = '$confirmations (Confirming...)';
               } else {
-                // Fallback to stored confirmations or default text
-                final storedConfirmations = transaction.confirmations ?? 0;
-                if (storedConfirmations >= 6) {
-                  confirmationText = 'Confirmed (6+)';
-                } else if (storedConfirmations > 0) {
-                  confirmationText = '$storedConfirmations (Confirming...)';
-                } else {
-                  confirmationText = 'Unconfirmed';
-                }
+                // Show actual confirmation count for fully confirmed transactions
+                confirmationText = confirmations.toString();
               }
 
               return Text(

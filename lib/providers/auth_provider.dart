@@ -4,7 +4,7 @@ import 'package:local_auth/local_auth.dart';
 import 'dart:io';
 import 'dart:convert';
 import '../services/storage_service.dart';
-import '../services/cli_wallet_detector.dart';
+// import '../services/cli_wallet_detector.dart'; // Removed - CLI no longer used
 
 class AuthProvider with ChangeNotifier {
   static const String _hasWalletKey = 'has_wallet';
@@ -23,7 +23,7 @@ class AuthProvider with ChangeNotifier {
   String? _error;
   bool _cliWalletImported = false;
   final LocalAuthentication _localAuth = LocalAuthentication();
-  final CliWalletDetector _cliDetector = CliWalletDetector();
+  // final CliWalletDetector _cliDetector = CliWalletDetector(); // Removed - CLI no longer used
 
   // Getters
   bool get isAuthenticated => _isAuthenticated;
@@ -45,9 +45,10 @@ class AuthProvider with ChangeNotifier {
       await _loadStoredData();
       
       // Check for existing CLI wallet BEFORE checking if we need setup
-      if (!_hasWallet && !_cliWalletImported) {
-        await _detectAndImportCliWallet();
-      }
+      // Disabled - CLI detection no longer used
+      // if (!_hasWallet && !_cliWalletImported) {
+      //   await _detectAndImportCliWallet();
+      // }
       
       // Check if biometrics are available on mobile
       if (Platform.isAndroid || Platform.isIOS) {
@@ -341,6 +342,8 @@ class AuthProvider with ChangeNotifier {
   }
 
   /// Detect and import existing CLI wallet
+  // Disabled - CLI detection no longer used
+  /*
   Future<void> _detectAndImportCliWallet() async {
     try {
       if (kDebugMode) {
@@ -406,6 +409,7 @@ class AuthProvider with ChangeNotifier {
       // Don't fail initialization if CLI detection fails
     }
   }
+  */
 
   /// Load stored authentication data
   Future<void> _loadStoredData() async {

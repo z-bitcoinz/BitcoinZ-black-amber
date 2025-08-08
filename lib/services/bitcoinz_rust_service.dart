@@ -35,6 +35,11 @@ class BitcoinzRustService {
   double? lastBalance;
   int? lastTxCount;
   
+  // Blockchain info caching
+  int? _currentBlockHeight;
+  DateTime? _blockHeightLastFetch;
+  static const Duration _blockHeightCacheDuration = Duration(seconds: 30);
+  
   /// Initialize the Rust bridge and wallet
   Future<bool> initialize({
     required String serverUri,
@@ -258,14 +263,39 @@ class BitcoinzRustService {
       final txList = jsonDecode(txListJson) as List;
       
       double pendingBalance = 0;
+      double pendingTransparent = 0;
+      double pendingShielded = 0;
+      
       for (final tx in txList) {
         if (tx['unconfirmed'] == true) {
           final amount = (tx['amount'] ?? 0).abs() / 100000000.0;
           if (tx['outgoing_metadata'] == null) {
             // Incoming unconfirmed
             pendingBalance += amount;
-            if (kDebugMode) {
-              print('🔄 UNCONFIRMED INCOMING via Rust: ${tx['txid']} - $amount BTCZ');
+            
+            // Determine if it's to a transparent or shielded address
+            final address = tx['address'] as String?;
+            if (address != null) {
+              if (address.startsWith('t1') || address.startsWith('t3')) {
+                pendingTransparent += amount;
+                if (kDebugMode) {
+                  print('🔄 UNCONFIRMED TRANSPARENT INCOMING: ${tx['txid']} - $amount BTCZ to $address');
+                }
+              } else if (address.startsWith('zs1') || address.startsWith('zc')) {
+                pendingShielded += amount;
+                if (kDebugMode) {
+                  print('🔄 UNCONFIRMED SHIELDED INCOMING: ${tx['txid']} - $amount BTCZ to $address');
+                }
+              } else {
+                // Unknown address type, add to shielded by default
+                pendingShielded += amount;
+                if (kDebugMode) {
+                  print('🔄 UNCONFIRMED INCOMING (unknown type): ${tx['txid']} - $amount BTCZ');
+                }
+              }
+            } else {
+              // No address info, add to shielded by default
+              pendingShielded += amount;
             }
           }
         }
@@ -276,12 +306,61 @@ class BitcoinzRustService {
         shielded: (data['zbalance'] ?? 0) / 100000000.0,
         total: ((data['tbalance'] ?? 0) + (data['zbalance'] ?? 0)) / 100000000.0,
         unconfirmed: pendingBalance,
+        unconfirmedTransparent: pendingTransparent,
+        unconfirmedShielded: pendingShielded,
       );
       
       fnSetTotalBalance?.call(balance);
     } catch (e) {
       if (kDebugMode) print('❌ Fetch balance failed: $e');
     }
+  }
+  
+  /// Get current blockchain height (with caching)
+  Future<int?> getCurrentBlockHeight() async {
+    if (!_initialized) return null;
+    
+    // Check cache
+    final now = DateTime.now();
+    if (_currentBlockHeight != null && 
+        _blockHeightLastFetch != null &&
+        now.difference(_blockHeightLastFetch!).compareTo(_blockHeightCacheDuration) < 0) {
+      return _currentBlockHeight;
+    }
+    
+    try {
+      final infoJson = await rust_api.execute(command: 'info', args: '');
+      final info = jsonDecode(infoJson);
+      
+      if (kDebugMode) {
+        print('📊 Info response keys: ${info.keys.toList()}');
+        print('📊 Full info: $info');
+      }
+      
+      // Check multiple possible field names for block height
+      dynamic heightValue = info['latest_block_height'] ??  // This is the correct field!
+                           info['height'] ?? 
+                           info['blockHeight'] ?? 
+                           info['block_height'] ?? 
+                           info['latestBlock'] ?? 
+                           info['latest_block'] ??
+                           info['synced_to'];
+      
+      if (heightValue != null) {
+        _currentBlockHeight = heightValue is int ? heightValue : int.tryParse(heightValue.toString());
+        if (_currentBlockHeight != null) {
+          _blockHeightLastFetch = now;
+          if (kDebugMode) {
+            print('📊 Current block height: $_currentBlockHeight (from field: ${info.keys.where((k) => info[k] == heightValue).first})');
+          }
+          return _currentBlockHeight;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get block height: $e');
+    }
+    
+    return _currentBlockHeight; // Return cached value if fetch fails
   }
   
   /// Fetch transactions
@@ -297,16 +376,57 @@ class BitcoinzRustService {
         print('📋 Transactions from Rust: ${txList.length} total, $unconfirmedCount unconfirmed');
       }
       
+      // Get current block height for confirmation calculation
+      final currentHeight = await getCurrentBlockHeight();
+      
       final transactions = <TransactionModel>[];
       
+      int index = 0;
       for (final tx in txList) {
+        index++;
+        
+        // Debug log first transaction to see available fields
+        if (kDebugMode && index == 1) {
+          print('📋 First transaction fields: ${(tx as Map).keys.toList()}');
+          print('📋 Transaction data sample: txid=${tx['txid']?.toString()?.substring(0, 8)}..., block_height=${tx['block_height']}, height=${tx['height']}, blockHeight=${tx['blockHeight']}');
+        }
         final type = tx['outgoing_metadata'] != null ? 'sent' : 'received';
         final address = type == 'sent'
             ? (tx['outgoing_metadata'].isNotEmpty ? tx['outgoing_metadata'][0]['address'] : '')
             : tx['address'];
         
         final amount = (tx['amount'] ?? 0).abs() / 100000000.0;
-        final confirmations = tx['unconfirmed'] == true ? 0 : 1;
+        
+        // Calculate real confirmations
+        int confirmations = 0;
+        
+        // Check multiple possible field names for transaction block height
+        dynamic txHeightValue = tx['block_height'] ?? 
+                                tx['blockHeight'] ?? 
+                                tx['height'] ??
+                                tx['blockheight'];
+        
+        final blockHeight = txHeightValue is int ? txHeightValue : 
+                           (txHeightValue != null ? int.tryParse(txHeightValue.toString()) : null);
+        
+        if (tx['unconfirmed'] == true) {
+          confirmations = 0;
+          if (kDebugMode) {
+            print('🔄 Unconfirmed TX: ${(tx['txid'] as String).substring(0, 8)}...');
+          }
+        } else if (blockHeight != null && blockHeight > 0 && currentHeight != null) {
+          confirmations = currentHeight - blockHeight + 1;
+          if (confirmations < 0) confirmations = 1; // Safety check
+          if (kDebugMode && index < 3) { // Log first 3 transactions
+            print('📊 TX ${(tx['txid'] as String).substring(0, 8)}...: blockHeight=$blockHeight, currentHeight=$currentHeight, confirmations=$confirmations');
+          }
+        } else {
+          // Default to 1 if we can't calculate
+          confirmations = 1;
+          if (kDebugMode && index < 3) { // Log first 3 transactions
+            print('⚠️ TX ${(tx['txid'] as String).substring(0, 8)}...: Cannot calculate confirmations (blockHeight=$blockHeight, currentHeight=$currentHeight)');
+          }
+        }
         
         // Log unconfirmed transactions
         if (tx['unconfirmed'] == true) {
@@ -319,6 +439,7 @@ class BitcoinzRustService {
           txid: tx['txid'] ?? '',
           type: type,
           amount: amount,
+          blockHeight: blockHeight,
           fromAddress: type == 'received' ? address : null,
           toAddress: type == 'sent' ? address : null,
           timestamp: DateTime.fromMillisecondsSinceEpoch((tx['datetime'] ?? 0) * 1000),
@@ -330,8 +451,8 @@ class BitcoinzRustService {
         transactions.add(transaction);
       }
       
-      // Sort by confirmations (unconfirmed first)
-      transactions.sort((a, b) => (a.confirmations ?? 0).compareTo(b.confirmations ?? 0));
+      // Sort by timestamp (newest first)
+      transactions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
       
       fnSetTransactionsList?.call(transactions);
     } catch (e) {

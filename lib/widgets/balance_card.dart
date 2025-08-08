@@ -122,43 +122,8 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                       },
                     ),
                     
-                    // Unconfirmed Balance (if any)
-                    if (walletProvider.hasWallet && walletProvider.balance.hasUnconfirmedBalance) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.orange.withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade200,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Confirming: ${walletProvider.balance.formattedUnconfirmed} BTCZ',
-                              style: TextStyle(
-                                color: Colors.orange.shade100,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                    // Remove the unconfirmed balance badge from here
+                    // It will be shown under each address type instead
                     
                     const SizedBox(height: 20),
                     
@@ -219,6 +184,15 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
   }
   
   Widget _buildBalanceColumn(BuildContext context, String label, String amount, IconData icon) {
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    final isTransparent = label == 'Transparent';
+    final hasUnconfirmed = isTransparent 
+        ? walletProvider.balance.hasUnconfirmedTransparentBalance
+        : walletProvider.balance.hasUnconfirmedShieldedBalance;
+    final unconfirmedAmount = isTransparent
+        ? walletProvider.balance.formattedUnconfirmedTransparent
+        : walletProvider.balance.formattedUnconfirmedShielded;
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
@@ -252,6 +226,35 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
               letterSpacing: -0.5,
             ),
           ),
+          // Show confirming amount if there are unconfirmed transactions
+          if (hasUnconfirmed) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 10,
+                  height: 10,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.orange.withOpacity(0.8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Confirming: $unconfirmedAmount',
+                  style: TextStyle(
+                    color: Colors.orange.shade200,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

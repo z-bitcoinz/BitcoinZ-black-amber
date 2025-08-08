@@ -877,6 +877,8 @@ class WalletProvider with ChangeNotifier {
         shielded: shieldedBalance / 100000000,
         total: (transparentBalance + shieldedBalance) / 100000000,
         unconfirmed: unconfirmedBalance / 100000000,
+        unconfirmedTransparent: 0, // CLI doesn't provide this breakdown
+        unconfirmedShielded: unconfirmedBalance / 100000000, // Assume shielded for CLI
       );
     } catch (e) {
       if (kDebugMode) print('❌ Error parsing CLI balance: $e');

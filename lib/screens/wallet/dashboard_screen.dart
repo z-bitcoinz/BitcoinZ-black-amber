@@ -290,6 +290,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildBalanceItem(String title, double amount, IconData icon, Color color) {
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    final isTransparent = title == 'Transparent';
+    final hasUnconfirmed = isTransparent 
+        ? walletProvider.balance.hasUnconfirmedTransparentBalance
+        : walletProvider.balance.hasUnconfirmedShieldedBalance;
+    final unconfirmedAmount = isTransparent
+        ? walletProvider.balance.unconfirmedTransparent
+        : walletProvider.balance.unconfirmedShielded;
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -316,6 +325,36 @@ class _DashboardScreenState extends State<DashboardScreen>
               fontWeight: FontWeight.w600,
             ),
           ),
+          // Show confirming indicator if there are unconfirmed transactions
+          if (hasUnconfirmed) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 10,
+                  height: 10,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    'Confirming: ${Formatters.formatBtcz(unconfirmedAmount)}',
+                    style: TextStyle(
+                      color: Colors.orange.shade700,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
