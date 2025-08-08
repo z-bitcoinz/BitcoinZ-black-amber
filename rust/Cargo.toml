@@ -1,0 +1,57 @@
+[package]
+name = "bitcoinz_wallet_rust"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "bitcoinz_wallet_rust"
+crate-type = ["staticlib", "cdylib"]
+
+[features]
+default = ["embed_params"]
+embed_params = ["zecwalletlitelib/embed_params"]
+
+[dependencies]
+flutter_rust_bridge = "=2.11.1"
+lazy_static = "1.4.0"
+anyhow = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde_json = "1.0"
+
+# BitcoinZ wallet library (copied from BitcoinZ Blue)
+zecwalletlitelib = { path = "zecwalletlitelib" }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+oslog = "0.2"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.13"
+jni = "0.21"
+
+# Platform-specific optimizations
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1
+
+# iOS specific
+[target.aarch64-apple-ios]
+rustflags = ["-C", "link-arg=-dead_strip"]
+
+# Android specific
+[target.aarch64-linux-android]
+rustflags = ["-C", "link-arg=-s"]
+
+[target.armv7-linux-androideabi]
+rustflags = ["-C", "link-arg=-s"]
+
+# Patches from BitcoinZ Blue
+[patch.crates-io]
+zcash_address = { git = "https://github.com/adityapk00/librustzcash", rev = "adf49f8b848a5ac85e1476354614eeae9880206a"}
+zcash_primitives = { git = "https://github.com/adityapk00/librustzcash", rev = "adf49f8b848a5ac85e1476354614eeae9880206a"}
+zcash_client_backend = { git = "https://github.com/adityapk00/librustzcash", rev = "adf49f8b848a5ac85e1476354614eeae9880206a"}
+zcash_note_encryption = { git = "https://github.com/adityapk00/librustzcash", rev = "adf49f8b848a5ac85e1476354614eeae9880206a"}
+zcash_encoding = { git = "https://github.com/adityapk00/librustzcash", rev = "adf49f8b848a5ac85e1476354614eeae9880206a"}
+zcash_proofs = { git = "https://github.com/adityapk00/librustzcash", rev = "adf49f8b848a5ac85e1476354614eeae9880206a"}
+orchard = { git = "https://github.com/adityapk00/orchard", rev = "0a960a380f4e9c3472c9260f3df61cd5e50d51b0" }

@@ -1,0 +1,76 @@
+name: bitcoinz_mobile_wallet
+description: "BitcoinZ Mobile Light Wallet - A secure, privacy-focused mobile wallet for BitcoinZ cryptocurrency"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # State management
+  provider: ^6.1.1
+  
+  # Secure storage
+  flutter_secure_storage: ^9.0.0
+  shared_preferences: ^2.2.2
+  
+  # Authentication
+  local_auth: ^2.1.6
+  
+  # QR Code
+  qr_flutter: ^4.1.0
+  qr_code_scanner: ^1.0.1
+  
+  # Sharing
+  share_plus: ^7.2.1
+  
+  # File system
+  path_provider: ^2.1.1
+  path: ^1.8.3
+  
+  # FFI for Rust integration
+  ffi: ^2.1.0
+  flutter_rust_bridge: 2.11.1
+  
+  # HTTP requests (for fallback API calls)
+  http: ^1.1.0
+  
+  # JSON handling
+  json_annotation: ^4.8.1
+  
+  # UI and utilities
+  cupertino_icons: ^1.0.2
+  
+  # Crypto utilities
+  crypto: ^3.0.3
+  
+  # BIP39 for seed phrase validation
+  bip39: ^1.0.6
+  
+  # Number formatting
+  intl: ^0.18.1
+  
+  # Logging
+  logger: ^2.0.2
+  
+  # Database
+  sqflite: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+  json_serializable: ^6.7.1
+  build_runner: ^2.4.7
+  args: ^2.4.2
+  
+  # Interactive CLI dependencies
+  chalkdart: ^2.0.9
+  cli_util: ^0.4.1
+  mason_logger: ^0.2.11
+
+flutter:
+  uses-material-design: true
