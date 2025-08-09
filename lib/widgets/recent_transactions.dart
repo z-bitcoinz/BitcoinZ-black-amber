@@ -215,7 +215,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                         fontWeight: FontWeight.bold,
                         color: transaction.isReceived 
                             ? Colors.green
-                            : Theme.of(context).colorScheme.onSurface,
+                            : Colors.orange,
                       ),
                     ),
                     _buildStatusWidget(transaction, context),
@@ -278,26 +278,11 @@ class _RecentTransactionsState extends State<RecentTransactions> {
         ],
       );
     } else {
-      // 1+ confirmations = Confirmed (with green dot)
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: Colors.green,
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-          SizedBox(width: 4),
-          Text(
-            'Confirmed',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.green,
-            ),
-          ),
-        ],
+      // 1+ confirmations = Confirmed (checkmark only)
+      return Icon(
+        Icons.check_circle,
+        size: 12,
+        color: Colors.green,
       );
     }
   }

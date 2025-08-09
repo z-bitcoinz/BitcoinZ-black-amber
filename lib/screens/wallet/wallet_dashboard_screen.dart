@@ -241,14 +241,14 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
+        preferredSize: const Size.fromHeight(60),
         child: ClipRRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
             child: AppBar(
               backgroundColor: const Color(0xFF1A1A1A).withOpacity(0.8),
               elevation: 0,
-              toolbarHeight: 80,
+              toolbarHeight: 60,
               automaticallyImplyLeading: false,
               flexibleSpace: Container(
                 decoration: BoxDecoration(
@@ -304,28 +304,13 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'BitcoinZ',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'WALLET',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ],
+                  const Text(
+                    'BitcoinZ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               ),
@@ -341,9 +326,21 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                     alignment: Alignment.center,
                     children: [
                       IconButton(
-                        icon: Icon(
-                          Icons.mail,
-                          color: Theme.of(context).colorScheme.primary,
+                        icon: Container(
+                          decoration: BoxDecoration(
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.mail,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                         ),
                         onPressed: _showUnreadMemos,
                       ),
@@ -448,7 +445,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
               slivers: [
                 // Spacing for extended AppBar
                 const SliverToBoxAdapter(
-                  child: SizedBox(height: 80),
+                  child: SizedBox(height: 60),
                 ),
                 // Balance Card
                 SliverToBoxAdapter(
