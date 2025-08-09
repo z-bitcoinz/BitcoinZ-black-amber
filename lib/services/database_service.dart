@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/transaction_model.dart';
 import '../models/address_model.dart';
 
@@ -16,20 +19,77 @@ class DatabaseService {
   }
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+    // Check if database exists and is open
+    if (_database != null) {
+      try {
+        // Test if database is still valid by running a simple query
+        await _database!.rawQuery('SELECT 1');
+        return _database!;
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Database is closed or invalid, resetting...');
+        await _resetDatabase();
+      }
+    }
+    
+    // Initialize or reinitialize database
+    try {
+      _database = await _initDatabase();
+      return _database!;
+    } catch (e) {
+      if (kDebugMode) print('❌ Database initialization failed: $e');
+      
+      // On authorization errors, reset and retry with fresh state
+      if (e.toString().contains('authorization denied') || 
+          e.toString().contains('authorization') ||
+          e.toString().contains('sqlite3_step')) {
+        if (kDebugMode) print('🔄 Authorization error detected, attempting recovery...');
+        await _resetDatabase();
+        
+        // Delete the database file and try again
+        await _deleteDatabaseFile();
+        
+        // Try one more time with completely fresh state
+        try {
+          _database = await _initDatabase();
+          return _database!;
+        } catch (retryError) {
+          if (kDebugMode) print('❌ Database recovery failed: $retryError');
+          // If still failing, throw a more descriptive error
+          throw Exception('Database initialization failed. Please restart the app.');
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<Database> _initDatabase() async {
-    final databasesPath = await getDatabasesPath();
-    final path = join(databasesPath, 'bitcoinz_wallet.db');
+    String path;
+    
+    // Use application support directory for better permissions
+    if (defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux) {
+      // Desktop platforms: use application support directory
+      final Directory appSupportDir = await getApplicationSupportDirectory();
+      // Create database subdirectory if needed
+      final dbDir = Directory(join(appSupportDir.path, 'database'));
+      if (!await dbDir.exists()) {
+        await dbDir.create(recursive: true);
+      }
+      path = join(dbDir.path, 'bitcoinz_wallet.db');
+      if (kDebugMode) print('📁 Database path: $path');
+    } else {
+      // Mobile platforms: use default database path
+      final databasesPath = await getDatabasesPath();
+      path = join(databasesPath, 'bitcoinz_wallet.db');
+    }
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
+      singleInstance: true,
     );
   }
 
@@ -47,6 +107,7 @@ class DatabaseService {
         from_address TEXT,
         to_address TEXT,
         memo TEXT,
+        memo_read INTEGER NOT NULL DEFAULT 0,
         block_height INTEGER,
         is_sent INTEGER NOT NULL DEFAULT 0,
         is_received INTEGER NOT NULL DEFAULT 0,
@@ -81,8 +142,9 @@ class DatabaseService {
 
   Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
     // Handle database schema upgrades here
-    if (oldVersion < newVersion) {
-      // Add future schema changes here
+    if (oldVersion < 2) {
+      // Add memo_read column to existing transactions table
+      await db.execute('ALTER TABLE transactions ADD COLUMN memo_read INTEGER NOT NULL DEFAULT 0');
     }
   }
 
@@ -97,18 +159,49 @@ class DatabaseService {
   }
 
   Future<void> insertTransactions(List<TransactionModel> transactions) async {
-    final db = await database;
-    final batch = db.batch();
-    
-    for (final transaction in transactions) {
-      batch.insert(
-        'transactions',
-        _transactionToMap(transaction),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+    try {
+      final db = await database;
+      
+      // Use individual inserts instead of batch to avoid transaction issues
+      for (final transaction in transactions) {
+        try {
+          await db.insert(
+            'transactions',
+            _transactionToMap(transaction),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        } catch (e) {
+          // Continue with other transactions if one fails
+          if (kDebugMode) print('Warning: Failed to insert transaction ${transaction.txid}: $e');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('Warning: Failed to insert transactions: $e');
+      
+      // If authorization error, try to reset and retry once
+      if (e.toString().contains('authorization') && !e.toString().contains('retry')) {
+        try {
+          if (kDebugMode) print('🔄 Retrying after database reset...');
+          await forceReset();
+          final db = await database;
+          
+          for (final transaction in transactions) {
+            try {
+              await db.insert(
+                'transactions',
+                _transactionToMap(transaction),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+            } catch (insertError) {
+              if (kDebugMode) print('Warning: Failed to insert transaction ${transaction.txid}: $insertError');
+            }
+          }
+          if (kDebugMode) print('✅ Retry successful!');
+        } catch (retryError) {
+          if (kDebugMode) print('⚠️ Retry failed: $retryError');
+        }
+      }
     }
-    
-    await batch.commit(noResult: true);
   }
 
   Future<List<TransactionModel>> getTransactions({
@@ -241,6 +334,113 @@ class DatabaseService {
     );
   }
 
+  Future<void> markTransactionMemoAsRead(String txid) async {
+    try {
+      final db = await database;
+      await db.update(
+        'transactions',
+        {'memo_read': 1, 'updated_at': DateTime.now().millisecondsSinceEpoch},
+        where: 'txid = ?',
+        whereArgs: [txid],
+      );
+    } catch (e) {
+      if (kDebugMode) print('Warning: Failed to mark memo as read: $e');
+      
+      // If authorization error, try to reset and retry once
+      if (e.toString().contains('authorization') && !e.toString().contains('retry')) {
+        try {
+          if (kDebugMode) print('🔄 Retrying after database reset...');
+          await forceReset();
+          final db = await database;
+          await db.update(
+            'transactions',
+            {'memo_read': 1, 'updated_at': DateTime.now().millisecondsSinceEpoch},
+            where: 'txid = ?',
+            whereArgs: [txid],
+          );
+          if (kDebugMode) print('✅ Retry successful!');
+          return;
+        } catch (retryError) {
+          if (kDebugMode) print('⚠️ Retry failed: $retryError');
+        }
+      }
+      // Continue silently - memo status will be stored in memory/SharedPreferences
+    }
+  }
+
+  Future<int> getUnreadMemoCount() async {
+    try {
+      final db = await database;
+      final result = await db.rawQuery('''
+        SELECT COUNT(*) as count FROM transactions 
+        WHERE memo IS NOT NULL AND memo != '' AND memo_read = 0
+      ''');
+      
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      if (kDebugMode) print('Warning: Failed to get unread memo count: $e');
+      
+      // If authorization error, try to reset and retry once
+      if (e.toString().contains('authorization') && !e.toString().contains('retry')) {
+        try {
+          if (kDebugMode) print('🔄 Retrying after database reset...');
+          await forceReset();
+          final db = await database;
+          final result = await db.rawQuery('''
+            SELECT COUNT(*) as count FROM transactions 
+            WHERE memo IS NOT NULL AND memo != '' AND memo_read = 0
+          ''');
+          if (kDebugMode) print('✅ Retry successful!');
+          return Sqflite.firstIntValue(result) ?? 0;
+        } catch (retryError) {
+          if (kDebugMode) print('⚠️ Retry failed: $retryError');
+        }
+      }
+      return 0;
+    }
+  }
+  
+  Future<Map<String, bool>> getMemoReadStatus() async {
+    try {
+      final db = await database;
+      final results = await db.rawQuery('''
+        SELECT txid, memo_read FROM transactions 
+        WHERE memo IS NOT NULL AND memo != ''
+      ''');
+      
+      final Map<String, bool> readStatus = {};
+      for (final row in results) {
+        readStatus[row['txid'] as String] = (row['memo_read'] as int) == 1;
+      }
+      return readStatus;
+    } catch (e) {
+      if (kDebugMode) print('Warning: Failed to get memo read status: $e');
+      
+      // If authorization error, try to reset and retry once
+      if (e.toString().contains('authorization') && !e.toString().contains('retry')) {
+        try {
+          if (kDebugMode) print('🔄 Retrying after database reset...');
+          await forceReset();
+          final db = await database;
+          final results = await db.rawQuery('''
+            SELECT txid, memo_read FROM transactions 
+            WHERE memo IS NOT NULL AND memo != ''
+          ''');
+          
+          final Map<String, bool> readStatus = {};
+          for (final row in results) {
+            readStatus[row['txid'] as String] = (row['memo_read'] as int) == 1;
+          }
+          if (kDebugMode) print('✅ Retry successful!');
+          return readStatus;
+        } catch (retryError) {
+          if (kDebugMode) print('⚠️ Retry failed: $retryError');
+        }
+      }
+      return {};
+    }
+  }
+
   // Address CRUD operations
   Future<void> insertAddress(AddressModel address) async {
     final db = await database;
@@ -318,8 +518,101 @@ class DatabaseService {
   }
 
   Future<void> close() async {
-    final db = await database;
-    await db.close();
+    if (_database != null) {
+      try {
+        await _database!.close();
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Error closing database: $e');
+      } finally {
+        _database = null; // Always clear the reference
+      }
+    }
+  }
+  
+  /// Reset the database singleton
+  static Future<void> _resetDatabase() async {
+    if (_database != null) {
+      try {
+        if (kDebugMode) print('🔄 Resetting database singleton...');
+        await _database!.close();
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Error closing database during reset: $e');
+      } finally {
+        _database = null;
+      }
+    }
+  }
+  
+  /// Delete the database file (for recovery from corruption)
+  static Future<void> _deleteDatabaseFile() async {
+    try {
+      // First try to delete old wrongly-placed database on macOS
+      if (defaultTargetPlatform == TargetPlatform.macOS) {
+        try {
+          // Clean up old database in Documents directory
+          final Directory oldDocDir = await getApplicationDocumentsDirectory();
+          final oldPath = join(oldDocDir.path, 'bitcoinz_wallet.db');
+          final oldDbFile = File(oldPath);
+          if (await oldDbFile.exists()) {
+            if (kDebugMode) print('🗑️ Deleting old database at wrong location: $oldPath');
+            await oldDbFile.delete();
+          }
+          // Clean up journal files
+          for (final suffix in ['-journal', '-wal', '-shm']) {
+            try {
+              final file = File('$oldPath$suffix');
+              if (await file.exists()) await file.delete();
+            } catch (_) {}
+          }
+        } catch (e) {
+          if (kDebugMode) print('⚠️ Could not delete old database: $e');
+        }
+      }
+      
+      // Now delete the correct database location
+      String path;
+      
+      if (defaultTargetPlatform == TargetPlatform.macOS ||
+          defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux) {
+        final Directory appSupportDir = await getApplicationSupportDirectory();
+        final dbDir = Directory(join(appSupportDir.path, 'database'));
+        path = join(dbDir.path, 'bitcoinz_wallet.db');
+      } else {
+        final databasesPath = await getDatabasesPath();
+        path = join(databasesPath, 'bitcoinz_wallet.db');
+      }
+      
+      final dbFile = File(path);
+      if (await dbFile.exists()) {
+        if (kDebugMode) print('🗑️ Deleting corrupted database file: $path');
+        await dbFile.delete();
+        
+        // Also delete journal and wal files if they exist
+        final journalFile = File('$path-journal');
+        if (await journalFile.exists()) {
+          await journalFile.delete();
+        }
+        
+        final walFile = File('$path-wal');
+        if (await walFile.exists()) {
+          await walFile.delete();
+        }
+        
+        final shmFile = File('$path-shm');
+        if (await shmFile.exists()) {
+          await shmFile.delete();
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Error deleting database file: $e');
+    }
+  }
+  
+  /// Force reset database (can be called externally if needed)
+  static Future<void> forceReset() async {
+    await _resetDatabase();
+    await _deleteDatabaseFile();
   }
 
   // Conversion methods
@@ -335,6 +628,7 @@ class DatabaseService {
       'from_address': transaction.fromAddress,
       'to_address': transaction.toAddress,
       'memo': transaction.memo,
+      'memo_read': transaction.memoRead ? 1 : 0,
       'block_height': transaction.blockHeight,
       'is_sent': transaction.isSent ? 1 : 0,
       'is_received': transaction.isReceived ? 1 : 0,
@@ -355,6 +649,7 @@ class DatabaseService {
       fromAddress: map['from_address'] as String?,
       toAddress: map['to_address'] as String?,
       memo: map['memo'] as String?,
+      memoRead: (map['memo_read'] as int? ?? 0) == 1,
       blockHeight: map['block_height'] as int?,
     );
   }

@@ -92,6 +92,9 @@ class _MainScreenState extends State<MainScreen>
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
+      // Set the notification context for showing memo notifications
+      walletProvider.setNotificationContext(context);
+      
       // Try to restore wallet from stored data first
       bool restored = false;
       if (authProvider.hasWallet && authProvider.isAuthenticated) {

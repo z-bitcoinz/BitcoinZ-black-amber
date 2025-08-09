@@ -126,24 +126,65 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                   vertical: 8,
                 ),
                 onTap: () => _showTransactionDetails(transaction),
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: transaction.isReceived 
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(
-                    transaction.isReceived 
-                        ? Icons.arrow_downward
-                        : Icons.arrow_upward,
-                    color: transaction.isReceived 
-                        ? Colors.green
-                        : Colors.orange,
-                    size: 20,
-                  ),
+                leading: Stack(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: transaction.isReceived 
+                            ? Colors.green.withOpacity(0.1)
+                            : Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(
+                        transaction.isReceived 
+                            ? Icons.arrow_downward
+                            : Icons.arrow_upward,
+                        color: transaction.isReceived 
+                            ? Colors.green
+                            : Colors.orange,
+                        size: 20,
+                      ),
+                    ),
+                    // Memo indicator
+                    if (transaction.hasMemo)
+                      Consumer<WalletProvider>(
+                        builder: (context, walletProvider, _) {
+                          // Get the actual memo read status from cache
+                          final isRead = walletProvider.getTransactionMemoReadStatus(
+                            transaction.txid, 
+                            transaction.memoRead
+                          );
+                          
+                          return Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: isRead
+                                    ? Theme.of(context).colorScheme.surfaceVariant
+                                    : Theme.of(context).colorScheme.primary,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.message,
+                                size: 10,
+                                color: isRead
+                                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                                    : Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
                 title: Text(
                   transaction.isReceived ? 'Received' : 'Sent',
@@ -254,7 +295,20 @@ class _RecentTransactionsState extends State<RecentTransactions> {
     }
   }
 
-  void _showTransactionDetails(transaction) {
+  void _showTransactionDetails(transaction) async {
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    
+    // Mark memo as read if it has one and is unread (check cached status)
+    if (transaction.hasMemo) {
+      final isRead = walletProvider.getTransactionMemoReadStatus(
+        transaction.txid, 
+        transaction.memoRead
+      );
+      if (!isRead) {
+        await walletProvider.markMemoAsRead(transaction.txid);
+      }
+    }
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -307,23 +361,79 @@ class _RecentTransactionsState extends State<RecentTransactions> {
             child: ListView(
               controller: scrollController,
               children: [
-                _buildDetailRow('Transaction ID', transaction.txid, copyable: true),
+                // Basic info first
                 _buildDetailRow('Amount', '${transaction.amount.toStringAsFixed(8)} BTCZ'),
                 _buildDetailRow('Type', transaction.isReceived ? 'Received' : 'Sent'),
-                _buildDetailRow('Date', DateFormat('EEEE, MMMM dd, yyyy at HH:mm:ss').format(transaction.timestamp)),
+                
+                // Memo prominently displayed if exists
+                if (transaction.memo?.isNotEmpty == true)
+                  _buildMemoCard(transaction.memo!),
+                
+                // Status and confirmations
                 _buildDetailRow('Status', transaction.confirmations == 0 ? 'Unconfirmed' : (transaction.confirmations < 6 ? 'Confirming' : 'Confirmed')),
                 _buildConfirmationRow(transaction),
-                if (transaction.fee != null)
-                  _buildDetailRow('Fee', '${transaction.fee!.toStringAsFixed(8)} BTCZ'),
+                
+                // Date and time
+                _buildDetailRow('Date', DateFormat('EEEE, MMMM dd, yyyy at HH:mm:ss').format(transaction.timestamp)),
+                
+                // Addresses
                 if (transaction.fromAddress != null)
                   _buildDetailRow('From', transaction.fromAddress!, copyable: true),
                 if (transaction.toAddress != null)
                   _buildDetailRow('To', transaction.toAddress!, copyable: true),
-                if (transaction.memo?.isNotEmpty == true)
-                  _buildDetailRow('Memo', transaction.memo!),
+                
+                // Additional details
+                if (transaction.fee != null)
+                  _buildDetailRow('Fee', '${transaction.fee!.toStringAsFixed(8)} BTCZ'),
                 if (transaction.blockHeight != null)
                   _buildDetailRow('Block Height', transaction.blockHeight.toString()),
+                  
+                // Transaction ID at the bottom for reference
+                _buildDetailRow('Transaction ID', transaction.txid, copyable: true),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMemoCard(String memo) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.message,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Memo',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            memo,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              height: 1.5,
             ),
           ),
         ],

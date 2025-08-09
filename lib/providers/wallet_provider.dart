@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
 import '../models/wallet_model.dart';
@@ -9,6 +11,7 @@ import '../services/bitcoinz_service.dart';
 import '../services/database_service.dart';
 import '../services/bitcoinz_rust_service.dart';
 import '../providers/auth_provider.dart';
+import '../screens/wallet/paginated_transaction_history_screen.dart';
 
 class WalletProvider with ChangeNotifier {
   WalletModel? _wallet;
@@ -39,11 +42,21 @@ class WalletProvider with ChangeNotifier {
   DateTime? _blockHeightCacheTime;
   static const Duration _blockHeightCacheDuration = Duration(seconds: 30);
   
+  // Memo notification state
+  int _unreadMemoCount = 0;
+  BuildContext? _notificationContext;
+  Map<String, bool> _memoReadStatusCache = {}; // In-memory cache for memo read status
+  SharedPreferences? _prefs; // For fallback storage when database fails
+  bool _prefsInitialized = false; // Track if SharedPreferences is ready
+  
   final DatabaseService _databaseService = DatabaseService.instance;
   late final BitcoinzRustService _rustService; // Native Rust service with mempool monitoring
   
   // Constructor
   WalletProvider() {
+    // Initialize SharedPreferences early
+    _initializePreferences();
+    
     // Initialize Native Rust service with mempool monitoring
     _rustService = BitcoinzRustService.instance;
     _rustService.fnSetTotalBalance = (balance) {
@@ -51,10 +64,52 @@ class WalletProvider with ChangeNotifier {
       _balance = balance;
       notifyListeners();
     };
-    _rustService.fnSetTransactionsList = (transactions) {
+    _rustService.fnSetTransactionsList = (transactions) async {
       final unconfirmedCount = transactions.where((tx) => tx.confirmations == 0).length;
       if (kDebugMode) print('🦀 Rust Bridge updated transactions: ${transactions.length} txs ($unconfirmedCount unconfirmed)');
-      _transactions = transactions;
+      
+      // Preserve memo read status from existing transactions and cache
+      final Map<String, bool> memoReadStatus = {};
+      for (final existingTx in _transactions) {
+        if (existingTx.hasMemo) {
+          memoReadStatus[existingTx.txid] = existingTx.memoRead;
+        }
+      }
+      
+      // Merge with in-memory cache and SharedPreferences
+      for (final tx in transactions) {
+        if (tx.hasMemo && !memoReadStatus.containsKey(tx.txid)) {
+          // Check cache and SharedPreferences for memo read status
+          memoReadStatus[tx.txid] = getMemoReadStatus(tx.txid);
+        }
+      }
+      
+      // Check for new transactions with memos
+      final Set<String> existingTxIds = _transactions.map((tx) => tx.txid).toSet();
+      final List<TransactionModel> newMemoTransactions = [];
+      
+      // Update transactions with preserved read status
+      final updatedTransactions = transactions.map((tx) {
+        // Use memo read status from our merged sources
+        if (tx.hasMemo && memoReadStatus.containsKey(tx.txid)) {
+          tx = tx.copyWith(memoRead: memoReadStatus[tx.txid]);
+        } else if (tx.hasMemo && !existingTxIds.contains(tx.txid)) {
+          // This is a new transaction with a memo
+          newMemoTransactions.add(tx);
+        }
+        return tx;
+      }).toList();
+      
+      _transactions = updatedTransactions;
+      
+      // Show notification for new memo transactions
+      if (newMemoTransactions.isNotEmpty) {
+        _notifyNewMemoTransactions(newMemoTransactions);
+      }
+      
+      // Update unread memo count when transactions are updated
+      await updateUnreadMemoCount();
+      
       notifyListeners();
     };
     _rustService.fnSetAllAddresses = (addresses) {
@@ -98,6 +153,9 @@ class WalletProvider with ChangeNotifier {
   // Mobile-optimized getters
   bool get isWalletInitialized => hasWallet;
   int get totalAddresses => _addresses['transparent']!.length + _addresses['shielded']!.length;
+  
+  // Memo notification getters
+  int get unreadMemoCount => _unreadMemoCount;
   bool get needsSync => _lastSyncTime == null || DateTime.now().difference(_lastSyncTime!).inMinutes > 5;
 
   /// Initialize or create wallet (mobile-first)
@@ -201,6 +259,9 @@ class WalletProvider with ChangeNotifier {
   Future<void> loadCliWallet(AuthProvider authProvider) async {
     if (!authProvider.hasWallet || !authProvider.cliWalletImported) return;
     
+    // Ensure SharedPreferences is loaded before wallet operations
+    await ensurePreferencesInitialized();
+    
     _setLoading(true);
     _clearError();
 
@@ -250,6 +311,9 @@ class WalletProvider with ChangeNotifier {
   /// Restore wallet from stored data
   Future<bool> restoreFromStoredData(AuthProvider authProvider) async {
     if (!authProvider.hasWallet || !authProvider.isAuthenticated) return false;
+    
+    // Ensure SharedPreferences is loaded before wallet operations
+    await ensurePreferencesInitialized();
     
     // If this is a CLI wallet, use CLI loading instead
     if (authProvider.cliWalletImported) {
@@ -1452,6 +1516,165 @@ class WalletProvider with ChangeNotifier {
     }
   }
 
+  /// Mark a transaction memo as read
+  Future<void> markMemoAsRead(String txid) async {
+    try {
+      // Update in-memory cache first
+      _memoReadStatusCache[txid] = true;
+      
+      // Always save to SharedPreferences for persistence
+      await _saveMemoStatusToPrefs(txid, true);
+      
+      // Also try to update in database (but don't fail if it doesn't work)
+      try {
+        await _databaseService.markTransactionMemoAsRead(txid);
+      } catch (dbError) {
+        if (kDebugMode) print('⚠️ Database update failed (using SharedPreferences): $dbError');
+      }
+      
+      // Update in memory
+      final index = _transactions.indexWhere((tx) => tx.txid == txid);
+      if (index != -1) {
+        _transactions[index] = _transactions[index].copyWith(memoRead: true);
+      }
+      
+      // Update unread count
+      await updateUnreadMemoCount();
+      
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) print('❌ Error marking memo as read: $e');
+    }
+  }
+  
+  /// Update the count of unread memos
+  Future<void> updateUnreadMemoCount() async {
+    // Always use the same method as the transaction list for consistency
+    // Don't use database since we're storing memo status in SharedPreferences
+    _unreadMemoCount = _transactions.where((tx) {
+      if (!tx.hasMemo) return false;
+      // Use the exact same helper method as transaction list uses
+      final isRead = getTransactionMemoReadStatus(tx.txid, tx.memoRead);
+      return !isRead;
+    }).length;
+    
+    if (kDebugMode) print('📊 Unread memo count: $_unreadMemoCount (from ${_transactions.where((tx) => tx.hasMemo).length} total memos)');
+    notifyListeners();
+  }
+  
+  /// Get transactions with unread memos
+  List<TransactionModel> getUnreadMemoTransactions() {
+    return _transactions.where((tx) {
+      if (!tx.hasMemo) return false;
+      // Use the same helper method for consistency
+      final isRead = getTransactionMemoReadStatus(tx.txid, tx.memoRead);
+      return !isRead;
+    }).toList();
+  }
+  
+  /// Set the context for showing notifications
+  void setNotificationContext(BuildContext context) {
+    _notificationContext = context;
+  }
+  
+  /// Show notification for new memo transactions
+  void _notifyNewMemoTransactions(List<TransactionModel> newMemoTransactions) {
+    if (_notificationContext == null || !_notificationContext!.mounted) return;
+    
+    for (final tx in newMemoTransactions) {
+      final String amount = tx.isReceived 
+          ? '+${tx.amount.toStringAsFixed(8)} BTCZ'
+          : '-${tx.amount.toStringAsFixed(8)} BTCZ';
+      
+      final String memoSnippet = tx.memo != null && tx.memo!.length > 30
+          ? '${tx.memo!.substring(0, 30)}...'
+          : tx.memo ?? '';
+      
+      // Show snackbar notification
+      ScaffoldMessenger.of(_notificationContext!).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.message,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'New message received!',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$amount${memoSnippet.isNotEmpty ? ' • $memoSnippet' : ''}',
+                      style: const TextStyle(fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Theme.of(_notificationContext!).colorScheme.primary,
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          action: SnackBarAction(
+            label: 'VIEW',
+            textColor: Colors.white,
+            onPressed: () {
+              // Navigate to transaction details
+              _showTransactionDetails(tx);
+            },
+          ),
+        ),
+      );
+      
+      // Log for debugging
+      if (kDebugMode) {
+        print('📬 NEW MEMO TRANSACTION: ${tx.txid.substring(0, 8)}... - $amount');
+        print('   Memo: $memoSnippet');
+      }
+    }
+  }
+  
+  /// Show transaction details (for notification tap)
+  void _showTransactionDetails(TransactionModel transaction) {
+    if (_notificationContext == null || !_notificationContext!.mounted) return;
+    
+    // Mark as read
+    markMemoAsRead(transaction.txid);
+    
+    // Navigate to transaction history with this transaction highlighted
+    Navigator.of(_notificationContext!).push(
+      MaterialPageRoute(
+        builder: (context) => const PaginatedTransactionHistoryScreen(),
+        settings: RouteSettings(
+          arguments: {'highlightTxid': transaction.txid},
+        ),
+      ),
+    );
+  }
+  
   /// Clear all wallet data (for logout)
   void clearWallet() {
     stopAutoSync();
@@ -1522,5 +1745,119 @@ class WalletProvider with ChangeNotifier {
       'pending': pending,
       'recent': recentTransactions,
     };
+  }
+  
+  
+  /// Initialize SharedPreferences and load memo status
+  Future<void> _initializePreferences() async {
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      _prefsInitialized = true;
+      await _loadMemoStatusFromPrefs();
+      if (kDebugMode) print('📱 SharedPreferences initialized with ${_memoReadStatusCache.length} memo statuses');
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to initialize SharedPreferences: $e');
+    }
+  }
+  
+  /// Ensure SharedPreferences is initialized (call before wallet operations)
+  Future<void> ensurePreferencesInitialized() async {
+    if (!_prefsInitialized) {
+      await _initializePreferences();
+    }
+  }
+  
+  /// Load memo read status from SharedPreferences
+  Future<void> _loadMemoStatusFromPrefs() async {
+    if (_prefs == null) return;
+    
+    try {
+      final keys = _prefs!.getKeys();
+      for (final key in keys) {
+        if (key.startsWith('memo_read_')) {
+          final txid = key.substring('memo_read_'.length);
+          final isRead = _prefs!.getBool(key) ?? false;
+          _memoReadStatusCache[txid] = isRead;
+        }
+      }
+      
+      if (kDebugMode && _memoReadStatusCache.isNotEmpty) {
+        print('📱 Loaded ${_memoReadStatusCache.length} memo read statuses from SharedPreferences');
+      }
+      
+      // Recalculate unread count after loading cache
+      await updateUnreadMemoCount();
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Error loading memo status from SharedPreferences: $e');
+    }
+  }
+  
+  /// Save memo read status to SharedPreferences
+  Future<void> _saveMemoStatusToPrefs(String txid, bool isRead) async {
+    // Wait for SharedPreferences if not ready yet
+    if (_prefs == null && !_prefsInitialized) {
+      try {
+        _prefs = await SharedPreferences.getInstance();
+        _prefsInitialized = true;
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Error initializing SharedPreferences: $e');
+        return;
+      }
+    }
+    
+    if (_prefs == null) return;
+    
+    try {
+      await _prefs!.setBool('memo_read_$txid', isRead);
+      if (kDebugMode) {
+        print('💾 Saved memo read status to SharedPreferences: $txid = $isRead');
+      }
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Error saving memo status to SharedPreferences: $e');
+    }
+  }
+  
+  /// Get memo read status with fallback
+  bool getMemoReadStatus(String txid) {
+    // Check cache first (most reliable)
+    if (_memoReadStatusCache.containsKey(txid)) {
+      return _memoReadStatusCache[txid]!;
+    }
+    
+    // Check SharedPreferences next
+    if (_prefs != null) {
+      final key = 'memo_read_$txid';
+      if (_prefs!.containsKey(key)) {
+        final isRead = _prefs!.getBool(key) ?? false;
+        _memoReadStatusCache[txid] = isRead;
+        return isRead;
+      }
+    }
+    
+    // Default to unread for new memos
+    return false;
+  }
+  
+  /// Get transaction memo read status for UI display
+  /// This ensures consistency between notification count and transaction list
+  bool getTransactionMemoReadStatus(String txid, bool defaultValue) {
+    // Always check cache first for most up-to-date status
+    if (_memoReadStatusCache.containsKey(txid)) {
+      return _memoReadStatusCache[txid]!;
+    }
+    
+    // Check SharedPreferences if cache doesn't have it
+    if (_prefs != null) {
+      final key = 'memo_read_$txid';
+      if (_prefs!.containsKey(key)) {
+        final isRead = _prefs!.getBool(key) ?? defaultValue;
+        // Update cache for next time
+        _memoReadStatusCache[txid] = isRead;
+        return isRead;
+      }
+    }
+    
+    // Fall back to the transaction's own memoRead property
+    return defaultValue;
   }
 }

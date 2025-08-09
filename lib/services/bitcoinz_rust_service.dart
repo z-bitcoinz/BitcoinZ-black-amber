@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/balance_model.dart';
 import '../models/transaction_model.dart';
+import '../services/database_service.dart';
 import '../src/rust/api.dart' as rust_api;
 import '../src/rust/frb_generated.dart';
 
@@ -379,6 +380,9 @@ class BitcoinzRustService {
       // Get current block height for confirmation calculation
       final currentHeight = await getCurrentBlockHeight();
       
+      // Load memo read status from database
+      final memoReadStatus = await DatabaseService.instance.getMemoReadStatus();
+      
       final transactions = <TransactionModel>[];
       
       int index = 0;
@@ -435,8 +439,14 @@ class BitcoinzRustService {
           }
         }
         
+        final txid = tx['txid'] ?? '';
+        final hasMemo = tx['memo'] != null && tx['memo'].toString().isNotEmpty;
+        
+        // Get memo read status from database, default to false for new transactions
+        final isRead = hasMemo ? (memoReadStatus[txid] ?? false) : false;
+        
         final transaction = TransactionModel(
-          txid: tx['txid'] ?? '',
+          txid: txid,
           type: type,
           amount: amount,
           blockHeight: blockHeight,
@@ -446,6 +456,7 @@ class BitcoinzRustService {
           confirmations: confirmations,
           memo: tx['memo'],
           fee: type == 'sent' ? 0.0001 : 0.0,
+          memoRead: isRead,
         );
         
         transactions.add(transaction);
@@ -453,6 +464,9 @@ class BitcoinzRustService {
       
       // Sort by timestamp (newest first)
       transactions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      
+      // Store transactions in database to persist memo read status
+      await DatabaseService.instance.insertTransactions(transactions);
       
       fnSetTransactionsList?.call(transactions);
     } catch (e) {

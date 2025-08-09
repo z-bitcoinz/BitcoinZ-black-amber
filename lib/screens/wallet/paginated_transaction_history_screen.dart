@@ -29,6 +29,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
   TransactionFilter _currentFilter = TransactionFilter.all;
   bool _isRefreshing = false;
   Map<String, int> _transactionStats = {};
+  bool _filterUnreadMemos = false; // Filter for unread memos from notification
   
   // Block height caching
   int? _cachedBlockHeight;
@@ -58,8 +59,14 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
     // Setup scroll listener for pagination
     _scrollController.addListener(_onScroll);
     
-    // Load initial data
+    // Check if we should filter for unread memos (from notification icon)
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['filterUnreadMemos'] == true) {
+        setState(() {
+          _filterUnreadMemos = true;
+        });
+      }
       _loadInitialData();
     });
   }
@@ -194,11 +201,20 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Transaction History'),
+        title: Text(_filterUnreadMemos ? 'Unread Messages' : 'Transaction History'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: _filterUnreadMemos, // Show back button when filtering
         actions: [
+          if (_filterUnreadMemos)
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _filterUnreadMemos = false;
+                });
+              },
+              child: const Text('Show All'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _refreshTransactions,
@@ -251,33 +267,34 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                         
                         SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 12 : 16),
                         
-                        // Filter Chips
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: TransactionFilter.values.map((filter) {
-                              final isSelected = _currentFilter == filter;
-                              final count = _getFilterCount(filter);
-                              
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: FilterChip(
-                                  label: Text('${_getFilterLabel(filter)} ($count)'),
-                                  selected: isSelected,
-                                  onSelected: (_) => _onFilterChanged(filter),
-                                  selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                                  checkmarkColor: Theme.of(context).colorScheme.primary,
-                                  labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: isSelected 
-                                        ? Theme.of(context).colorScheme.primary 
-                                        : Theme.of(context).colorScheme.onSurface,
-                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        // Filter Chips (hide when filtering unread memos)
+                        if (!_filterUnreadMemos)
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: TransactionFilter.values.map((filter) {
+                                final isSelected = _currentFilter == filter;
+                                final count = _getFilterCount(filter);
+                                
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: FilterChip(
+                                    label: Text('${_getFilterLabel(filter)} ($count)'),
+                                    selected: isSelected,
+                                    onSelected: (_) => _onFilterChanged(filter),
+                                    selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                                    checkmarkColor: Theme.of(context).colorScheme.primary,
+                                    labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                      color: isSelected 
+                                          ? Theme.of(context).colorScheme.primary 
+                                          : Theme.of(context).colorScheme.onSurface,
+                                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                    ),
                                   ),
-                                ),
-                              );
-                            }).toList(),
+                                );
+                              }).toList(),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -301,6 +318,19 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
     // Filter transactions locally (BitcoinZ Blue approach)
     List<TransactionModel> filteredTransactions = walletProvider.transactions;
     
+    // Apply unread memo filter if coming from notification icon
+    if (_filterUnreadMemos) {
+      filteredTransactions = filteredTransactions.where((tx) {
+        if (!tx.hasMemo) return false;
+        // Use cached memo status to check if unread
+        final isRead = walletProvider.getTransactionMemoReadStatus(
+          tx.txid, 
+          tx.memoRead
+        );
+        return !isRead; // Only show unread memos
+      }).toList();
+    }
+    
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
       filteredTransactions = filteredTransactions.where((tx) {
@@ -311,8 +341,8 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
       }).toList();
     }
     
-    // Apply type filter
-    if (_currentFilter != TransactionFilter.all) {
+    // Apply type filter (only if not filtering unread memos)
+    if (!_filterUnreadMemos && _currentFilter != TransactionFilter.all) {
       filteredTransactions = filteredTransactions.where((tx) {
         switch (_currentFilter) {
           case TransactionFilter.sent:
@@ -427,19 +457,60 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
             padding: EdgeInsets.all(ResponsiveUtils.getHorizontalPadding(context)),
             child: Row(
               children: [
-                // Transaction Icon
-                Container(
-                  width: ResponsiveUtils.getIconSize(context, base: 40),
-                  height: ResponsiveUtils.getIconSize(context, base: 40),
-                  decoration: BoxDecoration(
-                    color: _getTransactionColor(transaction).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context) * 0.5),
-                  ),
-                  child: Icon(
-                    _getTransactionIcon(transaction),
-                    color: _getTransactionColor(transaction),
-                    size: ResponsiveUtils.getIconSize(context, base: 20),
-                  ),
+                // Transaction Icon with memo indicator
+                Stack(
+                  children: [
+                    Container(
+                      width: ResponsiveUtils.getIconSize(context, base: 40),
+                      height: ResponsiveUtils.getIconSize(context, base: 40),
+                      decoration: BoxDecoration(
+                        color: _getTransactionColor(transaction).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context) * 0.5),
+                      ),
+                      child: Icon(
+                        _getTransactionIcon(transaction),
+                        color: _getTransactionColor(transaction),
+                        size: ResponsiveUtils.getIconSize(context, base: 20),
+                      ),
+                    ),
+                    // Memo indicator
+                    if (transaction.hasMemo)
+                      Consumer<WalletProvider>(
+                        builder: (context, walletProvider, _) {
+                          // Get the actual memo read status from cache (same as transaction list)
+                          final isRead = walletProvider.getTransactionMemoReadStatus(
+                            transaction.txid, 
+                            transaction.memoRead
+                          );
+                          
+                          return Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: isRead
+                                    ? Theme.of(context).colorScheme.surfaceVariant
+                                    : Theme.of(context).colorScheme.primary,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.message,
+                                size: 10,
+                                color: isRead
+                                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                                    : Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
                 
                 SizedBox(width: ResponsiveUtils.isSmallMobile(context) ? 12 : 16),
@@ -549,7 +620,20 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
     );
   }
 
-  void _showTransactionDetails(TransactionModel transaction) {
+  void _showTransactionDetails(TransactionModel transaction) async {
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    
+    // Mark memo as read if it has one and is unread (check cached status)
+    if (transaction.hasMemo) {
+      final isRead = walletProvider.getTransactionMemoReadStatus(
+        transaction.txid, 
+        transaction.memoRead
+      );
+      if (!isRead) {
+        await walletProvider.markMemoAsRead(transaction.txid);
+      }
+    }
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -602,24 +686,80 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
             child: ListView(
               controller: scrollController,
               children: [
-                _buildDetailRow('Transaction ID', transaction.txid, copyable: true),
+                // Basic info first
                 _buildDetailRow('Amount', '${transaction.amount.toStringAsFixed(8)} BTCZ'),
                 _buildDetailRow('Type', _getTransactionTitle(transaction)),
-                _buildDetailRow('Date', DateFormat('EEEE, MMMM dd, yyyy at HH:mm:ss').format(transaction.timestamp)),
+                
+                // Memo prominently displayed if exists (same as main page)
+                if (transaction.memo?.isNotEmpty == true)
+                  _buildMemoCard(transaction.memo!),
+                
+                // Status and confirmations
                 _buildDetailRow('Status', transaction.isPending ? 'Confirming' : 'Confirmed'),
                 if (!transaction.isPending)
                   _buildConfirmationRow(transaction),
-                if (transaction.fee != null)
-                  _buildDetailRow('Fee', '${transaction.fee!.toStringAsFixed(8)} BTCZ'),
+                
+                // Date and time
+                _buildDetailRow('Date', DateFormat('EEEE, MMMM dd, yyyy at HH:mm:ss').format(transaction.timestamp)),
+                
+                // Addresses
                 if (transaction.fromAddress != null)
                   _buildDetailRow('From', transaction.fromAddress!, copyable: true),
                 if (transaction.toAddress != null)
                   _buildDetailRow('To', transaction.toAddress!, copyable: true),
-                if (transaction.memo?.isNotEmpty == true)
-                  _buildDetailRow('Memo', transaction.memo!),
+                
+                // Additional details
+                if (transaction.fee != null)
+                  _buildDetailRow('Fee', '${transaction.fee!.toStringAsFixed(8)} BTCZ'),
                 if (transaction.blockHeight != null)
                   _buildDetailRow('Block Height', transaction.blockHeight.toString()),
+                
+                // Transaction ID at the bottom for reference
+                _buildDetailRow('Transaction ID', transaction.txid, copyable: true),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMemoCard(String memo) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.message,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Memo',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            memo,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              height: 1.5,
             ),
           ),
         ],

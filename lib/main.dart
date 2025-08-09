@@ -10,6 +10,7 @@ import 'screens/splash_screen.dart';
 import 'utils/constants.dart';
 import 'services/bitcoinz_service.dart';
 import 'services/storage_service.dart';
+import 'services/database_service.dart';
 import 'src/rust/frb_generated.dart';
 
 void main() async {
@@ -23,6 +24,18 @@ void main() async {
     // Initialize storage service first
     await StorageService.initialize();
     logger.i('Storage service initialized: ${StorageService.storageType}');
+    
+    // Reset database if corrupted (especially important on macOS)
+    // This ensures we start with a clean slate if there were authorization errors
+    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      try {
+        // Force reset to clean up any corrupted database files
+        await DatabaseService.forceReset();
+        logger.i('🔄 Database reset completed for desktop platform');
+      } catch (e) {
+        logger.w('Database reset failed (may not exist yet): $e');
+      }
+    }
     
     // Initialize Rust bridge for native mempool monitoring
     try {

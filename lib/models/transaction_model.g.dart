@@ -18,6 +18,7 @@ TransactionModel _$TransactionModelFromJson(Map<String, dynamic> json) =>
       toAddress: json['to_address'] as String?,
       confirmations: (json['confirmations'] as num?)?.toInt(),
       fee: (json['fee'] as num?)?.toDouble(),
+      memoRead: json['memo_read'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$TransactionModelToJson(TransactionModel instance) =>
@@ -32,4 +33,5 @@ Map<String, dynamic> _$TransactionModelToJson(TransactionModel instance) =>
       'to_address': instance.toAddress,
       'confirmations': instance.confirmations,
       'fee': instance.fee,
+      'memo_read': instance.memoRead,
     };

@@ -5,6 +5,7 @@ import 'dart:async';
 import '../../providers/wallet_provider.dart';
 import '../../widgets/balance_card.dart';
 import '../../widgets/recent_transactions.dart';
+import 'paginated_transaction_history_screen.dart';
 
 class WalletDashboardScreen extends StatefulWidget {
   const WalletDashboardScreen({super.key});
@@ -80,6 +81,19 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
     } finally {
       _connectionPulseController.reset();
     }
+  }
+  
+  void _showUnreadMemos() {
+    // Navigate to transaction history filtered by unread memos
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PaginatedTransactionHistoryScreen(),
+        settings: const RouteSettings(
+          arguments: {'filterUnreadMemos': true},
+        ),
+      ),
+    );
   }
   
   void _showServerInfo() {
@@ -230,6 +244,54 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
         toolbarHeight: 56,
         automaticallyImplyLeading: false,
         actions: [
+          // Message notification indicator
+          Consumer<WalletProvider>(
+            builder: (context, walletProvider, child) {
+              final unreadCount = walletProvider.unreadMemoCount;
+              if (unreadCount > 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.mail,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        onPressed: _showUnreadMemos,
+                      ),
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 12,
+                            minHeight: 12,
+                          ),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           // Connection status indicator
           Consumer<WalletProvider>(
             builder: (context, walletProvider, child) {

@@ -20,6 +20,8 @@ class TransactionModel {
   final String? toAddress;
   final int? confirmations;
   final double? fee;
+  @JsonKey(name: 'memo_read', defaultValue: false)
+  final bool memoRead;
 
   const TransactionModel({
     required this.txid,
@@ -32,6 +34,7 @@ class TransactionModel {
     this.toAddress,
     this.confirmations,
     this.fee,
+    this.memoRead = false,
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) => _$TransactionModelFromJson(json);
@@ -175,6 +178,7 @@ class TransactionModel {
     String? toAddress,
     int? confirmations,
     double? fee,
+    bool? memoRead,
   }) {
     return TransactionModel(
       txid: txid ?? this.txid,
@@ -187,6 +191,7 @@ class TransactionModel {
       toAddress: toAddress ?? this.toAddress,
       confirmations: confirmations ?? this.confirmations,
       fee: fee ?? this.fee,
+      memoRead: memoRead ?? this.memoRead,
     );
   }
 
