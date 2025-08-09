@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui';
+import 'dart:async';
 import '../../providers/wallet_provider.dart';
 import '../../utils/responsive.dart';
+import '../../widgets/transaction_success_dialog.dart';
 
 class SendScreen extends StatefulWidget {
   const SendScreen({super.key});
@@ -27,6 +29,12 @@ class _SendScreenState extends State<SendScreen>
   bool _isShieldedTransaction = false;
   double _estimatedFee = 0.001; // Default fee
   
+  // Transaction progress states
+  String _sendingStatus = '';
+  double _sendingProgress = 0.0;
+  late AnimationController _buttonAnimationController;
+  late Animation<double> _buttonScaleAnimation;
+  
   @override
   void initState() {
     super.initState();
@@ -43,6 +51,19 @@ class _SendScreenState extends State<SendScreen>
       parent: _fadeController,
       curve: Curves.easeInOut,
     ));
+    
+    _buttonAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    
+    _buttonScaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(
+      parent: _buttonAnimationController,
+      curve: Curves.easeInOut,
+    ));
 
     _fadeController.forward();
   }
@@ -50,6 +71,7 @@ class _SendScreenState extends State<SendScreen>
   @override
   void dispose() {
     _fadeController.dispose();
+    _buttonAnimationController.dispose();
     _addressController.dispose();
     _amountController.dispose();
     _memoController.dispose();
@@ -120,9 +142,16 @@ class _SendScreenState extends State<SendScreen>
   Future<void> _sendTransaction() async {
     if (!_formKey.currentState!.validate() || _isSending) return;
     
+    // Animate button press
+    _buttonAnimationController.forward().then((_) {
+      _buttonAnimationController.reverse();
+    });
+    
     setState(() {
       _isSending = true;
       _errorMessage = null;
+      _sendingStatus = 'Validating transaction...';
+      _sendingProgress = 0.25;
     });
 
     try {
@@ -130,7 +159,25 @@ class _SendScreenState extends State<SendScreen>
       final address = _addressController.text.trim();
       final memo = _memoController.text.trim();
       
+      // Update progress
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        setState(() {
+          _sendingStatus = 'Creating transaction...';
+          _sendingProgress = 0.5;
+        });
+      }
+      
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+      
+      // Update progress
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) {
+        setState(() {
+          _sendingStatus = 'Broadcasting to network...';
+          _sendingProgress = 0.75;
+        });
+      }
       
       final result = await walletProvider.sendTransaction(
         toAddress: address,
@@ -139,46 +186,50 @@ class _SendScreenState extends State<SendScreen>
       );
 
       if (result != null && mounted) {
-        // Show success dialog
+        setState(() {
+          _sendingStatus = 'Transaction sent!';
+          _sendingProgress = 1.0;
+        });
+        
+        // Short delay to show completion
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Show custom success dialog
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Transaction Sent'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                  size: 48,
-                ),
-                const SizedBox(height: 16),
-                Text('Transaction ID: ${result.substring(0, 8)}...'),
-                const SizedBox(height: 8),
-                const Text('Your transaction has been broadcast to the network.'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _resetForm();
-                },
-                child: const Text('OK'),
-              ),
-            ],
+          builder: (context) => TransactionSuccessDialog(
+            transactionId: result,
+            amount: amount,
+            toAddress: address,
+            onClose: _resetForm,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to send transaction: $e';
+          _errorMessage = e.toString().contains('Insufficient')
+              ? 'Insufficient balance to complete this transaction'
+              : e.toString().contains('Invalid')
+              ? 'Invalid address format. Please check and try again'
+              : 'Transaction failed. Please try again later';
           _isSending = false;
+          _sendingStatus = '';
+          _sendingProgress = 0.0;
         });
+        
+        // Show error with animation
+        _showErrorAnimation();
       }
     }
+  }
+  
+  void _showErrorAnimation() {
+    // Shake animation for error
+    _buttonAnimationController.forward().then((_) {
+      _buttonAnimationController.reverse();
+    });
   }
 
   void _resetForm() {
@@ -276,15 +327,15 @@ class _SendScreenState extends State<SendScreen>
                                       crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
                                         Text(
-                                          'Available Balance',
+                                          'AVAILABLE BALANCE',
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(0.8),
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                            letterSpacing: 0.5,
+                                            color: Colors.white.withOpacity(0.9),
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 1.5,
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 8),
                                         
                                         Text(
                                           walletProvider.balance.formattedSpendable,
@@ -507,33 +558,70 @@ class _SendScreenState extends State<SendScreen>
                           ),
                         ],
                         
-                        // Error Message
+                        // Error Message with animation
                         if (_errorMessage != null) ...[
                           SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 24),
-                          Container(
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
                             padding: EdgeInsets.all(ResponsiveUtils.getHorizontalPadding(context) * 0.75),
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.red.withOpacity(0.15),
+                                  Colors.red.withOpacity(0.05),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
                               borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context) * 0.5),
                               border: Border.all(
-                                color: Colors.red.withOpacity(0.3),
+                                color: Colors.red.withOpacity(0.4),
+                                width: 1.5,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.red.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
                             child: Row(
                               children: [
-                                Icon(
-                                  Icons.error_outline,
-                                  color: Colors.red,
-                                  size: ResponsiveUtils.getIconSize(context, base: 18),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: Colors.red.shade400,
+                                    size: ResponsiveUtils.getIconSize(context, base: 20),
+                                  ),
                                 ),
-                                SizedBox(width: ResponsiveUtils.isSmallMobile(context) ? 6 : 8),
+                                SizedBox(width: ResponsiveUtils.isSmallMobile(context) ? 8 : 12),
                                 Expanded(
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: TextStyle(
-                                      color: Colors.red,
-                                      fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.9,
-                                    ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Transaction Failed',
+                                        style: TextStyle(
+                                          color: Colors.red.shade400,
+                                          fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.9,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _errorMessage!,
+                                        style: TextStyle(
+                                          color: Colors.red.shade300,
+                                          fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.85,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -544,53 +632,100 @@ class _SendScreenState extends State<SendScreen>
                         // Send Button
                         SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 32 : 40),
                         
-                        SizedBox(
-                          width: double.infinity,
-                          height: ResponsiveUtils.getButtonHeight(context),
-                          child: ElevatedButton(
-                            onPressed: (_isSending || !_canSend(walletProvider)) ? null : _sendTransaction,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  ResponsiveUtils.getButtonBorderRadius(context),
+                        AnimatedBuilder(
+                          animation: _buttonScaleAnimation,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: _buttonScaleAnimation.value,
+                              child: Container(
+                                width: double.infinity,
+                                height: ResponsiveUtils.getButtonHeight(context),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(
+                                    ResponsiveUtils.getButtonBorderRadius(context),
+                                  ),
+                                  boxShadow: _canSend(walletProvider) && !_isSending ? [
+                                    BoxShadow(
+                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ] : [],
+                                ),
+                                child: ElevatedButton(
+                                  onPressed: (_isSending || !_canSend(walletProvider)) ? null : _sendTransaction,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _isSending 
+                                        ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
+                                        : Theme.of(context).colorScheme.primary,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        ResponsiveUtils.getButtonBorderRadius(context),
+                                      ),
+                                    ),
+                                    elevation: _isSending ? 0 : 6,
+                                  ),
+                                  child: _isSending
+                                      ? Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Stack(
+                                              alignment: Alignment.center,
+                                              children: [
+                                                SizedBox(
+                                                  width: ResponsiveUtils.getIconSize(context, base: 24),
+                                                  height: ResponsiveUtils.getIconSize(context, base: 24),
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2.5,
+                                                    value: _sendingProgress,
+                                                    backgroundColor: Colors.white.withOpacity(0.2),
+                                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                                      Colors.white,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (_sendingProgress == 1.0)
+                                                  Icon(
+                                                    Icons.check,
+                                                    color: Colors.white,
+                                                    size: ResponsiveUtils.getIconSize(context, base: 16),
+                                                  ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              _sendingStatus,
+                                              style: TextStyle(
+                                                fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.8,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.white.withOpacity(0.9),
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.send_rounded,
+                                              size: ResponsiveUtils.getIconSize(context, base: 20),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Send Transaction',
+                                              style: TextStyle(
+                                                fontSize: ResponsiveUtils.getBodyTextSize(context),
+                                                fontWeight: FontWeight.w600,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                 ),
                               ),
-                              elevation: _isSending ? 0 : 4,
-                            ),
-                            child: _isSending
-                                ? Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: ResponsiveUtils.getIconSize(context, base: 20),
-                                        height: ResponsiveUtils.getIconSize(context, base: 20),
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(width: ResponsiveUtils.isSmallMobile(context) ? 8 : 12),
-                                      Text(
-                                        'Sending...',
-                                        style: TextStyle(
-                                          fontSize: ResponsiveUtils.getBodyTextSize(context),
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : Text(
-                                    'Send',
-                                    style: TextStyle(
-                                      fontSize: ResponsiveUtils.getBodyTextSize(context),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                          ),
+                            );
+                          },
                         ),
                         
                         SizedBox(height: ResponsiveUtils.getVerticalPadding(context)),
