@@ -69,11 +69,26 @@ class _RecentTransactionsState extends State<RecentTransactions> {
           return Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF1F1F23).withOpacity(0.9),
+                  const Color(0xFF1A1A1D).withOpacity(0.7),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.05),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Column(
               children: [
@@ -104,11 +119,31 @@ class _RecentTransactionsState extends State<RecentTransactions> {
 
         return Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFF1F1F23).withOpacity(0.9), // Smoky glass effect
+                const Color(0xFF1A1A1D).withOpacity(0.7),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.05),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                blurRadius: 30,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: ListView.separated(
             shrinkWrap: true,

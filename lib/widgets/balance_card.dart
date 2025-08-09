@@ -43,34 +43,61 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
       builder: (context, walletProvider, child) {
         return Container(
           width: double.infinity,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(context).colorScheme.primary.withOpacity(0.7),
-                      Theme.of(context).colorScheme.secondary.withOpacity(0.5),
+          child: Stack(
+            children: [
+              // Glow effect behind the card
+              Positioned.fill(
+                child: Container(
+                  margin: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                        blurRadius: 60,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 20),
+                      ),
+                      BoxShadow(
+                        color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                        blurRadius: 40,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 10),
+                      ),
                     ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.15),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
                 ),
+              ),
+              // Main card with glassmorphism
+              ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF2A2A2E).withOpacity(0.8), // Smoky dark gray
+                          const Color(0xFF1F1F23).withOpacity(0.6), // Darker gradient
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.08),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        // Inner shadow for depth
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -178,7 +205,9 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
               ),
             ),
           ),
-        );
+          ],
+        ),
+      );
       },
     );
   }
