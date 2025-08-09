@@ -112,7 +112,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
           );
         }
 
-        // Temporarily removing all decoration to test if gap disappears
+        // Simple list without decoration
         return MediaQuery.removePadding(
           context: context,
           removeTop: true,
@@ -121,9 +121,13 @@ class _RecentTransactionsState extends State<RecentTransactions> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: recentTransactions.length,
-            separatorBuilder: (context, index) => Divider(
-              height: 1,
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+            separatorBuilder: (context, index) => Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: Divider(
+                height: 1,
+                thickness: 0.5,
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              ),
             ),
             itemBuilder: (context, index) {
               final transaction = recentTransactions[index];
