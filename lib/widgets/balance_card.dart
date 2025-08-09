@@ -78,15 +78,15 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF2A2A2E).withOpacity(0.8), // Smoky dark gray
-                          const Color(0xFF1F1F23).withOpacity(0.6), // Darker gradient
+                          const Color(0xFF242424).withOpacity(0.9), // Lighter for YouTube-style
+                          const Color(0xFF1A1A1A).withOpacity(0.7), // Subtle gradient
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(28),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.08),
+                        color: Colors.white.withOpacity(0.06),
                         width: 1.5,
                       ),
                       boxShadow: [
@@ -99,7 +99,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                       ],
                     ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // Total Balance Section
                     Text(
@@ -135,7 +135,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                           },
                           child: Text(
                             walletProvider.hasWallet 
-                                ? '${walletProvider.balance.formattedTotal} BTCZ'
+                                ? walletProvider.balance.formattedTotal
                                 : '••••••••',
                             style: const TextStyle(
                               color: Colors.white,

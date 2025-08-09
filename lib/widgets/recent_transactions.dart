@@ -66,31 +66,25 @@ class _RecentTransactionsState extends State<RecentTransactions> {
             .toList();
 
         if (recentTransactions.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF1F1F23).withOpacity(0.9),
-                  const Color(0xFF1A1A1D).withOpacity(0.7),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.05),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF1C1C1C).withOpacity(0.95),
+                    const Color(0xFF161616).withOpacity(0.85),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-              ],
-            ),
-            child: Column(
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.05),
+                  width: 1,
+                ),
+              ),
+              child: Column(
               children: [
                 Icon(
                   Icons.receipt_long,
@@ -114,38 +108,16 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                 ),
               ],
             ),
+            ),
           );
         }
 
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFF1F1F23).withOpacity(0.9), // Smoky glass effect
-                const Color(0xFF1A1A1D).withOpacity(0.7),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.05),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
-                blurRadius: 30,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+        // Temporarily removing all decoration to test if gap disappears
+        return MediaQuery.removePadding(
+          context: context,
+          removeTop: true,
           child: ListView.separated(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: recentTransactions.length,

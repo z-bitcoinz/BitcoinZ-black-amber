@@ -120,12 +120,19 @@ class BalanceModel {
 
   /// Private helper to format balance
   String _formatBalance(double balance) {
-    if (balance == 0) return '0.00000000';
+    if (balance == 0) return '0';
     
-    // Show up to 8 decimal places, removing trailing zeros
-    String formatted = balance.toStringAsFixed(8);
-    formatted = formatted.replaceAll(RegExp(r'0*$'), '');
-    formatted = formatted.replaceAll(RegExp(r'\.$'), '');
+    // Show 3 decimal places followed by ** to indicate more digits
+    String formatted = balance.toStringAsFixed(3);
+    
+    // Remove trailing zeros after decimal point
+    if (formatted.contains('.')) {
+      formatted = formatted.replaceAll(RegExp(r'0*$'), '');
+      formatted = formatted.replaceAll(RegExp(r'\.$'), '');
+    }
+    
+    // Add ** to indicate there are more digits
+    formatted = '$formatted**';
     
     return formatted;
   }

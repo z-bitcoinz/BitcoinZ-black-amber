@@ -244,8 +244,8 @@ class BitcoinZWalletApp extends StatelessWidget {
     // Professional crypto wallet colors for dark theme
     const primaryColor = Color(0xFFFFB800); // BitcoinZ golden orange
     const secondaryColor = Color(0xFF00D4AA); // BitcoinZ green
-    const backgroundColor = Color(0xFF121214); // Lighter black with depth
-    const surfaceColor = Color(0xFF1C1C1F); // Smoky glass surface
+    const backgroundColor = Color(0xFF0F0F0F); // YouTube-style dark background
+    const surfaceColor = Color(0xFF181818); // YouTube-style surface
     
     return ThemeData(
       useMaterial3: true,

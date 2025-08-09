@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
+import 'dart:ui';
 import '../../providers/wallet_provider.dart';
 import '../../widgets/balance_card.dart';
 import '../../widgets/recent_transactions.dart';
@@ -238,12 +239,97 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
     
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        toolbarHeight: 56,
-        automaticallyImplyLeading: false,
-        actions: [
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(80),
+        child: ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: AppBar(
+              backgroundColor: const Color(0xFF1A1A1A).withOpacity(0.8),
+              elevation: 0,
+              toolbarHeight: 80,
+              automaticallyImplyLeading: false,
+              flexibleSpace: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF1F1F1F).withOpacity(0.8),
+                      const Color(0xFF151515).withOpacity(0.6),
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.white.withOpacity(0.05),
+                      width: 1,
+                    ),
+                  ),
+                ),
+              ),
+              title: Row(
+                children: [
+                  // BitcoinZ Logo
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.primary,
+                          Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Z',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'BitcoinZ',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        'WALLET',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
           // Message notification indicator
           Consumer<WalletProvider>(
             builder: (context, walletProvider, child) {
@@ -348,6 +434,9 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
             },
           ),
         ],
+            ),
+          ),
+        ),
       ),
       body: Consumer<WalletProvider>(
         builder: (context, walletProvider, child) {
@@ -357,44 +446,56 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
+                // Spacing for extended AppBar
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 80),
+                ),
                 // Balance Card
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                     child: const BalanceCard(),
                   ),
                 ),
                 
-                // Recent Transactions Header
+                // Recent Transactions Header and List combined
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          'Recent Activity',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
+                        Container(
+                          height: 30,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Recent Activity',
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () {
+                                  // Navigate to full transaction history
+                                  DefaultTabController.of(context)?.animateTo(3);
+                                },
+                                child: const Text('View All'),
+                              ),
+                            ],
                           ),
                         ),
-                        TextButton(
-                          onPressed: () {
-                            // Navigate to full transaction history
-                            DefaultTabController.of(context)?.animateTo(3);
-                          },
-                          child: const Text('View All'),
-                        ),
+                        const RecentTransactions(limit: 5),
                       ],
                     ),
-                  ),
-                ),
-                
-                // Recent Transactions List
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: RecentTransactions(limit: 5),
                   ),
                 ),
                 
