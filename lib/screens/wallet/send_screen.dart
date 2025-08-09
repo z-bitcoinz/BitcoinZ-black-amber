@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'dart:ui';
 import '../../providers/wallet_provider.dart';
 import '../../utils/responsive.dart';
 
@@ -203,17 +204,9 @@ class _SendScreenState extends State<SendScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Send BitcoinZ'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            onPressed: _scanQRCode,
-            tooltip: 'Scan QR Code',
-          ),
-        ],
       ),
       body: SafeArea(
         child: Consumer<WalletProvider>(
@@ -228,80 +221,116 @@ class _SendScreenState extends State<SendScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Balance Display
+                        // Balance Display - Match home page glassmorphism
                         Container(
                           width: double.infinity,
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context)),
-                            child: Container(
-                              padding: EdgeInsets.all(ResponsiveUtils.getHorizontalPadding(context)),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                                    Theme.of(context).colorScheme.secondary.withOpacity(0.05),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context)),
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                                  width: 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                                    blurRadius: 15,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    'Balance',
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 4 : 8),
-                                  
-                                  // Spendable Balance (main)
-                                  Text(
-                                    '${walletProvider.balance.formattedSpendable} BTCZ',
-                                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.primary,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: -0.5,
-                                    ),
-                                  ),
-                                  
-                                  // Total Balance (secondary)
-                                  if (walletProvider.balance.spendable != walletProvider.balance.total) ...[
-                                    SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 2 : 4),
-                                    Text(
-                                      'Total: ${walletProvider.balance.formattedTotal} BTCZ',
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                                        fontWeight: FontWeight.w500,
+                          child: Stack(
+                            children: [
+                              // Glow effect
+                              Positioned.fill(
+                                child: Container(
+                                  margin: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(28),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                                        blurRadius: 60,
+                                        spreadRadius: 0,
+                                        offset: const Offset(0, 20),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              // Glass card
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(28),
+                                child: BackdropFilter(
+                                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          const Color(0xFF242424).withOpacity(0.9),
+                                          const Color(0xFF1A1A1A).withOpacity(0.7),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(28),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.06),
+                                        width: 1.5,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.2),
+                                          blurRadius: 20,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                  
-                                  // Spendable label
-                                  SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 2 : 4),
-                                  Text(
-                                    'Available to Send',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'Available Balance',
+                                          style: TextStyle(
+                                            color: Colors.white.withOpacity(0.8),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        
+                                        Text(
+                                          walletProvider.balance.formattedSpendable,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 32,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: -1,
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                        
+                                        if (walletProvider.balance.hasUnconfirmedBalance) ...[
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              SizedBox(
+                                                width: 10,
+                                                height: 10,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 1.5,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                                    Colors.orange.withOpacity(0.8),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'Confirming: ${walletProvider.balance.formattedUnconfirmed}',
+                                                style: TextStyle(
+                                                  color: Colors.orange.shade200,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ),
                         
@@ -425,34 +454,25 @@ class _SendScreenState extends State<SendScreen>
                           },
                         ),
                         
-                        // Fee Display
+                        // Fee Display - Smaller and cleaner
                         SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 12 : 16),
-                        Container(
-                          padding: EdgeInsets.all(ResponsiveUtils.getHorizontalPadding(context) * 0.75),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context) * 0.5),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Network Fee',
-                                style: TextStyle(
-                                  fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.9,
-                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                                ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 14,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Network fee: ~${_estimatedFee.toStringAsFixed(4)}',
+                              style: TextStyle(
+                                fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.8,
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                               ),
-                              Text(
-                                '${_estimatedFee.toStringAsFixed(8)} BTCZ',
-                                style: TextStyle(
-                                  fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.9,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                         
                         // Memo (for shielded transactions)
@@ -564,7 +584,7 @@ class _SendScreenState extends State<SendScreen>
                                     ],
                                   )
                                 : Text(
-                                    'Send BitcoinZ',
+                                    'Send',
                                     style: TextStyle(
                                       fontSize: ResponsiveUtils.getBodyTextSize(context),
                                       fontWeight: FontWeight.w600,

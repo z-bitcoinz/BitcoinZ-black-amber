@@ -293,23 +293,41 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                       ],
                     ),
                     child: const Center(
-                      child: Text(
-                        'Z',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      child: Icon(
+                        Icons.account_balance_wallet,
+                        color: Colors.black87,
+                        size: 20,
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    'BitcoinZ',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      children: [
+                        const TextSpan(
+                          text: 'Bitcoin',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        TextSpan(
+                          text: 'Z',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            shadows: [
+                              Shadow(
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
