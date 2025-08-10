@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui';
 import '../providers/wallet_provider.dart';
+import '../providers/currency_provider.dart';
 
 class BalanceCard extends StatefulWidget {
   const BalanceCard({super.key});
@@ -39,8 +40,8 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<WalletProvider>(
-      builder: (context, walletProvider, child) {
+    return Consumer2<WalletProvider, CurrencyProvider>(
+      builder: (context, walletProvider, currencyProvider, child) {
         return Container(
           width: double.infinity,
           child: Stack(
@@ -149,8 +150,27 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                       },
                     ),
                     
-                    // Remove the unconfirmed balance badge from here
-                    // It will be shown under each address type instead
+                    // Show fiat value if available
+                    if (walletProvider.hasWallet && currencyProvider.currentPrice != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        currencyProvider.formatFiatAmount(walletProvider.balance.total),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.9),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      Text(
+                        currencyProvider.selectedCurrency.name,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                     
                     const SizedBox(height: 20),
                     

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'dart:ui';
 import 'dart:async';
 import '../../providers/wallet_provider.dart';
+import '../../providers/currency_provider.dart';
 import '../../utils/responsive.dart';
 import '../../widgets/transaction_success_dialog.dart';
 import '../../widgets/transaction_confirmation_dialog.dart';
@@ -30,6 +31,7 @@ class _SendScreenState extends State<SendScreen>
   String? _errorMessage;
   bool _isShieldedTransaction = false;
   double _estimatedFee = 0.001; // Default fee
+  bool _isFiatInput = false; // Toggle for fiat/BTCZ input
   
   // Transaction progress states
   String _sendingStatus = '';
@@ -275,8 +277,8 @@ class _SendScreenState extends State<SendScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Consumer<WalletProvider>(
-        builder: (context, walletProvider, child) {
+      body: Consumer2<WalletProvider, CurrencyProvider>(
+        builder: (context, walletProvider, currencyProvider, child) {
           return Stack(
             children: [
               FadeTransition(
@@ -374,6 +376,19 @@ class _SendScreenState extends State<SendScreen>
                                         height: 1.2,
                                       ),
                                     ),
+                                    
+                                    // Show fiat value if available
+                                    if (currencyProvider.currentPrice != null) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        currencyProvider.formatFiatAmount(walletProvider.balance.spendable),
+                                        style: TextStyle(
+                                          color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                     
                                     if (walletProvider.balance.hasUnconfirmedBalance) ...[
                                       const SizedBox(height: 8),
@@ -537,28 +552,90 @@ class _SendScreenState extends State<SendScreen>
                                       letterSpacing: 1.2,
                                     ),
                                   ),
-                                  GestureDetector(
-                                    onTap: () => _setMaxAmount(walletProvider),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                                          width: 1,
+                                  Row(
+                                    children: [
+                                      // Toggle for BTCZ/Fiat input
+                                      if (currencyProvider.currentPrice != null) ...[
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.05),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              GestureDetector(
+                                                onTap: () => setState(() => _isFiatInput = false),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: !_isFiatInput 
+                                                        ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
+                                                        : Colors.transparent,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    'BTCZ',
+                                                    style: TextStyle(
+                                                      color: !_isFiatInput 
+                                                          ? Theme.of(context).colorScheme.primary
+                                                          : Colors.white.withOpacity(0.5),
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              GestureDetector(
+                                                onTap: () => setState(() => _isFiatInput = true),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: _isFiatInput 
+                                                        ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
+                                                        : Colors.transparent,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    currencyProvider.selectedCurrency.code,
+                                                    style: TextStyle(
+                                                      color: _isFiatInput 
+                                                          ? Theme.of(context).colorScheme.primary
+                                                          : Colors.white.withOpacity(0.5),
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      GestureDetector(
+                                        onTap: () => _setMaxAmount(walletProvider),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'MAX',
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                      child: Text(
-                                        'MAX',
-                                        style: TextStyle(
-                                          color: Theme.of(context).colorScheme.primary,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 1,
-                                        ),
-                                      ),
-                                    ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -596,13 +673,15 @@ class _SendScreenState extends State<SendScreen>
                                   color: Colors.white,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: '0.00000000',
+                                  hintText: _isFiatInput ? '0.00' : '0.00000000',
                                   hintStyle: TextStyle(
                                     color: Colors.white.withOpacity(0.2),
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
                                   ),
-                                  suffixText: 'BTCZ',
+                                  suffixText: _isFiatInput 
+                                      ? currencyProvider.selectedCurrency.code 
+                                      : 'BTCZ',
                                   suffixStyle: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -615,11 +694,18 @@ class _SendScreenState extends State<SendScreen>
                                   if (value == null || value.trim().isEmpty) {
                                     return 'Please enter an amount';
                                   }
-                                  final amount = double.tryParse(value.trim());
-                                  if (amount == null || amount <= 0) {
+                                  final parsed = double.tryParse(value.trim());
+                                  if (parsed == null || parsed <= 0) {
                                     return 'Please enter a valid amount';
                                   }
-                                  final totalNeeded = amount + _estimatedFee;
+                                  
+                                  // Convert to BTCZ for validation
+                                  double btczAmount = parsed;
+                                  if (_isFiatInput) {
+                                    btczAmount = currencyProvider.convertFiatToBtcz(parsed) ?? 0;
+                                  }
+                                  
+                                  final totalNeeded = btczAmount + _estimatedFee;
                                   if (totalNeeded > walletProvider.balance.spendable) {
                                     return 'Insufficient balance';
                                   }
@@ -634,6 +720,46 @@ class _SendScreenState extends State<SendScreen>
                             ),
                           ],
                         ),
+                        
+                        // Show conversion amount
+                        if (currencyProvider.currentPrice != null) ...[
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Builder(
+                              builder: (context) {
+                                final text = _amountController.text.trim();
+                                if (text.isEmpty) return const SizedBox.shrink();
+                                final parsed = double.tryParse(text);
+                                if (parsed == null || parsed <= 0) return const SizedBox.shrink();
+                                
+                                String conversionText = '';
+                                if (_isFiatInput) {
+                                  final btczAmount = currencyProvider.convertFiatToBtcz(parsed);
+                                  if (btczAmount != null) {
+                                    conversionText = '≈ ${btczAmount.toStringAsFixed(8)} BTCZ';
+                                  }
+                                } else {
+                                  final fiatAmount = currencyProvider.convertBtczToFiat(parsed);
+                                  if (fiatAmount != null) {
+                                    conversionText = '≈ ${currencyProvider.formatWithSymbol(fiatAmount)}';
+                                  }
+                                }
+                                
+                                if (conversionText.isEmpty) return const SizedBox.shrink();
+                                
+                                return Text(
+                                  conversionText,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                         
                         // Network Fee - Subtle
                         const SizedBox(height: 8),

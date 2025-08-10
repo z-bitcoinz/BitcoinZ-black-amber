@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'currency_settings_screen.dart';
+import '../../providers/currency_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,34 +20,187 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         automaticallyImplyLeading: false,
       ),
-      body: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      body: Consumer<CurrencyProvider>(
+        builder: (context, currencyProvider, child) {
+          return ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              Icon(
-                Icons.settings,
-                size: 64,
-                color: Colors.grey,
+              // Currency Settings
+              _buildSettingsSection(
+                title: 'Display',
+                children: [
+                  _buildSettingsTile(
+                    context: context,
+                    icon: Icons.attach_money,
+                    title: 'Fiat Currency',
+                    subtitle: currencyProvider.selectedCurrency.name,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          currencyProvider.selectedCurrency.code,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CurrencySettingsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
-              SizedBox(height: 24),
-              Text(
-                'Settings',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+              
+              const SizedBox(height: 24),
+              
+              // Placeholder for other settings
+              _buildSettingsSection(
+                title: 'Security',
+                children: [
+                  _buildSettingsTile(
+                    context: context,
+                    icon: Icons.lock,
+                    title: 'PIN/Biometric',
+                    subtitle: 'Manage security settings',
+                    onTap: () {
+                      // TODO: Navigate to security settings
+                    },
+                  ),
+                  _buildSettingsTile(
+                    context: context,
+                    icon: Icons.backup,
+                    title: 'Backup Wallet',
+                    subtitle: 'View seed phrase',
+                    onTap: () {
+                      // TODO: Navigate to backup settings
+                    },
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              _buildSettingsSection(
+                title: 'About',
+                children: [
+                  _buildSettingsTile(
+                    context: context,
+                    icon: Icons.info,
+                    title: 'App Version',
+                    subtitle: '1.0.0',
+                    onTap: null,
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+  
+  Widget _buildSettingsSection({
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.08),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            children: children,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildSettingsTile({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
                 ),
               ),
-              SizedBox(height: 16),
-              Text(
-                'This screen will contain app settings, security options, backup management, and other configuration options.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
+              if (trailing != null) trailing,
             ],
           ),
         ),
