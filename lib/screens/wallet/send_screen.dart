@@ -6,6 +6,8 @@ import 'dart:async';
 import '../../providers/wallet_provider.dart';
 import '../../utils/responsive.dart';
 import '../../widgets/transaction_success_dialog.dart';
+import '../../widgets/transaction_confirmation_dialog.dart';
+import '../../widgets/sending_progress_overlay.dart';
 
 class SendScreen extends StatefulWidget {
   const SendScreen({super.key});
@@ -147,6 +149,27 @@ class _SendScreenState extends State<SendScreen>
       _buttonAnimationController.reverse();
     });
     
+    // Get transaction details
+    final amount = _getAmountValue()!;
+    final address = _addressController.text.trim();
+    
+    // Show confirmation dialog first
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => TransactionConfirmationDialog(
+        toAddress: address,
+        amount: amount,
+        fee: _estimatedFee,
+        onConfirm: () => _processSendTransaction(amount, address),
+        onCancel: () {
+          // User cancelled, do nothing
+        },
+      ),
+    );
+  }
+  
+  Future<void> _processSendTransaction(double amount, String address) async {
     setState(() {
       _isSending = true;
       _errorMessage = null;
@@ -155,8 +178,6 @@ class _SendScreenState extends State<SendScreen>
     });
 
     try {
-      final amount = _getAmountValue()!;
-      final address = _addressController.text.trim();
       final memo = _memoController.text.trim();
       
       // Update progress
@@ -256,9 +277,11 @@ class _SendScreenState extends State<SendScreen>
     return Scaffold(
       body: Consumer<WalletProvider>(
         builder: (context, walletProvider, child) {
-          return FadeTransition(
-            opacity: _fadeAnimation,
-            child: CustomScrollView(
+          return Stack(
+            children: [
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
                 // Top spacing
@@ -860,9 +883,17 @@ class _SendScreenState extends State<SendScreen>
                 ),
               ],
             ),
-          );
-        },
-      ),
-    );
-  }
+          ),
+          // Progress Overlay
+          SendingProgressOverlay(
+            status: _sendingStatus,
+            progress: _sendingProgress,
+            isVisible: _isSending,
+          ),
+        ],
+      );
+    },
+  ),
+);
+}
 }
