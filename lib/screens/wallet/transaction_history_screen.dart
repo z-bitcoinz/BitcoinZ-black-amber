@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/wallet_provider.dart';
+import '../../providers/currency_provider.dart';
 import '../../models/transaction.dart';
 import '../../utils/responsive.dart';
 
@@ -438,14 +439,35 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          Text(
-                            formattedAmount,
-                            style: TextStyle(
-                              fontSize: ResponsiveUtils.getBodyTextSize(context),
-                              fontWeight: FontWeight.bold,
-                              color: isReceived ? Colors.green : Colors.red,
-                              fontFamily: 'monospace',
-                            ),
+                          Consumer<CurrencyProvider>(
+                            builder: (context, currencyProvider, _) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    formattedAmount,
+                                    style: TextStyle(
+                                      fontSize: ResponsiveUtils.getBodyTextSize(context),
+                                      fontWeight: FontWeight.bold,
+                                      color: isReceived ? Colors.green : Colors.red,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                  // Show fiat amount if price available
+                                  if (currencyProvider.currentPrice != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      currencyProvider.formatFiatAmount(amount),
+                                      style: TextStyle(
+                                        fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.75,
+                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),

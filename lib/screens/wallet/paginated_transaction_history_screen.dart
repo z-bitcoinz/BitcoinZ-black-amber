@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/wallet_provider.dart';
+import '../../providers/currency_provider.dart';
 import '../../models/transaction_model.dart';
 import '../../utils/responsive.dart';
 // import '../../services/btcz_cli_service.dart'; // Removed - CLI no longer used
@@ -529,13 +530,34 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          Text(
-                            '${isReceived ? '+' : '-'}${transaction.amount.toStringAsFixed(8)} BTCZ',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: _getTransactionColor(transaction),
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'monospace',
-                            ),
+                          Consumer<CurrencyProvider>(
+                            builder: (context, currencyProvider, _) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${isReceived ? '+' : '-'}${transaction.amount.toStringAsFixed(8)} BTCZ',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      color: _getTransactionColor(transaction),
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                  // Show fiat amount if price available
+                                  if (currencyProvider.currentPrice != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      currencyProvider.formatFiatAmount(transaction.amount.abs()),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),

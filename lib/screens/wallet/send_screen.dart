@@ -105,7 +105,15 @@ class _SendScreenState extends State<SendScreen>
   double? _getAmountValue() {
     final text = _amountController.text.trim();
     if (text.isEmpty) return null;
-    return double.tryParse(text);
+    final parsed = double.tryParse(text);
+    if (parsed == null) return null;
+    
+    // Convert fiat to BTCZ if in fiat mode
+    if (_isFiatInput) {
+      final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+      return currencyProvider.convertFiatToBtcz(parsed);
+    }
+    return parsed;
   }
 
   bool _canSend(WalletProvider walletProvider) {
@@ -155,6 +163,22 @@ class _SendScreenState extends State<SendScreen>
     final amount = _getAmountValue()!;
     final address = _addressController.text.trim();
     
+    // Get fiat amount if available
+    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+    double? fiatAmount;
+    String? currencyCode;
+    
+    if (currencyProvider.currentPrice != null) {
+      if (_isFiatInput) {
+        // User entered fiat, so parse the text directly for fiat amount
+        fiatAmount = double.tryParse(_amountController.text.trim());
+      } else {
+        // User entered BTCZ, convert to fiat
+        fiatAmount = currencyProvider.convertBtczToFiat(amount);
+      }
+      currencyCode = currencyProvider.selectedCurrency.code;
+    }
+    
     // Show confirmation dialog first
     showDialog(
       context: context,
@@ -163,6 +187,8 @@ class _SendScreenState extends State<SendScreen>
         toAddress: address,
         amount: amount,
         fee: _estimatedFee,
+        fiatAmount: fiatAmount,
+        currencyCode: currencyCode,
         onConfirm: () => _processSendTransaction(amount, address),
         onCancel: () {
           // User cancelled, do nothing
@@ -270,7 +296,13 @@ class _SendScreenState extends State<SendScreen>
   void _setMaxAmount(WalletProvider walletProvider) {
     final maxAmount = walletProvider.balance.spendable - _estimatedFee;
     if (maxAmount > 0) {
-      _amountController.text = maxAmount.toStringAsFixed(8);
+      if (_isFiatInput) {
+        final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+        final fiatAmount = currencyProvider.convertBtczToFiat(maxAmount);
+        _amountController.text = fiatAmount?.toStringAsFixed(2) ?? '0.00';
+      } else {
+        _amountController.text = maxAmount.toStringAsFixed(8);
+      }
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../providers/wallet_provider.dart';
+import '../providers/currency_provider.dart';
 // import '../services/btcz_cli_service.dart'; // Removed - CLI no longer used
 import '../utils/responsive.dart';
 
@@ -209,21 +210,37 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                     color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                   ),
                 ),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      transaction.displayAmount,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: transaction.isReceived 
-                            ? Colors.green
-                            : Colors.orange,
-                      ),
-                    ),
-                    _buildStatusWidget(transaction, context),
-                  ],
+                trailing: Consumer<CurrencyProvider>(
+                  builder: (context, currencyProvider, _) {
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          transaction.displayAmount,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: transaction.isReceived 
+                                ? Colors.green
+                                : Colors.orange,
+                          ),
+                        ),
+                        // Show fiat amount if price available
+                        if (currencyProvider.currentPrice != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            currencyProvider.formatFiatAmount(transaction.amount.abs()),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ] else
+                          _buildStatusWidget(transaction, context),
+                      ],
+                    );
+                  },
                 ),
               );
             },
@@ -359,6 +376,16 @@ class _RecentTransactionsState extends State<RecentTransactions> {
               children: [
                 // Basic info first
                 _buildDetailRow('Amount', '${transaction.amount.toStringAsFixed(8)} BTCZ'),
+                // Show fiat value in details
+                Consumer<CurrencyProvider>(
+                  builder: (context, currencyProvider, _) {
+                    if (currencyProvider.currentPrice != null) {
+                      final fiatAmount = currencyProvider.formatFiatAmount(transaction.amount.abs());
+                      return _buildDetailRow('Value (${currencyProvider.selectedCurrency.code})', fiatAmount);
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 _buildDetailRow('Type', transaction.isReceived ? 'Received' : 'Sent'),
                 
                 // Memo prominently displayed if exists

@@ -6,6 +6,8 @@ class TransactionConfirmationDialog extends StatefulWidget {
   final String toAddress;
   final double amount;
   final double fee;
+  final double? fiatAmount;
+  final String? currencyCode;
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
 
@@ -14,6 +16,8 @@ class TransactionConfirmationDialog extends StatefulWidget {
     required this.toAddress,
     required this.amount,
     required this.fee,
+    this.fiatAmount,
+    this.currencyCode,
     required this.onConfirm,
     required this.onCancel,
   });
@@ -97,7 +101,7 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                     child: Container(
-                      padding: const EdgeInsets.all(28),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -118,30 +122,23 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                         children: [
                           // Header
                           Container(
-                            padding: const EdgeInsets.only(bottom: 20),
-                            child: Column(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
                                   Icons.security,
                                   color: Theme.of(context).colorScheme.primary,
-                                  size: 48,
+                                  size: 36,
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(width: 10),
                                 const Text(
                                   'CONFIRM TRANSACTION',
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 20,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Please review the details carefully',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.6),
-                                    fontSize: 13,
+                                    letterSpacing: 1.2,
                                   ),
                                 ),
                               ],
@@ -150,7 +147,7 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                           
                           // Transaction Details Card
                           Container(
-                            padding: const EdgeInsets.all(20),
+                            padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.3),
                               borderRadius: BorderRadius.circular(16),
@@ -170,9 +167,9 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                                   fullAddress: widget.toAddress,
                                 ),
                                 
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
                                 _buildDivider(),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
                                 
                                 // Amount
                                 _buildDetailRow(
@@ -181,9 +178,12 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                                   '${widget.amount.toStringAsFixed(8)} BTCZ',
                                   Icons.monetization_on_outlined,
                                   isAmount: true,
+                                  subtitle: widget.fiatAmount != null && widget.currencyCode != null
+                                      ? '≈ ${widget.fiatAmount!.toStringAsFixed(2)} ${widget.currencyCode}'
+                                      : null,
                                 ),
                                 
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
                                 
                                 // Network Fee
                                 _buildDetailRow(
@@ -194,9 +194,9 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                                   isSubtle: true,
                                 ),
                                 
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
                                 _buildDivider(),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
                                 
                                 // Total
                                 Row(
@@ -211,14 +211,30 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                                         letterSpacing: 1,
                                       ),
                                     ),
-                                    Text(
-                                      '${total.toStringAsFixed(8)} BTCZ',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.primary,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'monospace',
-                                      ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          '${total.toStringAsFixed(8)} BTCZ',
+                                          style: TextStyle(
+                                            color: Theme.of(context).colorScheme.primary,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                        if (widget.fiatAmount != null && widget.currencyCode != null) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '≈ ${(widget.fiatAmount! * (total / widget.amount)).toStringAsFixed(2)} ${widget.currencyCode}',
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -226,7 +242,7 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                             ),
                           ),
                           
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 16),
                           
                           // Action Buttons
                           Row(
@@ -319,7 +335,7 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                             ],
                           ),
                           
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           
                           // Security Note
                           Row(
@@ -362,6 +378,7 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
     String? fullAddress,
     bool isAmount = false,
     bool isSubtle = false,
+    String? subtitle,
   }) {
     return Row(
       children: [
@@ -399,16 +416,32 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      value,
-                      style: TextStyle(
-                        color: isSubtle 
-                            ? Colors.white.withOpacity(0.6)
-                            : Colors.white,
-                        fontSize: isAmount ? 16 : 14,
-                        fontWeight: isAmount ? FontWeight.bold : FontWeight.w500,
-                        fontFamily: isAddress || isAmount ? 'monospace' : null,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          value,
+                          style: TextStyle(
+                            color: isSubtle 
+                                ? Colors.white.withOpacity(0.6)
+                                : Colors.white,
+                            fontSize: isAmount ? 16 : 14,
+                            fontWeight: isAmount ? FontWeight.bold : FontWeight.w500,
+                            fontFamily: isAddress || isAmount ? 'monospace' : null,
+                          ),
+                        ),
+                        if (subtitle != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   if (isAddress) 
