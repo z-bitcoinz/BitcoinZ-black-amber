@@ -726,11 +726,21 @@ class WalletProvider with ChangeNotifier {
       return;
     }
 
-    _setSyncing(true);
+    // Don't show sync UI for background refreshes
+    // This is called every 60 seconds so we don't want the UI popping up
+    // Only set syncing flag for initial sync or manual sync
+    final isInitialSync = _transactions.isEmpty || _balance == null;
     
-    // Start polling for sync status (for Rust Bridge)
-    if (_wallet?.walletId?.startsWith('cli_imported_') != true) {
-      _startSyncStatusPolling();
+    if (isInitialSync) {
+      _setSyncing(true);
+      
+      // Start polling for sync status (for Rust Bridge)
+      if (_wallet?.walletId?.startsWith('cli_imported_') != true) {
+        _startSyncStatusPolling();
+      }
+    } else {
+      // For routine refreshes, just do a silent update
+      if (kDebugMode) print('🔄 Silent background refresh (no UI)...');
     }
     
     try {
@@ -741,7 +751,8 @@ class WalletProvider with ChangeNotifier {
       } else {
         // For Rust FFI wallets, sync directly with Rust service
         await _rustService.sync();
-        await _loadBalance(); // Only load balance in background
+        // Don't call _loadBalance() as it uses BitcoinZService which isn't initialized
+        // The Rust service will update balance via callbacks
         await _refreshWalletData(); // Refresh all data after sync
       }
       _lastSyncTime = DateTime.now();
@@ -749,8 +760,11 @@ class WalletProvider with ChangeNotifier {
       // Don't show error for background sync failures
       debugPrint('Background sync failed: $e');
     } finally {
-      _setSyncing(false);
-      _stopSyncStatusPolling();
+      // Only stop sync UI if we started it
+      if (isInitialSync) {
+        _setSyncing(false);
+        _stopSyncStatusPolling();
+      }
     }
   }
 
@@ -762,8 +776,8 @@ class WalletProvider with ChangeNotifier {
     if (kDebugMode) print('🔄 Starting sync status polling...');
     if (kDebugMode) print('   Rust service initialized: ${_rustService.initialized}');
     
-    // Set syncing flag immediately
-    _setSyncing(true);
+    // Don't set syncing flag here, let the caller decide
+    // _setSyncing(true);
     if (kDebugMode) print('   Syncing flag set to true');
     
     // Poll every second for sync status
@@ -906,7 +920,7 @@ class WalletProvider with ChangeNotifier {
   Future<void> syncWallet() async {
     if (!hasWallet) return;
 
-    _setSyncing(true);
+    _setSyncing(true);  // Set syncing flag for manual sync
     _clearError();
     
     // Start polling for sync status
@@ -1225,15 +1239,24 @@ class WalletProvider with ChangeNotifier {
     // Always use Rust Bridge for all wallets (provides mempool monitoring)
     if (_rustService.initialized) {
       if (kDebugMode) print('   Using Rust Bridge for wallet refresh');
+      
+      // Don't trigger sync UI for routine refreshes
+      // The Rust service refresh is lightweight and doesn't need UI
       await _rustService.refresh(); // Rust service handles everything
     } else {
       if (kDebugMode) print('   Rust Bridge not initialized, using fallback refresh');
-      await Future.wait([
-        _loadBalance(),
-        _loadTransactions(),
-        _loadAddresses(),
-      ]);
-      notifyListeners();
+      
+      // Only try to load if BitcoinZService is initialized
+      try {
+        await Future.wait([
+          _loadBalance(),
+          _loadTransactions(),
+          _loadAddresses(),
+        ]);
+        notifyListeners();
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Fallback refresh failed: $e');
+      }
     }
     
     // Note: Rust Bridge service is now the single source of truth for all data
@@ -1241,9 +1264,21 @@ class WalletProvider with ChangeNotifier {
 
   Future<void> _loadBalance() async {
     try {
+      // Only try to load balance if the service might be initialized
+      // Otherwise rely on Rust service callbacks
       _balance = await BitcoinZService.instance.getBalance();
     } catch (e) {
-      rethrow;
+      // Don't rethrow, just log the error
+      if (kDebugMode) print('⚠️ Could not load balance from BitcoinZService: $e');
+      // Return empty balance to avoid crashes
+      _balance ??= BalanceModel(
+        transparent: 0,
+        shielded: 0,
+        total: 0,
+        unconfirmed: 0,
+        unconfirmedTransparent: 0,
+        unconfirmedShielded: 0,
+      );
     }
   }
 

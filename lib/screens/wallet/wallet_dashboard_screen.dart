@@ -6,7 +6,6 @@ import 'dart:ui';
 import '../../providers/wallet_provider.dart';
 import '../../widgets/balance_card.dart';
 import '../../widgets/recent_transactions.dart';
-import '../../widgets/sync_progress_overlay.dart';
 import '../../widgets/connection_status_widget.dart';
 import 'paginated_transaction_history_screen.dart';
 
@@ -469,14 +468,12 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          Consumer<WalletProvider>(
-            builder: (context, walletProvider, child) {
-              return RefreshIndicator(
-                onRefresh: _silentSync,
-                color: Theme.of(context).colorScheme.primary,
-                child: CustomScrollView(
+      body: Consumer<WalletProvider>(
+        builder: (context, walletProvider, child) {
+          return RefreshIndicator(
+            onRefresh: _silentSync,
+            color: Theme.of(context).colorScheme.primary,
+            child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 // Spacing for extended AppBar
@@ -541,10 +538,6 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
           );
         },
       ),
-      // Sync progress overlay (like BitcoinZ Blue)
-      const SyncProgressOverlay(),
-    ],
-  ),
     );
   }
 }

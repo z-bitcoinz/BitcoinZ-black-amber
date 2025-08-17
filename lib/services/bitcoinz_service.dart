@@ -238,6 +238,20 @@ class BitcoinZService {
 
   /// Get wallet balance
   Future<BalanceModel> getBalance() async {
+    // Return a default balance if not initialized
+    // The actual balance will be provided by Rust service via callbacks
+    if (!_initialized) {
+      // Return empty balance when not initialized
+      return BalanceModel(
+        transparent: 0,
+        shielded: 0,
+        total: 0,
+        unconfirmed: 0,
+        unconfirmedTransparent: 0,
+        unconfirmedShielded: 0,
+      );
+    }
+    
     _ensureInitialized();
     
     try {
