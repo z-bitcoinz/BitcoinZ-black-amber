@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+import 'package:bip39/bip39.dart' as bip39;
 import 'dart:async';
 import 'dart:convert';
 import '../models/wallet_model.dart';
@@ -27,6 +29,15 @@ class WalletProvider with ChangeNotifier {
   String _connectionStatus = 'Disconnected';
   DateTime? _lastConnectionCheck;
   Timer? _syncTimer;
+  
+  // Sync progress tracking (like BitcoinZ Blue)
+  int _syncedBlocks = 0;
+  int _totalBlocks = 0;
+  int _batchNum = 0;
+  int _batchTotal = 0;
+  double _syncProgress = 0.0;
+  String _syncMessage = '';
+  Timer? _syncStatusTimer;
   bool _autoSyncEnabled = true;
   
   // Pagination state
@@ -142,6 +153,14 @@ class WalletProvider with ChangeNotifier {
   DateTime? get lastConnectionCheck => _lastConnectionCheck;
   bool get autoSyncEnabled => _autoSyncEnabled;
   
+  // Sync progress getters (like BitcoinZ Blue)
+  int get syncedBlocks => _syncedBlocks;
+  int get totalBlocks => _totalBlocks;
+  int get batchNum => _batchNum;
+  int get batchTotal => _batchTotal;
+  double get syncProgress => _syncProgress;
+  String get syncMessage => _syncMessage;
+  
   // Pagination getters
   bool get hasMoreTransactions => _hasMoreTransactions;
   bool get isLoadingMore => _isLoadingMore;
@@ -158,30 +177,121 @@ class WalletProvider with ChangeNotifier {
   int get unreadMemoCount => _unreadMemoCount;
   bool get needsSync => _lastSyncTime == null || DateTime.now().difference(_lastSyncTime!).inMinutes > 5;
 
+  /// Generate a new wallet (seed + birthday) without creating Rust wallet
+  Future<Map<String, dynamic>> generateNewWallet() async {
+    if (kDebugMode) {
+      print('🎲 Generating new wallet seed locally...');
+    }
+    
+    // Generate seed phrase locally using BIP39
+    // Import is already at top: import 'package:bip39/bip39.dart' as bip39;
+    final mnemonic = bip39.generateMnemonic(strength: 256); // 24 words
+    
+    // Get current block height to calculate birthday
+    // For now, use a reasonable estimate since we can't easily get height without wallet
+    // BitcoinZ mainnet is around block 1,612,000+ as of 2024
+    int currentHeight = 1612850; // Recent mainnet height
+    
+    // Calculate birthday (current height - 100 for safety)
+    final birthday = currentHeight - 100;
+    
+    if (kDebugMode) {
+      print('✅ New wallet seed generated locally:');
+      print('   Seed: ${mnemonic.split(' ').length} words');
+      print('   Birthday block: $birthday');
+      print('   Note: Wallet will be created after seed verification');
+    }
+    
+    return {
+      'seed': mnemonic,
+      'birthday': birthday,
+    };
+  }
+
   /// Initialize or create wallet (mobile-first)
-  Future<void> createWallet(String seedPhrase, {AuthProvider? authProvider}) async {
+  Future<void> createWallet(String seedPhrase, {AuthProvider? authProvider, bool isNewWallet = true}) async {
     _setLoading(true);
     _clearError();
 
     try {
       if (kDebugMode) {
         print('🏗️ WalletProvider.createWallet() starting...');
-        print('  seedPhrase length: ${seedPhrase.split(' ').length} words');
+        print('  seedPhrase provided: ${seedPhrase.isNotEmpty}');
+        print('  isNewWallet: $isNewWallet');
         print('  authProvider provided: ${authProvider != null}');
       }
       
-      final walletInfo = await BitcoinZService.instance.createWallet(seedPhrase);
-      _wallet = walletInfo;
+      // Create wallet directly via Rust Bridge if no seed provided
+      String finalSeedPhrase = seedPhrase;
+      
+      if (isNewWallet && seedPhrase.isNotEmpty) {
+        // For new wallets, ignore the UI-generated seed and let Rust generate one
+        if (kDebugMode) {
+          print('🦀 Creating new wallet via Rust Bridge...');
+          print('   Note: Ignoring UI seed phrase, will use Rust-generated seed');
+        }
+        final rustInitialized = await _rustService.initialize(
+          serverUri: 'https://lightd.btcz.rocks:9067',
+          createNew: true,  // Create new wallet
+        );
+        
+        if (!rustInitialized) {
+          throw Exception('Failed to create wallet via Rust Bridge');
+        }
+        
+        // Get the generated seed phrase from Rust
+        finalSeedPhrase = _rustService.getSeedPhrase() ?? '';
+        if (finalSeedPhrase.isEmpty) {
+          throw Exception('Failed to get seed phrase from Rust Bridge');
+        }
+        
+        if (kDebugMode) {
+          print('✅ New wallet created with seed phrase from Rust');
+          print('   Birthday: ${_rustService.getBirthday()}');
+        }
+      } else {
+        // Restore wallet from provided seed phrase
+        if (kDebugMode) print('🦀 Restoring wallet via Rust Bridge...');
+        final rustInitialized = await _rustService.initialize(
+          serverUri: 'https://lightd.btcz.rocks:9067',
+          seedPhrase: seedPhrase,
+          createNew: false,
+        );
+        
+        if (!rustInitialized) {
+          throw Exception('Failed to restore wallet via Rust Bridge');
+        }
+        
+        if (kDebugMode) print('✅ Wallet restored from seed phrase');
+      }
+      
+      // Refresh wallet data from Rust to get real addresses
       await _refreshWalletData();
-      await _checkConnection(); // Check connection after wallet creation
+      await _checkConnection();
+      
+      // Create wallet model with real data from Rust
+      final walletId = const Uuid().v4();
+      final walletInfo = WalletModel(
+        walletId: walletId,
+        transparentAddresses: _addresses['transparent'] ?? [],
+        shieldedAddresses: _addresses['shielded'] ?? [],
+        createdAt: DateTime.now(),
+        birthdayHeight: _rustService.getBirthday() ?? 0,
+      );
+      
+      _wallet = walletInfo;
       
       if (kDebugMode) {
-        print('📱 Wallet created successfully:');
-        print('  walletId: ${walletInfo.walletId}');
-        print('  transparent addresses: ${walletInfo.transparentAddresses.length}');
-        print('  shielded addresses: ${walletInfo.shieldedAddresses.length}');
-        if (walletInfo.shieldedAddresses.isNotEmpty) {
-          print('  first shielded address: ${walletInfo.shieldedAddresses.first}');
+        print('📱 Wallet initialized successfully:');
+        print('  walletId: $walletId');
+        print('  birthday block: ${walletInfo.birthdayHeight}');
+        print('  transparent addresses: ${_addresses['transparent']?.length ?? 0}');
+        print('  shielded addresses: ${_addresses['shielded']?.length ?? 0}');
+        if (_addresses['transparent']?.isNotEmpty ?? false) {
+          print('  first t-address: ${_addresses['transparent']!.first}');
+        }
+        if (_addresses['shielded']?.isNotEmpty ?? false) {
+          print('  first z-address: ${_addresses['shielded']!.first}');
         }
       }
       
@@ -189,12 +299,13 @@ class WalletProvider with ChangeNotifier {
       if (authProvider != null) {
         if (kDebugMode) print('💾 Calling authProvider.registerWallet()...');
         await authProvider.registerWallet(
-          walletInfo.walletId,
-          seedPhrase: seedPhrase,
+          walletId,
+          seedPhrase: finalSeedPhrase,
           walletData: {
-            'walletId': walletInfo.walletId,
-            'transparentAddresses': walletInfo.transparentAddresses,
-            'shieldedAddresses': walletInfo.shieldedAddresses,
+            'walletId': walletId,
+            'transparentAddresses': _addresses['transparent'] ?? [],
+            'shieldedAddresses': _addresses['shielded'] ?? [],
+            'birthdayHeight': walletInfo.birthdayHeight,
             'createdAt': DateTime.now().toIso8601String(),
           },
         );
@@ -221,23 +332,50 @@ class WalletProvider with ChangeNotifier {
     _clearError();
 
     try {
-      final walletInfo = await BitcoinZService.instance.restoreWallet(
-        seedPhrase,
+      // Restore wallet directly via Rust Bridge
+      if (kDebugMode) print('🦀 Restoring wallet via Rust Bridge...');
+      final rustInitialized = await _rustService.initialize(
+        serverUri: 'https://lightd.btcz.rocks:9067',
+        seedPhrase: seedPhrase,
+        createNew: false,
+      );
+      
+      if (!rustInitialized) {
+        throw Exception('Failed to restore wallet via Rust Bridge');
+      }
+      
+      // Refresh wallet data from Rust to get real addresses
+      await _refreshWalletData();
+      await _checkConnection();
+      
+      // Create wallet model with real data from Rust
+      final walletId = const Uuid().v4();
+      final walletInfo = WalletModel(
+        walletId: walletId,
+        transparentAddresses: _addresses['transparent'] ?? [],
+        shieldedAddresses: _addresses['shielded'] ?? [],
+        createdAt: DateTime.now(),
         birthdayHeight: birthdayHeight,
       );
+      
       _wallet = walletInfo;
-      await _refreshWalletData();
-      await _checkConnection(); // Check connection after wallet restoration
+      
+      if (kDebugMode) {
+        print('📱 Wallet restored successfully:');
+        print('  walletId: $walletId');
+        print('  transparent addresses: ${_addresses['transparent']?.length ?? 0}');
+        print('  shielded addresses: ${_addresses['shielded']?.length ?? 0}');
+      }
       
       // Store wallet data persistently
       if (authProvider != null) {
         await authProvider.registerWallet(
-          walletInfo.walletId,
+          walletId,
           seedPhrase: seedPhrase,
           walletData: {
-            'walletId': walletInfo.walletId,
-            'transparentAddresses': walletInfo.transparentAddresses,
-            'shieldedAddresses': walletInfo.shieldedAddresses,
+            'walletId': walletId,
+            'transparentAddresses': _addresses['transparent'] ?? [],
+            'shieldedAddresses': _addresses['shielded'] ?? [],
             'birthdayHeight': birthdayHeight,
             'restoredAt': DateTime.now().toIso8601String(),
           },
@@ -343,30 +481,88 @@ class WalletProvider with ChangeNotifier {
       }
       
       if (seedPhrase != null && walletData != null) {
-        // Recreate wallet from stored seed phrase
-        final walletInfo = await BitcoinZService.instance.restoreWallet(
-          seedPhrase,
+        // Initialize Rust Bridge service first to get the correct addresses
+        if (kDebugMode) print('🦀 Initializing Rust Bridge for restored wallet...');
+        
+        // First check if the Rust wallet file already exists
+        // If it does, load it; otherwise restore from seed
+        bool rustInitialized = false;
+        
+        try {
+          // Try to load existing wallet first
+          if (kDebugMode) print('   Attempting to load existing Rust wallet...');
+          rustInitialized = await _rustService.initialize(
+            serverUri: 'https://lightd.btcz.rocks:9067',
+            createNew: false,  // Don't create new
+            seedPhrase: null,  // Don't provide seed, load existing
+          );
+          
+          if (rustInitialized) {
+            if (kDebugMode) print('✅ Loaded existing Rust wallet successfully');
+          }
+        } catch (e) {
+          if (kDebugMode) print('❌ Failed to load existing wallet: $e');
+          // Don't fail here, try to restore from seed
+        }
+        
+        // If loading existing wallet failed, restore from seed
+        if (!rustInitialized) {
+          try {
+            if (kDebugMode) print('   Restoring Rust wallet from seed phrase...');
+            rustInitialized = await _rustService.initialize(
+              serverUri: 'https://lightd.btcz.rocks:9067',
+              seedPhrase: seedPhrase,
+              createNew: false, // Restore from seed
+            );
+            
+            if (rustInitialized) {
+              if (kDebugMode) print('✅ Rust Bridge restored from seed successfully');
+            }
+          } catch (e) {
+            if (kDebugMode) print('⚠️ Rust Bridge initialization failed: $e');
+            // Don't throw - continue with cached data
+            _setConnectionStatus(false, 'Server unreachable - using cached data');
+          }
+        }
+        
+        // Get addresses - from Rust Bridge if initialized, otherwise from cached data
+        if (rustInitialized) {
+          // Get the addresses from Rust Bridge
+          await _rustService.fetchAddresses();
+          
+          // Wait a moment for the addresses to be set via callback
+          await Future.delayed(const Duration(milliseconds: 500));
+        } else {
+          // Use cached addresses from walletData
+          _addresses['transparent'] = List<String>.from(walletData['transparentAddresses'] ?? []);
+          _addresses['shielded'] = List<String>.from(walletData['shieldedAddresses'] ?? []);
+          if (kDebugMode) print('📋 Using cached addresses (offline mode)');
+        }
+        
+        // Create wallet model with available addresses
+        final walletId = walletData['walletId'] ?? const Uuid().v4();
+        final walletInfo = WalletModel(
+          walletId: walletId,
+          transparentAddresses: _addresses['transparent'] ?? [],
+          shieldedAddresses: _addresses['shielded'] ?? [],
+          createdAt: DateTime.now(),
           birthdayHeight: walletData['birthdayHeight'] ?? 0,
         );
         
         _wallet = walletInfo;
         
-        // Use newly generated addresses from Rust backend (not old stored ones)
-        _addresses['transparent'] = walletInfo.transparentAddresses;
-        _addresses['shielded'] = walletInfo.shieldedAddresses;
-        
-        // Update stored wallet data with new correct addresses
+        // Update stored wallet data with correct Rust Bridge addresses
         await authProvider.updateWalletData({
-          'walletId': walletInfo.walletId,
-          'transparentAddresses': walletInfo.transparentAddresses,
-          'shieldedAddresses': walletInfo.shieldedAddresses,
+          'walletId': walletId,
+          'transparentAddresses': _addresses['transparent'] ?? [],
+          'shieldedAddresses': _addresses['shielded'] ?? [],
           'birthdayHeight': walletData['birthdayHeight'] ?? 0,
           'createdAt': walletData['createdAt'] ?? DateTime.now().toIso8601String(),
           'updatedAt': DateTime.now().toIso8601String(),
         });
         
         if (kDebugMode) {
-          print('✅ Wallet restored with regenerated addresses:');
+          print('✅ Wallet restored with Rust Bridge addresses:');
           print('  transparent addresses: ${_addresses['transparent']!.length}');
           if (_addresses['transparent']!.isNotEmpty) {
             print('  first t-address: ${_addresses['transparent']!.first}');
@@ -381,7 +577,34 @@ class WalletProvider with ChangeNotifier {
         
         // Initialize connection and sync
         await _checkConnection();
-        await _refreshWalletData();
+        
+        // Always try to sync immediately like BitcoinZ Blue (same as other branch)
+        // Always check if the Rust service is actually initialized
+        if (kDebugMode) print('🤔 Checking if should start sync: rustInitialized=$rustInitialized, _rustService.initialized=${_rustService.initialized}');
+        if (_rustService.initialized) {
+          // Start sync immediately, not in background
+          if (kDebugMode) print('🚀 Starting initial sync like BitcoinZ Blue...');
+          _setSyncing(true);
+          _startSyncStatusPolling();
+          
+          // Trigger sync right away
+          Future(() async {
+            try {
+              if (kDebugMode) print('🔄 Triggering wallet sync...');
+              // Use Rust service sync directly
+              await _rustService.sync();
+              // Also try to get initial sync status
+              await _updateSyncStatus();
+              await _refreshWalletData();
+            } catch (e) {
+              if (kDebugMode) print('Initial sync error: $e');
+            }
+          });
+        } else {
+          // Load cached data when offline
+          if (kDebugMode) print('📱 Loading cached data (offline mode)...');
+          await _refreshWalletData();
+        }
         
         // Start auto-sync after restoration
         startAutoSync();
@@ -389,25 +612,75 @@ class WalletProvider with ChangeNotifier {
         notifyListeners();
         return true;
       } else if (seedPhrase != null) {
-        // Have seed phrase but no wallet data - recreate wallet
-        if (kDebugMode) print('⚠️ Have seed phrase but no wallet data, recreating...');
-        final walletInfo = await BitcoinZService.instance.createWallet(seedPhrase);
+        // Have seed phrase but no wallet data - recreate wallet with Rust Bridge
+        if (kDebugMode) print('⚠️ Have seed phrase but no wallet data, recreating with Rust Bridge...');
+        
+        // Initialize Rust Bridge with seed phrase
+        final rustInitialized = await _rustService.initialize(
+          serverUri: 'https://lightd.btcz.rocks:9067',
+          seedPhrase: seedPhrase,
+          createNew: false, // Restore from seed
+        );
+        
+        if (!rustInitialized) {
+          throw Exception('Failed to initialize Rust Bridge');
+        }
+        
+        // Get addresses from Rust Bridge
+        await _rustService.fetchAddresses();
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Create wallet model with Rust Bridge addresses
+        final walletId = const Uuid().v4();
+        final walletInfo = WalletModel(
+          walletId: walletId,
+          transparentAddresses: _addresses['transparent'] ?? [],
+          shieldedAddresses: _addresses['shielded'] ?? [],
+          createdAt: DateTime.now(),
+          birthdayHeight: 0,
+        );
+        
         _wallet = walletInfo;
         
-        // Store the newly created wallet addresses
-        _addresses['transparent'] = walletInfo.transparentAddresses;
-        _addresses['shielded'] = walletInfo.shieldedAddresses;
-        
-        // Update stored wallet data
+        // Update stored wallet data with Rust Bridge addresses
         await authProvider.updateWalletData({
-          'walletId': walletInfo.walletId,
-          'transparentAddresses': walletInfo.transparentAddresses,
-          'shieldedAddresses': walletInfo.shieldedAddresses,
+          'walletId': walletId,
+          'transparentAddresses': _addresses['transparent'] ?? [],
+          'shieldedAddresses': _addresses['shielded'] ?? [],
           'createdAt': DateTime.now().toIso8601String(),
         });
         
         await _checkConnection();
-        await _refreshWalletData();
+        
+        // Always try to sync immediately like BitcoinZ Blue
+        // Always check if the Rust service is actually initialized
+        if (kDebugMode) print('🤔 Checking if should start sync (branch 2): rustInitialized=$rustInitialized, _rustService.initialized=${_rustService.initialized}');
+        if (_rustService.initialized) {
+          // Start sync immediately, not in background
+          if (kDebugMode) print('🚀 Starting initial sync like BitcoinZ Blue (branch 2)...');
+          _setSyncing(true);
+          _startSyncStatusPolling();
+          
+          // Trigger sync right away
+          Future(() async {
+            try {
+              if (kDebugMode) print('🔄 Triggering wallet sync (second branch)...');
+              // Use Rust service sync directly
+              await _rustService.sync();
+              // Also try to get initial sync status
+              await _updateSyncStatus();
+              await _refreshWalletData();
+            } catch (e) {
+              if (kDebugMode) print('Initial sync error: $e');
+            }
+          });
+        } else {
+          // Load cached data when offline
+          await _refreshWalletData();
+          // Try to reconnect in background
+          _scheduleReconnectionAttempt();
+        }
+        
         startAutoSync();
         
         notifyListeners();
@@ -445,8 +718,20 @@ class WalletProvider with ChangeNotifier {
   /// Background sync for mobile (lighter operation)
   Future<void> syncWalletInBackground() async {
     if (!hasWallet || _isSyncing) return;
+    
+    // Check if Rust Bridge is initialized
+    if (!_rustService.initialized && _wallet?.walletId?.startsWith('cli_imported_') != true) {
+      if (kDebugMode) print('⚠️ Cannot sync - Rust Bridge not initialized');
+      _scheduleReconnectionAttempt();
+      return;
+    }
 
     _setSyncing(true);
+    
+    // Start polling for sync status (for Rust Bridge)
+    if (_wallet?.walletId?.startsWith('cli_imported_') != true) {
+      _startSyncStatusPolling();
+    }
     
     try {
       // Check if this is a CLI wallet
@@ -454,9 +739,10 @@ class WalletProvider with ChangeNotifier {
         // For CLI wallets, just refresh the data from CLI
         await _loadCliBalance(); // Only load balance in background
       } else {
-        // For Rust FFI wallets, use the original sync
-        await BitcoinZService.instance.syncWallet();
+        // For Rust FFI wallets, sync directly with Rust service
+        await _rustService.sync();
         await _loadBalance(); // Only load balance in background
+        await _refreshWalletData(); // Refresh all data after sync
       }
       _lastSyncTime = DateTime.now();
     } catch (e) {
@@ -464,15 +750,167 @@ class WalletProvider with ChangeNotifier {
       debugPrint('Background sync failed: $e');
     } finally {
       _setSyncing(false);
+      _stopSyncStatusPolling();
     }
   }
 
   /// Full sync wallet with blockchain
+  /// Start sync status polling (like BitcoinZ Blue)
+  void _startSyncStatusPolling() {
+    _stopSyncStatusPolling();
+    
+    if (kDebugMode) print('🔄 Starting sync status polling...');
+    if (kDebugMode) print('   Rust service initialized: ${_rustService.initialized}');
+    
+    // Set syncing flag immediately
+    _setSyncing(true);
+    if (kDebugMode) print('   Syncing flag set to true');
+    
+    // Poll every second for sync status
+    _syncStatusTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+      if (kDebugMode) print('🕙 Sync status poll timer tick...');
+      await _updateSyncStatus();
+    });
+    
+    // Initial status check
+    if (kDebugMode) print('   Triggering initial sync status check...');
+    Future.microtask(() => _updateSyncStatus());
+  }
+  
+  /// Stop sync status polling
+  void _stopSyncStatusPolling() {
+    _syncStatusTimer?.cancel();
+    _syncStatusTimer = null;
+  }
+  
+  /// Schedule a reconnection attempt when offline
+  void _scheduleReconnectionAttempt() {
+    if (kDebugMode) print('📡 Scheduling reconnection attempt...');
+    
+    // Try to reconnect every 10 seconds
+    Future.delayed(const Duration(seconds: 10), () async {
+      if (!_rustService.initialized && hasWallet) {
+        try {
+          if (kDebugMode) print('🔄 Attempting to reconnect to server...');
+          
+          // Get the seed phrase from storage
+          final authProvider = AuthProvider();
+          final seedPhrase = await authProvider.getSeedPhrase();
+          
+          if (seedPhrase != null) {
+            final connected = await _rustService.initialize(
+              serverUri: 'https://lightd.btcz.rocks:9067',
+              seedPhrase: seedPhrase,
+              createNew: false,
+            );
+            
+            if (connected) {
+              if (kDebugMode) print('✅ Reconnected successfully!');
+              _setConnectionStatus(true, 'Connected to server');
+              
+              // Now sync the wallet
+              syncWalletInBackground();
+            } else {
+              // Schedule another attempt
+              _scheduleReconnectionAttempt();
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) print('❌ Reconnection failed: $e');
+          // Schedule another attempt
+          _scheduleReconnectionAttempt();
+        }
+      }
+    });
+  }
+  
+  /// Update sync status from Rust Bridge
+  Future<void> _updateSyncStatus() async {
+    if (!_rustService.initialized) {
+      if (kDebugMode) print('⚠️ Rust service not initialized, skipping sync status update');
+      return;
+    }
+    
+    try {
+      final status = await _rustService.getSyncStatus();
+      if (status == null) {
+        if (kDebugMode) print('⚠️ No sync status available');
+        return;
+      }
+      
+      if (kDebugMode) {
+        print('📊 Sync status update: $status');
+      }
+      
+      final inProgress = status['in_progress'] ?? false;
+      
+      if (inProgress) {
+        _setSyncing(true);  // Ensure syncing flag is set
+        
+        _syncedBlocks = status['synced_blocks'] ?? 0;
+        _totalBlocks = status['total_blocks'] ?? 0;
+        _batchNum = status['batch_num'] ?? 0;
+        _batchTotal = status['batch_total'] ?? 0;
+        
+        // Calculate progress exactly like BitcoinZ Blue
+        double batchProgress = 0.0;
+        double totalProgress = 0.0;
+        
+        if (_totalBlocks > 0) {
+          batchProgress = (_syncedBlocks * 100.0) / _totalBlocks;
+          totalProgress = batchProgress;
+        }
+        
+        if (_batchTotal > 0 && _batchNum > 0) {
+          final base = ((_batchNum - 1) * 100.0) / _batchTotal;
+          totalProgress = base + (batchProgress / _batchTotal);
+        }
+        
+        _syncProgress = totalProgress.clamp(0.0, 100.0);
+        
+        // Create sync message (BitcoinZ Blue format)
+        if (_batchTotal > 0) {
+          _syncMessage = 'Syncing batch $_batchNum of $_batchTotal';
+        } else {
+          _syncMessage = 'Syncing...';
+        }
+        
+        if (kDebugMode) {
+          print('📊 $_syncMessage');
+          print('   Batch Progress: ${batchProgress.toStringAsFixed(2)}%. Total progress: ${totalProgress.toStringAsFixed(2)}%.');
+        }
+      } else {
+        // Sync completed
+        if (_isSyncing) {
+          _syncProgress = 100.0;
+          _syncMessage = 'Sync complete';
+          if (kDebugMode) print('✅ Sync completed!');
+          
+          // Refresh wallet data after sync
+          _refreshWalletData();
+          
+          // Stop after a short delay
+          Future.delayed(const Duration(seconds: 1), () {
+            _setSyncing(false);
+            _stopSyncStatusPolling();
+          });
+        }
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to update sync status: $e');
+    }
+  }
+  
   Future<void> syncWallet() async {
     if (!hasWallet) return;
 
     _setSyncing(true);
     _clearError();
+    
+    // Start polling for sync status
+    _startSyncStatusPolling();
 
     try {
       // Check if this is a CLI wallet
@@ -491,6 +929,7 @@ class WalletProvider with ChangeNotifier {
       _setConnectionStatus(false, 'Sync failed');
     } finally {
       _setSyncing(false);
+      _stopSyncStatusPolling();
     }
   }
   
@@ -501,27 +940,15 @@ class WalletProvider with ChangeNotifier {
         print('🔍 _checkConnection: walletId=${_wallet?.walletId}, isCliWallet=${_wallet?.walletId?.startsWith('cli_imported_')}');
       }
       
-      // Check if this is a CLI wallet
-      if (_wallet?.walletId?.startsWith('cli_imported_') == true) {
-        // Initialize Rust bridge with existing wallet
-        final rustInitialized = await _rustService.initialize(
-          serverUri: 'https://lightd.btcz.rocks:9067',
-          seedPhrase: null, // Will use existing wallet
-          createNew: false,
-        );
-        if (rustInitialized) {
-          _setConnectionStatus(true, 'Connected via CLI');
-        } else {
-          _setConnectionStatus(false, 'CLI unavailable');
-        }
+      // Check connection status by getting current block height
+      // If we can get a valid block height, we're connected
+      final blockHeight = await _rustService.getCurrentBlockHeight();
+      if (blockHeight != null && blockHeight > 0) {
+        _setConnectionStatus(true, 'Connected to server');
+        if (kDebugMode) print('✅ Connected: Block height $blockHeight');
       } else {
-        // For Rust FFI wallets, use the original logic
-        final status = await BitcoinZService.instance.getSyncStatus();
-        if (status != null && status.containsKey('is_syncing')) {
-          _setConnectionStatus(true, 'Connected to server');
-        } else {
-          _setConnectionStatus(false, 'Server unreachable');
-        }
+        _setConnectionStatus(false, 'Server unreachable');
+        if (kDebugMode) print('❌ Disconnected: No block height available');
       }
     } catch (e) {
       _setConnectionStatus(false, 'Connection error');
@@ -795,12 +1222,12 @@ class WalletProvider with ChangeNotifier {
   Future<void> _refreshWalletData() async {
     if (kDebugMode) print('🔄 _refreshWalletData called...');
     
-    // Check if this is a CLI wallet (use Rust Bridge)
-    if (_wallet?.walletId?.startsWith('cli_imported_') == true) {
-      if (kDebugMode) print('   Using Rust Bridge for CLI wallet');
+    // Always use Rust Bridge for all wallets (provides mempool monitoring)
+    if (_rustService.initialized) {
+      if (kDebugMode) print('   Using Rust Bridge for wallet refresh');
       await _rustService.refresh(); // Rust service handles everything
     } else {
-      if (kDebugMode) print('   Using regular wallet refresh path');
+      if (kDebugMode) print('   Rust Bridge not initialized, using fallback refresh');
       await Future.wait([
         _loadBalance(),
         _loadTransactions(),

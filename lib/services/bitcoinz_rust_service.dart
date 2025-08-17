@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import '../models/balance_model.dart';
 import '../models/transaction_model.dart';
 import '../services/database_service.dart';
+import '../services/wallet_storage_service.dart';
 import '../src/rust/api.dart' as rust_api;
 import '../src/rust/frb_generated.dart';
 
@@ -20,6 +21,10 @@ class BitcoinzRustService {
   bool _initialized = false;
   static bool _bridgeInitialized = false;
   String? _seedPhrase;
+  int? _birthday;
+  
+  /// Check if the service is initialized
+  bool get initialized => _initialized;
   
   // Callbacks (same as BitcoinZ Blue)
   Function(BalanceModel)? fnSetTotalBalance;
@@ -69,26 +74,104 @@ class BitcoinzRustService {
         if (kDebugMode) print('✅ Rust bridge already initialized, skipping');
       }
       
+      // Get the wallet data directory for Black Amber (where wallet.dat will be stored)
+      // This ensures we don't use BitcoinZ Blue's wallet directory
+      String? walletDirPath;
+      try {
+        final walletDir = await WalletStorageService.getWalletDataDirectory();
+        walletDirPath = walletDir.path;
+        if (kDebugMode) print('📁 Using Black Amber wallet directory: $walletDirPath');
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Failed to get wallet directory, using default: $e');
+        walletDirPath = null;
+      }
+      
       // Initialize wallet
       if (createNew) {
         // Create new wallet
-        if (kDebugMode) print('📝 Creating new wallet...');
-        _seedPhrase = await rust_api.initializeNew(serverUri: serverUri);
+        if (kDebugMode) {
+          print('📝 Creating new wallet via Rust...');
+          print('   Server: $serverUri');
+          print('   Directory: ${walletDirPath ?? "default"}');
+        }
         
-        if (_seedPhrase?.startsWith('Error:') ?? true) {
-          if (kDebugMode) print('❌ Failed to create wallet: $_seedPhrase');
+        // Use Black Amber's wallet directory to avoid conflicts with BitcoinZ Blue
+        if (kDebugMode) print('📁 Creating wallet in: ${walletDirPath ?? "default"}');
+        final result = await rust_api.initializeNewWithInfo(
+          serverUri: serverUri,
+          walletDir: walletDirPath, // Use Black Amber directory
+        );
+        
+        if (result.startsWith('Error:')) {
+          if (kDebugMode) print('❌ Failed to create wallet: $result');
           return false;
         }
-        if (kDebugMode) print('✅ New wallet created');
+        
+        // Parse JSON response to get seed and birthday
+        try {
+          if (kDebugMode) print('📋 Raw response: $result');
+          
+          // The response structure is:
+          // {"seed": "{\"seed\":\"actual words here\",\"birthday\":1612745}", "birthday": 1612745, "latest_block": 1612845}
+          // We need to handle this double-nested structure
+          
+          // First, find the actual seed phrase using a more robust regex
+          // Look for the innermost seed value (the actual words)
+          final innerSeedMatch = RegExp(r'\\"seed\\":\\"([^"\\]+)\\"').firstMatch(result);
+          if (innerSeedMatch != null) {
+            _seedPhrase = innerSeedMatch.group(1)!;
+            if (kDebugMode) print('📝 Extracted seed phrase via regex');
+          } else {
+            // Fallback: try to find any seed phrase pattern (24 words)
+            final wordsMatch = RegExp(r'"([a-z]+(?: [a-z]+){23})"').firstMatch(result);
+            if (wordsMatch != null) {
+              _seedPhrase = wordsMatch.group(1)!;
+              if (kDebugMode) print('📝 Extracted seed phrase via word pattern');
+            }
+          }
+          
+          // Extract birthday from the outer JSON (not escaped)
+          final birthdayMatch = RegExp(r'"birthday"\s*:\s*(\d+)(?=[,}])').firstMatch(result);
+          if (birthdayMatch != null) {
+            _birthday = int.parse(birthdayMatch.group(1)!);
+            if (kDebugMode) print('🎂 Extracted birthday: $_birthday');
+          }
+          
+          if (kDebugMode) {
+            print('✅ New wallet created');
+            print('   Seed phrase: ${_seedPhrase!.split(' ').length} words');
+            print('   Birthday block: $_birthday');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('❌ Failed to parse wallet creation response: $e');
+            print('   Error type: ${e.runtimeType}');
+            print('   Stack trace:');
+            print(StackTrace.current);
+          }
+          return false;
+        }
       } else if (seedPhrase != null) {
         // Restore from seed
         if (kDebugMode) print('🔄 Restoring wallet from seed...');
-        final result = await rust_api.initializeFromPhrase(
-          serverUri: serverUri,
-          seedPhrase: seedPhrase,
-          birthday: BigInt.zero, // Start from genesis
-          overwrite: true,
-        );
+        
+        // Use Black Amber's wallet directory for restoration
+        String result;
+        try {
+          if (kDebugMode) print('📁 Restoring wallet to: ${walletDirPath ?? "default"}');
+          
+          // Use the full function with wallet directory
+          result = await rust_api.initializeFromPhrase(
+            serverUri: serverUri,
+            seedPhrase: seedPhrase,
+            birthday: BigInt.zero, // Use 0 for full scan
+            overwrite: true, // Overwrite if exists
+            walletDir: walletDirPath,
+          );
+        } catch (e) {
+          if (kDebugMode) print('⚠️ Restore with custom directory failed: $e');
+          return false;
+        }
         
         if (result != 'OK' && !result.contains('seed')) {
           if (kDebugMode) print('❌ Failed to restore wallet: $result');
@@ -99,7 +182,13 @@ class BitcoinzRustService {
       } else {
         // Load existing wallet
         if (kDebugMode) print('📂 Loading existing wallet...');
-        final result = await rust_api.initializeExisting(serverUri: serverUri);
+        
+        // Load from Black Amber's wallet directory
+        if (kDebugMode) print('📁 Loading wallet from: ${walletDirPath ?? "default"}');
+        final result = await rust_api.initializeExisting(
+          serverUri: serverUri,
+          walletDir: walletDirPath, // Use Black Amber directory
+        );
         
         if (result != 'OK' && !result.contains('success')) {
           if (kDebugMode) print('❌ Failed to load existing wallet: $result');
@@ -159,7 +248,15 @@ class BitcoinzRustService {
     try {
       // Get transaction list
       final txListJson = await rust_api.execute(command: 'list', args: '');
-      final txList = jsonDecode(txListJson) as List;
+      final txListDecoded = jsonDecode(txListJson);
+      
+      // Check if response is an error
+      if (txListDecoded is Map && txListDecoded.containsKey('error')) {
+        if (kDebugMode) print('⚠️ Transaction list error: ${txListDecoded['error']}');
+        return;
+      }
+      
+      final txList = txListDecoded as List;
       
       // Get latest txid
       final latestTxid = txList.isNotEmpty ? txList[0]['txid'] : '';
@@ -167,6 +264,13 @@ class BitcoinzRustService {
       // Get balance
       final balanceJson = await rust_api.execute(command: 'balance', args: '');
       final balanceData = jsonDecode(balanceJson);
+      
+      // Check if balance response is an error
+      if (balanceData is Map && balanceData.containsKey('error')) {
+        if (kDebugMode) print('⚠️ Balance error: ${balanceData['error']}');
+        return;
+      }
+      
       final currentBalance = ((balanceData['tbalance'] ?? 0) + 
                               (balanceData['zbalance'] ?? 0)) / 100000000.0;
       
@@ -261,14 +365,36 @@ class BitcoinzRustService {
       
       // Check for unconfirmed transactions in mempool
       final txListJson = await rust_api.execute(command: 'list', args: '');
-      final txList = jsonDecode(txListJson) as List;
+      var txListDecoded = jsonDecode(txListJson);
+      
+      // Check if response is an error
+      if (txListDecoded is Map && txListDecoded.containsKey('error')) {
+        if (kDebugMode) print('⚠️ Transaction list error in fetchBalance: ${txListDecoded['error']}');
+        // Return empty list for transactions when error
+        txListDecoded = [];
+      }
+      
+      final txList = txListDecoded as List;
+      
+      // Debug: Log first transaction to see structure
+      if (kDebugMode && txList.isNotEmpty) {
+        print('🔍 First transaction data:');
+        print('   Full tx: ${txList.first}');
+        print('   unconfirmed field: ${txList.first['unconfirmed']}');
+        print('   block_height field: ${txList.first['block_height']}');
+      }
       
       double pendingBalance = 0;
       double pendingTransparent = 0;
       double pendingShielded = 0;
       
       for (final tx in txList) {
-        if (tx['unconfirmed'] == true) {
+        // Check for unconfirmed: either explicit flag OR no block height
+        final bool isUnconfirmed = tx['unconfirmed'] == true || 
+                                   tx['block_height'] == null || 
+                                   tx['block_height'] == 0;
+        
+        if (isUnconfirmed) {
           final amount = (tx['amount'] ?? 0).abs() / 100000000.0;
           if (tx['outgoing_metadata'] == null) {
             // Incoming unconfirmed
@@ -364,13 +490,25 @@ class BitcoinzRustService {
     return _currentBlockHeight; // Return cached value if fetch fails
   }
   
-  /// Fetch transactions
+  /// Fetch transactions with timeout
   Future<void> fetchTransactions() async {
     if (!_initialized) return;
     
     try {
-      final txListJson = await rust_api.execute(command: 'list', args: '');
-      final txList = jsonDecode(txListJson) as List;
+      // Add timeout to prevent infinite loading
+      final txListJson = await rust_api.execute(command: 'list', args: '').timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => '[]', // Return empty array on timeout
+      );
+      final txListDecoded = jsonDecode(txListJson);
+      
+      // Check if response is an error
+      if (txListDecoded is Map && txListDecoded.containsKey('error')) {
+        if (kDebugMode) print('⚠️ Transaction list error in fetchTransactions: ${txListDecoded['error']}');
+        return;
+      }
+      
+      final txList = txListDecoded as List;
       
       if (kDebugMode) {
         final unconfirmedCount = txList.where((tx) => tx['unconfirmed'] == true).length;
@@ -392,8 +530,14 @@ class BitcoinzRustService {
         // Debug log first transaction to see available fields
         if (kDebugMode && index == 1) {
           print('📋 First transaction fields: ${(tx as Map).keys.toList()}');
-          print('📋 Transaction data sample: txid=${tx['txid']?.toString()?.substring(0, 8)}..., block_height=${tx['block_height']}, height=${tx['height']}, blockHeight=${tx['blockHeight']}');
+          print('📋 Transaction data: txid=${tx['txid']?.toString()?.substring(0, 8)}..., unconfirmed=${tx['unconfirmed']}, block_height=${tx['block_height']}');
         }
+        
+        // Check if transaction is unconfirmed (multiple ways)
+        final bool txUnconfirmed = tx['unconfirmed'] == true || 
+                                   tx['block_height'] == null || 
+                                   tx['block_height'] == 0;
+        
         final type = tx['outgoing_metadata'] != null ? 'sent' : 'received';
         final address = type == 'sent'
             ? (tx['outgoing_metadata'].isNotEmpty ? tx['outgoing_metadata'][0]['address'] : '')
@@ -413,7 +557,7 @@ class BitcoinzRustService {
         final blockHeight = txHeightValue is int ? txHeightValue : 
                            (txHeightValue != null ? int.tryParse(txHeightValue.toString()) : null);
         
-        if (tx['unconfirmed'] == true) {
+        if (txUnconfirmed) {
           confirmations = 0;
           if (kDebugMode) {
             print('🔄 Unconfirmed TX: ${(tx['txid'] as String).substring(0, 8)}...');
@@ -433,9 +577,11 @@ class BitcoinzRustService {
         }
         
         // Log unconfirmed transactions
-        if (tx['unconfirmed'] == true) {
+        if (txUnconfirmed) {
           if (kDebugMode) {
             print('🔄 UNCONFIRMED TX via Rust: ${tx['txid']} - $type $amount BTCZ');
+            print('   unconfirmed flag: ${tx['unconfirmed']}');
+            print('   block_height: ${tx['block_height']}');
           }
         }
         
@@ -562,13 +708,17 @@ class BitcoinzRustService {
     }
   }
   
-  /// Get new address
+  /// Get new address with timeout
   Future<String?> getNewAddress({bool transparent = true}) async {
     if (!_initialized) return null;
     
     try {
       final command = transparent ? 'new' : 'new z';
-      final result = await rust_api.execute(command: command, args: '');
+      // Add timeout to prevent infinite loading
+      final result = await rust_api.execute(command: command, args: '').timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => '{"error": "Timeout generating address"}',
+      );
       final data = jsonDecode(result);
       
       if (data is List && data.isNotEmpty) {
@@ -584,6 +734,103 @@ class BitcoinzRustService {
   
   /// Get seed phrase
   String? getSeedPhrase() => _seedPhrase;
+  
+  /// Get birthday block height
+  int? getBirthday() => _birthday;
+  
+  /// Get sync status for progress display
+  Future<Map<String, dynamic>?> getSyncStatus() async {
+    if (!_initialized) {
+      if (kDebugMode) print('⚠️ getSyncStatus: Rust service not initialized');
+      return null;
+    }
+    
+    try {
+      if (kDebugMode) print('🔍 Calling syncstatus command...');
+      final statusStr = await rust_api.execute(command: 'syncstatus', args: '');
+      
+      if (kDebugMode) {
+        print('📊 Raw sync status from Rust: "$statusStr"');
+        print('   Type: ${statusStr.runtimeType}');
+        print('   Length: ${statusStr.length}');
+      }
+      
+      // Try to parse as JSON first
+      try {
+        final status = jsonDecode(statusStr);
+        if (status is Map<String, dynamic>) {
+          return status;
+        }
+      } catch (e) {
+        // Not JSON, parse the text format: "id: 1, batch: 0/9, blocks: 0/50000"
+        if (statusStr.contains('batch:') && statusStr.contains('blocks:')) {
+          if (kDebugMode) print('   Parsing text format sync status...');
+          
+          final parts = statusStr.split(',').map((s) => s.trim()).toList();
+          
+          int? batchNum, batchTotal, syncedBlocks, totalBlocks;
+          bool inProgress = false;
+          
+          for (final part in parts) {
+            if (part.contains('batch:')) {
+              // Find the batch: part even if not at the start
+              final batchMatch = RegExp(r'batch:\s*(\d+)/(\d+)').firstMatch(part);
+              if (batchMatch != null) {
+                batchNum = int.tryParse(batchMatch.group(1)!) ?? 0;
+                batchTotal = int.tryParse(batchMatch.group(2)!) ?? 0;
+                // Add 1 to batch number since it's 0-indexed for display
+                if (batchTotal > 0) batchNum = batchNum + 1;
+                if (kDebugMode) print('   Found batch: $batchNum/$batchTotal');
+              }
+            }
+            if (part.contains('blocks:')) {
+              // Find the blocks: part even if not at the start
+              final blockMatch = RegExp(r'blocks:\s*(\d+)/(\d+)').firstMatch(part);
+              if (blockMatch != null) {
+                syncedBlocks = int.tryParse(blockMatch.group(1)!) ?? 0;
+                totalBlocks = int.tryParse(blockMatch.group(2)!) ?? 0;
+                if (kDebugMode) print('   Found blocks: $syncedBlocks/$totalBlocks');
+              }
+            }
+          }
+          
+          // Consider it in progress if we have batch/block info and not completed
+          inProgress = (batchTotal != null && batchTotal > 0 && batchNum != null && batchNum <= batchTotal) || 
+                      (totalBlocks != null && totalBlocks > 0 && syncedBlocks != null && syncedBlocks < totalBlocks);
+          
+          final parsedStatus = {
+            'in_progress': inProgress,
+            'batch_num': batchNum ?? 0,
+            'batch_total': batchTotal ?? 0,
+            'synced_blocks': syncedBlocks ?? 0,
+            'total_blocks': totalBlocks ?? 0,
+          };
+          
+          if (kDebugMode) {
+            print('📊 Parsed sync status: $parsedStatus');
+          }
+          
+          return parsedStatus;
+        } else {
+          if (kDebugMode) {
+            print('   Status does not contain batch/blocks info');
+          }
+        }
+      }
+      
+      // Default response if we can't parse
+      return {
+        'in_progress': false,
+        'batch_num': 0,
+        'batch_total': 0,
+        'synced_blocks': 0,
+        'total_blocks': 0,
+      };
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get sync status: $e');
+      return null;
+    }
+  }
   
   /// Dispose and cleanup
   Future<void> dispose() async {

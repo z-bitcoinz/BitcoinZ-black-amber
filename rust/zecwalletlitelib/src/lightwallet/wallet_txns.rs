@@ -314,7 +314,9 @@ impl WalletTxns {
         let txids_to_remove = self
             .current
             .iter()
-            .filter(|(_, wtx)| wtx.unconfirmed && wtx.block < cutoff)
+            // Only remove unconfirmed transactions that have a non-zero block height AND are old
+            // This prevents removing legitimate mempool transactions (which have block = 0 or current height)
+            .filter(|(_, wtx)| wtx.unconfirmed && wtx.block > BlockHeight::from(0) && wtx.block < cutoff)
             .map(|(_, wtx)| wtx.txid.clone())
             .collect::<Vec<_>>();
 

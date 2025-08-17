@@ -4,6 +4,7 @@ import 'package:local_auth/local_auth.dart';
 import 'dart:io';
 import 'dart:convert';
 import '../services/storage_service.dart';
+import '../services/wallet_storage_service.dart';
 // import '../services/cli_wallet_detector.dart'; // Removed - CLI no longer used
 
 class AuthProvider with ChangeNotifier {
@@ -22,6 +23,7 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   bool _cliWalletImported = false;
+  bool _hasLegacyWallet = false;
   final LocalAuthentication _localAuth = LocalAuthentication();
   // final CliWalletDetector _cliDetector = CliWalletDetector(); // Removed - CLI no longer used
 
@@ -33,6 +35,7 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get cliWalletImported => _cliWalletImported;
+  bool get hasLegacyWallet => _hasLegacyWallet;
 
   /// Initialize auth provider with mobile-first approach
   Future<void> initialize() async {
@@ -44,11 +47,17 @@ class AuthProvider with ChangeNotifier {
     try {
       await _loadStoredData();
       
-      // Check for existing CLI wallet BEFORE checking if we need setup
-      // Disabled - CLI detection no longer used
-      // if (!_hasWallet && !_cliWalletImported) {
-      //   await _detectAndImportCliWallet();
-      // }
+      // Check for legacy BitcoinZ Blue wallet on macOS
+      if (Platform.isMacOS && !_hasWallet) {
+        final hasLegacy = await WalletStorageService.hasLegacyWallet();
+        if (hasLegacy) {
+          if (kDebugMode) {
+            print('🔄 Found legacy BitcoinZ Blue wallet data');
+          }
+          _hasLegacyWallet = true;
+          notifyListeners();
+        }
+      }
       
       // Check if biometrics are available on mobile
       if (Platform.isAndroid || Platform.isIOS) {
@@ -498,6 +507,13 @@ class AuthProvider with ChangeNotifier {
     return await StorageService.read(key: _seedPhraseKey);
   }
   
+  /// Get seed phrase synchronously (for initialization)
+  String? getSeedPhrase() {
+    // This is a temporary method to get the seed phrase during initialization
+    // In production, this should be handled more securely
+    return null; // Will be loaded asynchronously
+  }
+  
   /// Get stored wallet data
   Future<Map<String, dynamic>?> getStoredWalletData() async {
     if (!_isAuthenticated) return null;
@@ -515,5 +531,54 @@ class AuthProvider with ChangeNotifier {
   /// Update stored wallet data
   Future<void> updateWalletData(Map<String, dynamic> walletData) async {
     await StorageService.write(key: _walletDataKey, value: jsonEncode(walletData));
+  }
+  
+  /// Migrate legacy BitcoinZ Blue wallet to Black Amber
+  Future<bool> migrateLegacyWallet() async {
+    if (!Platform.isMacOS || !_hasLegacyWallet) {
+      return false;
+    }
+    
+    _setLoading(true);
+    _clearError();
+    
+    try {
+      if (kDebugMode) {
+        print('🔄 Starting migration from BitcoinZ Blue to Black Amber...');
+      }
+      
+      // Perform the migration
+      final success = await WalletStorageService.migrateLegacyWallet();
+      
+      if (success) {
+        // Mark as having a wallet now
+        _hasWallet = true;
+        _hasLegacyWallet = false;
+        
+        // Save wallet state
+        await StorageService.write(key: _hasWalletKey, value: 'true');
+        await StorageService.write(key: _walletIdKey, value: 'migrated_from_blue');
+        await StorageService.write(key: _walletDataKey, value: jsonEncode({
+          'migrated': true,
+          'migrated_at': DateTime.now().toIso8601String(),
+          'source': 'BitcoinZ Blue',
+        }));
+        
+        if (kDebugMode) {
+          print('✅ Successfully migrated wallet to BitcoinZ Black Amber');
+        }
+        
+        notifyListeners();
+        return true;
+      } else {
+        _setError('Failed to migrate wallet data');
+        return false;
+      }
+    } catch (e) {
+      _setError('Migration failed: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
   }
 }

@@ -6,6 +6,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/transaction_model.dart';
 import '../models/address_model.dart';
+import './wallet_storage_service.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -63,29 +64,16 @@ class DatabaseService {
   }
 
   Future<Database> _initDatabase() async {
-    String path;
+    // Use WalletStorageService for consistent cross-platform paths
+    final dbPath = await WalletStorageService.getDatabasePath();
     
-    // Use application support directory for better permissions
-    if (defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux) {
-      // Desktop platforms: use application support directory
-      final Directory appSupportDir = await getApplicationSupportDirectory();
-      // Create database subdirectory if needed
-      final dbDir = Directory(join(appSupportDir.path, 'database'));
-      if (!await dbDir.exists()) {
-        await dbDir.create(recursive: true);
-      }
-      path = join(dbDir.path, 'bitcoinz_wallet.db');
-      if (kDebugMode) print('📁 Database path: $path');
-    } else {
-      // Mobile platforms: use default database path
-      final databasesPath = await getDatabasesPath();
-      path = join(databasesPath, 'bitcoinz_wallet.db');
+    if (kDebugMode) {
+      print('📁 Database path: $dbPath');
+      print('   App: BitcoinZ Black Amber');
     }
 
     return await openDatabase(
-      path,
+      dbPath,
       version: 2,
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,

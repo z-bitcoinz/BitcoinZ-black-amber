@@ -8,10 +8,12 @@ import '../main_screen.dart';
 
 class SeedPhraseVerificationScreen extends StatefulWidget {
   final String seedPhrase;
+  final int? birthdayBlock;
 
   const SeedPhraseVerificationScreen({
     super.key,
     required this.seedPhrase,
+    this.birthdayBlock,
   });
 
   @override

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/wallet_provider.dart';
@@ -89,6 +90,7 @@ class _MainScreenState extends State<MainScreen>
 
   Future<void> _initializeWallet() async {
     try {
+      if (kDebugMode) print('🚀 MainScreen._initializeWallet() starting...');
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
@@ -98,11 +100,14 @@ class _MainScreenState extends State<MainScreen>
       // Try to restore wallet from stored data first
       bool restored = false;
       if (authProvider.hasWallet && authProvider.isAuthenticated) {
+        if (kDebugMode) print('   Restoring wallet from stored data...');
         restored = await walletProvider.restoreFromStoredData(authProvider);
+        if (kDebugMode) print('   Wallet restored: $restored');
       }
       
       // If restoration failed or no stored data, just sync if we have a wallet
       if (!restored && walletProvider.hasWallet) {
+        if (kDebugMode) print('   Starting wallet sync...');
         await walletProvider.syncWallet();
       }
     } catch (e) {

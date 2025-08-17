@@ -189,7 +189,7 @@ class _SendScreenState extends State<SendScreen>
         fee: _estimatedFee,
         fiatAmount: fiatAmount,
         currencyCode: currencyCode,
-        onConfirm: () => _processSendTransaction(amount, address),
+        onConfirm: () => _processSendTransaction(amount, address, fiatAmount, currencyCode),
         onCancel: () {
           // User cancelled, do nothing
         },
@@ -197,7 +197,7 @@ class _SendScreenState extends State<SendScreen>
     );
   }
   
-  Future<void> _processSendTransaction(double amount, String address) async {
+  Future<void> _processSendTransaction(double amount, String address, [double? fiatAmount, String? currencyCode]) async {
     setState(() {
       _isSending = true;
       _errorMessage = null;
@@ -251,6 +251,9 @@ class _SendScreenState extends State<SendScreen>
             transactionId: result,
             amount: amount,
             toAddress: address,
+            fiatAmount: fiatAmount,
+            currencyCode: currencyCode,
+            fee: _estimatedFee,
             onClose: _resetForm,
           ),
         );

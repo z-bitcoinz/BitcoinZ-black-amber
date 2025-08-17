@@ -10,28 +10,45 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref`, `initialize`
 
 /// Check if a wallet exists
-Future<bool> walletExists({required String chainName}) =>
-    RustLib.instance.api.crateApiWalletExists(chainName: chainName);
+Future<bool> walletExists({String? walletDir}) =>
+    RustLib.instance.api.crateApiWalletExists(walletDir: walletDir);
 
 /// Initialize a new wallet and return the seed phrase
-Future<String> initializeNew({required String serverUri}) =>
-    RustLib.instance.api.crateApiInitializeNew(serverUri: serverUri);
+Future<String> initializeNew({required String serverUri, String? walletDir}) =>
+    RustLib.instance.api
+        .crateApiInitializeNew(serverUri: serverUri, walletDir: walletDir);
+
+/// Initialize a new wallet and return both seed phrase and birthday
+Future<String> initializeNewWithInfo(
+        {required String serverUri, String? walletDir}) =>
+    RustLib.instance.api.crateApiInitializeNewWithInfo(
+        serverUri: serverUri, walletDir: walletDir);
 
 /// Initialize from an existing wallet
-Future<String> initializeExisting({required String serverUri}) =>
-    RustLib.instance.api.crateApiInitializeExisting(serverUri: serverUri);
+Future<String> initializeExisting(
+        {required String serverUri, String? walletDir}) =>
+    RustLib.instance.api
+        .crateApiInitializeExisting(serverUri: serverUri, walletDir: walletDir);
+
+/// Initialize from seed phrase (simplified version without wallet_dir to avoid serialization issues)
+Future<String> initializeFromPhraseSimple(
+        {required String serverUri, required String seedPhrase}) =>
+    RustLib.instance.api.crateApiInitializeFromPhraseSimple(
+        serverUri: serverUri, seedPhrase: seedPhrase);
 
 /// Initialize from seed phrase
 Future<String> initializeFromPhrase(
         {required String serverUri,
         required String seedPhrase,
         required BigInt birthday,
-        required bool overwrite}) =>
+        required bool overwrite,
+        String? walletDir}) =>
     RustLib.instance.api.crateApiInitializeFromPhrase(
         serverUri: serverUri,
         seedPhrase: seedPhrase,
         birthday: birthday,
-        overwrite: overwrite);
+        overwrite: overwrite,
+        walletDir: walletDir);
 
 /// Execute a command (main wallet interface)
 Future<String> execute({required String command, required String args}) =>

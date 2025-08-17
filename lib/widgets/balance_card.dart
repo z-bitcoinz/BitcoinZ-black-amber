@@ -135,9 +135,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                             ).createShader(bounds);
                           },
                           child: Text(
-                            walletProvider.hasWallet 
-                                ? walletProvider.balance.formattedTotal
-                                : '••••••••',
+                            walletProvider.balance.formattedTotal,  // Always show balance (defaults to 0)
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 32,
@@ -197,9 +195,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                           child: _buildBalanceColumn(
                             context,
                             'Transparent',
-                            walletProvider.hasWallet 
-                                ? walletProvider.balance.formattedTransparent
-                                : '••••',
+                            walletProvider.balance.formattedTransparent,  // Always show balance
                             Icons.visibility_outlined,
                           ),
                         ),
@@ -212,9 +208,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                           child: _buildBalanceColumn(
                             context,
                             'Shielded',
-                            walletProvider.hasWallet 
-                                ? walletProvider.balance.formattedShielded
-                                : '••••',
+                            walletProvider.balance.formattedShielded,  // Always show balance
                             Icons.shield_outlined,
                           ),
                         ),

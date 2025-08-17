@@ -12,16 +12,20 @@ lazy_static! {
 }
 
 /// Check if a wallet exists
-pub fn wallet_exists(_chain_name: String) -> bool {
-    let config = LightClientConfig::<MainNetwork>::create_unconnected(MainNetwork, None);
+pub fn wallet_exists(wallet_dir: Option<String>) -> bool {
+    let config = if let Some(dir) = wallet_dir {
+        LightClientConfig::<MainNetwork>::create_unconnected(MainNetwork, Some(dir))
+    } else {
+        LightClientConfig::<MainNetwork>::create_unconnected(MainNetwork, None)
+    };
     config.wallet_exists()
 }
 
 /// Initialize a new wallet and return the seed phrase
-pub fn initialize_new(server_uri: String) -> String {
+pub fn initialize_new(server_uri: String, wallet_dir: Option<String>) -> String {
     let server = LightClientConfig::<MainNetwork>::get_server_or_default(Some(server_uri));
     
-    let (config, latest_block_height) = match LightClientConfig::create(MainNetwork, server, None) {
+    let (config, latest_block_height) = match LightClientConfig::create(MainNetwork, server, wallet_dir) {
         Ok((c, h)) => (c, h),
         Err(e) => return format!("Error: {}", e),
     };
@@ -42,7 +46,9 @@ pub fn initialize_new(server_uri: String) -> String {
 
     // Start mempool monitor (CRITICAL for unconfirmed transactions!)
     let lc = Arc::new(lightclient);
+    println!("🚀 Starting mempool monitor for unconfirmed transaction detection...");
     LightClient::start_mempool_monitor(lc.clone());
+    println!("✅ Mempool monitor started");
 
     // Store the client globally
     LIGHTCLIENT.lock().unwrap().replace(Some(lc));
@@ -50,11 +56,88 @@ pub fn initialize_new(server_uri: String) -> String {
     seed
 }
 
-/// Initialize from an existing wallet
-pub fn initialize_existing(server_uri: String) -> String {
+/// Initialize a new wallet and return both seed phrase and birthday
+pub fn initialize_new_with_info(server_uri: String, wallet_dir: Option<String>) -> String {
     let server = LightClientConfig::<MainNetwork>::get_server_or_default(Some(server_uri));
     
-    let (config, _latest_block_height) = match LightClientConfig::create(MainNetwork, server, None) {
+    let (config, latest_block_height) = match LightClientConfig::create(MainNetwork, server, wallet_dir) {
+        Ok((c, h)) => (c, h),
+        Err(e) => return format!("Error: {}", e),
+    };
+
+    // Calculate birthday (current height - 100 blocks for safety)
+    let birthday = latest_block_height.saturating_sub(100);
+
+    let lightclient = match LightClient::new(&config, birthday) {
+        Ok(l) => l,
+        Err(e) => return format!("Error: {}", e),
+    };
+
+    // Initialize logging
+    let _ = lightclient.init_logging();
+
+    // Get the seed phrase
+    let seed_response = match lightclient.do_seed_phrase_sync() {
+        Ok(s) => s.to_string(),
+        Err(e) => return format!("Error: {}", e),
+    };
+    
+    // Extract the actual seed phrase from the JSON response
+    // The response is like {"seed":"words here..."} but might have escaped quotes
+    let seed = if seed_response.contains("\"seed\":") {
+        // Find the start of the seed value
+        if let Some(start_idx) = seed_response.find("\"seed\":\"") {
+            let start = start_idx + 8; // Length of "seed":"
+            // Find the closing quote (handle escaped quotes)
+            let remaining = &seed_response[start..];
+            let mut end = 0;
+            let chars: Vec<char> = remaining.chars().collect();
+            let mut escaped = false;
+            for (i, &ch) in chars.iter().enumerate() {
+                if escaped {
+                    escaped = false;
+                    continue;
+                }
+                if ch == '\\' {
+                    escaped = true;
+                    continue;
+                }
+                if ch == '"' {
+                    end = i;
+                    break;
+                }
+            }
+            if end > 0 {
+                remaining[..end].to_string()
+            } else {
+                seed_response
+            }
+        } else {
+            seed_response
+        }
+    } else {
+        seed_response
+    };
+
+    // Start mempool monitor (CRITICAL for unconfirmed transactions!)
+    let lc = Arc::new(lightclient);
+    println!("🚀 Starting mempool monitor for unconfirmed transaction detection...");
+    LightClient::start_mempool_monitor(lc.clone());
+    println!("✅ Mempool monitor started");
+
+    // Store the client globally
+    LIGHTCLIENT.lock().unwrap().replace(Some(lc));
+
+    // Return JSON with both seed and birthday
+    format!(r#"{{"seed": "{}", "birthday": {}, "latest_block": {}}}"#, 
+            seed, birthday, latest_block_height)
+}
+
+/// Initialize from an existing wallet
+pub fn initialize_existing(server_uri: String, wallet_dir: Option<String>) -> String {
+    let server = LightClientConfig::<MainNetwork>::get_server_or_default(Some(server_uri));
+    
+    let (config, _latest_block_height) = match LightClientConfig::create(MainNetwork, server, wallet_dir) {
         Ok((c, h)) => (c, h),
         Err(e) => return format!("Error: {}", e),
     };
@@ -70,7 +153,9 @@ pub fn initialize_existing(server_uri: String) -> String {
 
     // Start mempool monitor (CRITICAL for unconfirmed transactions!)
     let lc = Arc::new(lightclient);
+    println!("🚀 Starting mempool monitor for unconfirmed transaction detection...");
     LightClient::start_mempool_monitor(lc.clone());
+    println!("✅ Mempool monitor started");
 
     // Store the client globally
     LIGHTCLIENT.lock().unwrap().replace(Some(lc));
@@ -78,16 +163,30 @@ pub fn initialize_existing(server_uri: String) -> String {
     "OK".to_string()
 }
 
+/// Initialize from seed phrase (simplified version without wallet_dir to avoid serialization issues)
+pub fn initialize_from_phrase_simple(
+    server_uri: String,
+    seed_phrase: String,
+) -> String {
+    // Use default values to avoid serialization issues
+    let birthday: u64 = 0;
+    let overwrite = true;
+    let wallet_dir: Option<String> = None;
+    
+    initialize_from_phrase(server_uri, seed_phrase, birthday, overwrite, wallet_dir)
+}
+
 /// Initialize from seed phrase
 pub fn initialize_from_phrase(
     server_uri: String, 
     seed_phrase: String, 
     birthday: u64, 
-    overwrite: bool
+    overwrite: bool,
+    wallet_dir: Option<String>
 ) -> String {
     let server = LightClientConfig::<MainNetwork>::get_server_or_default(Some(server_uri));
     
-    let (config, _latest_block_height) = match LightClientConfig::create(MainNetwork, server, None) {
+    let (config, _latest_block_height) = match LightClientConfig::create(MainNetwork, server, wallet_dir) {
         Ok((c, h)) => (c, h),
         Err(e) => return format!("Error: {}", e),
     };
@@ -113,7 +212,9 @@ pub fn initialize_from_phrase(
 
     // Start mempool monitor (CRITICAL for unconfirmed transactions!)
     let lc = Arc::new(lightclient);
+    println!("🚀 Starting mempool monitor for unconfirmed transaction detection...");
     LightClient::start_mempool_monitor(lc.clone());
+    println!("✅ Mempool monitor started");
 
     // Store the client globally
     LIGHTCLIENT.lock().unwrap().replace(Some(lc));
@@ -153,7 +254,9 @@ pub fn deinitialize() -> String {
 /// Get sync status
 #[frb(sync)]
 pub fn get_sync_status() -> String {
-    execute("syncstatus".to_string(), "".to_string())
+    let result = execute("syncstatus".to_string(), "".to_string());
+    println!("📊 Sync status result: {}", result);
+    result
 }
 
 /// Sync the wallet

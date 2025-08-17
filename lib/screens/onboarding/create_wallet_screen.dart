@@ -21,6 +21,7 @@ class _CreateWalletScreenState extends State<CreateWalletScreen>
   
   bool _isGenerating = false;
   String? _generatedSeedPhrase;
+  int? _birthdayBlock;
 
   @override
   void initState() {
@@ -54,14 +55,18 @@ class _CreateWalletScreenState extends State<CreateWalletScreen>
     });
 
     try {
-      // Generate a new seed phrase (256 bits = 24 words)
-      final seedPhrase = bip39.generateMnemonic(strength: 256);
+      // Get wallet provider
+      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+      
+      // Generate new wallet via Rust Bridge (gets seed + birthday)
+      final walletData = await walletProvider.generateNewWallet();
       
       // Add a small delay for better UX
       await Future.delayed(const Duration(milliseconds: 1500));
       
       setState(() {
-        _generatedSeedPhrase = seedPhrase;
+        _generatedSeedPhrase = walletData['seed'] as String;
+        _birthdayBlock = walletData['birthday'] as int;
         _isGenerating = false;
       });
 
@@ -86,7 +91,10 @@ class _CreateWalletScreenState extends State<CreateWalletScreen>
     Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-            SeedPhraseDisplayScreen(seedPhrase: _generatedSeedPhrase!),
+            SeedPhraseDisplayScreen(
+              seedPhrase: _generatedSeedPhrase!,
+              birthdayBlock: _birthdayBlock,
+            ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return SlideTransition(
             position: Tween<Offset>(

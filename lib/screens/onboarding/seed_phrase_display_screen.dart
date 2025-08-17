@@ -5,10 +5,12 @@ import 'seed_phrase_verification_screen.dart';
 
 class SeedPhraseDisplayScreen extends StatefulWidget {
   final String seedPhrase;
+  final int? birthdayBlock;
 
   const SeedPhraseDisplayScreen({
     super.key,
     required this.seedPhrase,
+    this.birthdayBlock,
   });
 
   @override
@@ -99,7 +101,10 @@ class _SeedPhraseDisplayScreenState extends State<SeedPhraseDisplayScreen>
     Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-            SeedPhraseVerificationScreen(seedPhrase: widget.seedPhrase),
+            SeedPhraseVerificationScreen(
+              seedPhrase: widget.seedPhrase,
+              birthdayBlock: widget.birthdayBlock,
+            ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return SlideTransition(
             position: Tween<Offset>(
@@ -170,6 +175,65 @@ class _SeedPhraseDisplayScreenState extends State<SeedPhraseDisplayScreen>
                     ],
                   ),
                 ),
+
+                // Birthday Block Display (if available)
+                if (widget.birthdayBlock != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.cake_outlined,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Wallet Birthday Block',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Block #${widget.birthdayBlock}',
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Save this number along with your seed phrase. It helps restore your wallet faster.',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 // Seed Phrase Display  
                 Expanded(

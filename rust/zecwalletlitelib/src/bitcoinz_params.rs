@@ -47,7 +47,7 @@ impl Parameters for BitcoinZMainNetwork {
     }
 
     fn address_network(&self) -> Option<zcash_address::Network> {
-        Some(zcash_address::Network::Main) // TODO: May need custom BitcoinZ network
+        Some(zcash_address::Network::Main)
     }
 }
 
@@ -97,7 +97,7 @@ impl Parameters for BitcoinZTestNetwork {
     }
 
     fn address_network(&self) -> Option<zcash_address::Network> {
-        Some(zcash_address::Network::Test) // TODO: May need custom BitcoinZ testnet
+        Some(zcash_address::Network::Test)
     }
 }
 

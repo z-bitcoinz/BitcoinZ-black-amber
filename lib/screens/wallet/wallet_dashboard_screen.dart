@@ -6,6 +6,8 @@ import 'dart:ui';
 import '../../providers/wallet_provider.dart';
 import '../../widgets/balance_card.dart';
 import '../../widgets/recent_transactions.dart';
+import '../../widgets/sync_progress_overlay.dart';
+import '../../widgets/connection_status_widget.dart';
 import 'paginated_transaction_history_screen.dart';
 
 class WalletDashboardScreen extends StatefulWidget {
@@ -20,6 +22,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
   late AnimationController _connectionPulseController;
   late Animation<double> _connectionPulseAnimation;
   Timer? _autoSyncTimer;
+  Timer? _connectionCheckTimer;
   
   // Auto-sync interval (default 30 seconds)
   static const Duration _autoSyncInterval = Duration(seconds: 30);
@@ -47,9 +50,17 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
     // Start auto-sync
     _startAutoSync();
     
-    // Initial sync
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Initial sync and connection check
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _silentSync();
+      // Also check connection status to update UI
+      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+      await walletProvider.checkConnectionStatus();
+      
+      // Start periodic connection checks every 5 seconds
+      _connectionCheckTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+        await walletProvider.checkConnectionStatus();
+      });
     });
   }
 
@@ -57,6 +68,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
   void dispose() {
     _connectionPulseController.dispose();
     _autoSyncTimer?.cancel();
+    _connectionCheckTimer?.cancel();
     super.dispose();
   }
   
@@ -76,7 +88,8 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
     }
     
     try {
-      await walletProvider.syncWallet();
+      // Use syncWalletInBackground to show sync UI
+      await walletProvider.syncWalletInBackground();
     } catch (e) {
       // Silent fail - no user notification for auto-sync
     } finally {
@@ -330,6 +343,9 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                       ],
                     ),
                   ),
+                  const Spacer(),
+                  const ConnectionStatusWidget(),
+                  const SizedBox(width: 8),
                 ],
               ),
               actions: [
@@ -453,12 +469,14 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
           ),
         ),
       ),
-      body: Consumer<WalletProvider>(
-        builder: (context, walletProvider, child) {
-          return RefreshIndicator(
-            onRefresh: _silentSync,
-            color: Theme.of(context).colorScheme.primary,
-            child: CustomScrollView(
+      body: Stack(
+        children: [
+          Consumer<WalletProvider>(
+            builder: (context, walletProvider, child) {
+              return RefreshIndicator(
+                onRefresh: _silentSync,
+                color: Theme.of(context).colorScheme.primary,
+                child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 // Spacing for extended AppBar
@@ -523,6 +541,10 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
           );
         },
       ),
+      // Sync progress overlay (like BitcoinZ Blue)
+      const SyncProgressOverlay(),
+    ],
+  ),
     );
   }
 }
