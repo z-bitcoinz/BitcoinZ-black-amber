@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:local_auth/local_auth.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import '../services/storage_service.dart';
 import '../services/wallet_storage_service.dart';
 // import '../services/cli_wallet_detector.dart'; // Removed - CLI no longer used
@@ -197,11 +198,15 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Set PIN for authentication
+  /// Set PIN for authentication with secure hashing
   Future<bool> setPin(String pin) async {
     try {
-      // Simple hash for demo - in production use proper crypto
-      final pinHash = pin.hashCode.toString();
+      // Use SHA-256 for secure PIN hashing
+      // In production, consider using a salt and PBKDF2 or bcrypt
+      final bytes = utf8.encode(pin);
+      final digest = sha256.convert(bytes);
+      final pinHash = digest.toString();
+      
       await StorageService.write(key: _pinHashKey, value: pinHash);
       return true;
     } catch (e) {
@@ -214,9 +219,16 @@ class AuthProvider with ChangeNotifier {
   Future<bool> _authenticateWithPin(String pin) async {
     try {
       final storedPinHash = await StorageService.read(key: _pinHashKey);
-      if (storedPinHash == null) return false;
+      if (storedPinHash == null) {
+        // No PIN set yet - user needs to set up a PIN
+        return false;
+      }
       
-      final pinHash = pin.hashCode.toString();
+      // Hash the provided PIN and compare
+      final bytes = utf8.encode(pin);
+      final digest = sha256.convert(bytes);
+      final pinHash = digest.toString();
+      
       return pinHash == storedPinHash;
     } catch (e) {
       return false;

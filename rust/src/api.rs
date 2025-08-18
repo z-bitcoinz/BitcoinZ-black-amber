@@ -231,10 +231,11 @@ pub fn execute(command: String, args: String) -> String {
         None => return r#"{"error": "Wallet not initialized"}"#.to_string(),
     };
 
-    // Log unconfirmed transaction checks
-    if command == "list" {
-        println!("🔍 Fetching transaction list (checking for unconfirmed)...");
-    }
+    // Log unconfirmed transaction checks (disabled to reduce log spam)
+    // Only enable for debugging specific issues
+    // if command == "list" {
+    //     println!("🔍 Fetching transaction list (checking for unconfirmed)...");
+    // }
 
     let args_vec: Vec<&str> = if args.is_empty() {
         vec![]

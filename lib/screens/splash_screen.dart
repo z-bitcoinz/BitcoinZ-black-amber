@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../utils/constants.dart';
 import 'onboarding/welcome_screen.dart';
+import 'onboarding/pin_setup_screen.dart';
 import 'auth/auth_screen.dart';
 import 'main_screen.dart';
 
@@ -65,7 +66,26 @@ class _SplashScreenState extends State<SplashScreen>
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
 
     try {
+      // Initialize auth provider
       await authProvider.initialize();
+      
+      // Start pre-connecting to the server while showing splash
+      // This happens in background so the connection is ready when user enters PIN
+      if (authProvider.hasWallet) {
+        if (kDebugMode) {
+          print('🔌 Pre-connecting to server while on splash screen...');
+        }
+        // Start connection in background (non-blocking)
+        walletProvider.startEarlyConnection().then((_) {
+          if (kDebugMode) {
+            print('✅ Early connection established');
+          }
+        }).catchError((e) {
+          if (kDebugMode) {
+            print('⚠️ Early connection failed (will retry later): $e');
+          }
+        });
+      }
       
       // Wait minimum splash time for better UX
       await Future.delayed(const Duration(milliseconds: 2000));
@@ -80,7 +100,7 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-  void _navigateToNextScreen(AuthProvider authProvider, WalletProvider walletProvider) {
+  void _navigateToNextScreen(AuthProvider authProvider, WalletProvider walletProvider) async {
     Widget nextScreen;
 
     if (kDebugMode) {
@@ -95,14 +115,32 @@ class _SplashScreenState extends State<SplashScreen>
       // First time user - show welcome/onboarding
       nextScreen = const WelcomeScreen();
       if (kDebugMode) print('→ Navigating to WelcomeScreen (needsSetup)');
-    } else if (authProvider.needsAuthentication) {
-      // Returning user with wallet - show authentication
-      nextScreen = const AuthScreen();
-      if (kDebugMode) print('→ Navigating to AuthScreen (needsAuthentication)');
-    } else if (authProvider.isAuthenticated) {
-      // Authenticated user - go to main screen (it will handle wallet restoration)
-      nextScreen = const MainScreen();
-      if (kDebugMode) print('→ Navigating to MainScreen (isAuthenticated)');
+    } else if (authProvider.hasWallet) {
+      // Check if PIN is set
+      final hasPinSet = await authProvider.hasPinSet;
+      if (!hasPinSet) {
+        // Wallet exists but no PIN - need to set up PIN
+        nextScreen = PinSetupScreen(
+          walletId: authProvider.walletId ?? 'wallet_${DateTime.now().millisecondsSinceEpoch}',
+          walletData: {
+            'migrated': true,
+            'created_at': DateTime.now().toIso8601String(),
+          },
+        );
+        if (kDebugMode) print('→ Navigating to PinSetupScreen (wallet exists but no PIN)');
+      } else if (authProvider.needsAuthentication) {
+        // Returning user with wallet and PIN - show authentication
+        nextScreen = const AuthScreen();
+        if (kDebugMode) print('→ Navigating to AuthScreen (needsAuthentication)');
+      } else if (authProvider.isAuthenticated) {
+        // Authenticated user - go to main screen
+        nextScreen = const MainScreen();
+        if (kDebugMode) print('→ Navigating to MainScreen (isAuthenticated)');
+      } else {
+        // Has wallet and PIN but not authenticated
+        nextScreen = const AuthScreen();
+        if (kDebugMode) print('→ Navigating to AuthScreen (has wallet and PIN)');
+      }
     } else {
       // Fallback to welcome screen
       nextScreen = const WelcomeScreen();

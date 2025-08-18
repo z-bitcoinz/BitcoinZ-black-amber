@@ -41,6 +41,11 @@ class BitcoinzRustService {
   double? lastBalance;
   int? lastTxCount;
   
+  // Update throttling
+  bool _isUpdating = false;
+  DateTime? _lastUpdateTime;
+  static const Duration _minUpdateInterval = Duration(seconds: 2);
+  
   // Blockchain info caching
   int? _currentBlockHeight;
   DateTime? _blockHeightLastFetch;
@@ -212,7 +217,7 @@ class BitcoinzRustService {
     }
   }
   
-  /// Start update timers (EXACT copy of BitcoinZ Blue)
+  /// Start update timers (Optimized version)
   void startTimers() {
     if (kDebugMode) print('⏱️ Starting update timers...');
     
@@ -221,8 +226,9 @@ class BitcoinzRustService {
       refresh();
     });
     
-    // 1-second update timer for fast change detection
-    updateTimerId ??= Timer.periodic(const Duration(seconds: 1), (_) {
+    // 3-second update timer for change detection (reduced from 1 second to prevent UI overload)
+    // Will check more frequently only when there are unconfirmed transactions
+    updateTimerId ??= Timer.periodic(const Duration(seconds: 3), (_) {
       updateData();
     });
     
@@ -241,9 +247,25 @@ class BitcoinzRustService {
     if (kDebugMode) print('🛑 Stopped all timers');
   }
   
-  /// Fast update - runs every 1 second
+  /// Fast update - runs every 3 seconds with throttling
   Future<void> updateData() async {
     if (!_initialized) return;
+    
+    // Prevent concurrent updates
+    if (_isUpdating) {
+      return;
+    }
+    
+    // Throttle updates to prevent UI overload
+    if (_lastUpdateTime != null) {
+      final timeSinceLastUpdate = DateTime.now().difference(_lastUpdateTime!);
+      if (timeSinceLastUpdate < _minUpdateInterval) {
+        return;
+      }
+    }
+    
+    _isUpdating = true;
+    _lastUpdateTime = DateTime.now();
     
     try {
       // Get transaction list
@@ -301,6 +323,8 @@ class BitcoinzRustService {
       }
     } catch (e) {
       if (kDebugMode) print('❌ Update data failed: $e');
+    } finally {
+      _isUpdating = false;
     }
   }
   

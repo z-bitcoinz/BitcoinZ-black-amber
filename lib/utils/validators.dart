@@ -232,11 +232,6 @@ class Validators {
     return bip39.generateMnemonic();
   }
 
-  /// Validate seed phrase word
-  static bool isValidSeedWord(String word) {
-    return bip39.getWordList().contains(word.toLowerCase());
-  }
-
   /// Private helper to check for weak PINs
   static bool _isWeakPin(String pin) {
     // Check for repeated digits

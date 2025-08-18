@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/wallet_provider.dart';
 import '../main_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -171,134 +172,194 @@ class _AuthScreenState extends State<AuthScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF1A1A1A),
       body: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.all(24.0),
-          height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
-          child: Column(
-            children: [
-              Expanded(
-                flex: 2,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // App Logo
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Icon(
-                        Icons.account_balance_wallet,
-                        size: 40,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    Text(
-                      'Welcome Back',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    
-                    Text(
-                      'Enter your PIN to access your wallet',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                      ),
-                    ),
-                  ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
                 ),
-              ),
-              
-              // PIN Input Display
-              Expanded(
-                flex: 1,
-                child: AnimatedBuilder(
-                  animation: _shakeAnimation,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(_shakeAnimation.value, 0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(6, (index) {
-                              return Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 8),
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: index < _enteredPin.length
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Only show connection warning if actually offline
+                      Consumer<WalletProvider>(
+                        builder: (context, walletProvider, child) {
+                          // Only show if there's a real connection problem
+                          if (walletProvider.connectionStatus.toLowerCase().contains('offline') ||
+                              walletProvider.connectionStatus.toLowerCase().contains('error') ||
+                              walletProvider.connectionStatus.toLowerCase().contains('failed')) {
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF6B00).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFFF6B00).withOpacity(0.3),
+                                  width: 1,
                                 ),
-                              );
-                            }),
-                          ),
-                          if (_isAuthenticating) ...[
-                            const SizedBox(height: 24),
-                            const CircularProgressIndicator(),
-                          ],
-                        ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.wifi_off,
+                                    size: 16,
+                                    color: Color(0xFFFF6B00),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Server Offline',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFFFF6B00),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
                       ),
-                    );
-                  },
+                      
+                      const SizedBox(height: 20),
+                      
+                      // App Logo
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF6B00), Color(0xFFFFAA00)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(
+                          Icons.account_balance_wallet,
+                          size: 36,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      const Text(
+                        'Welcome Back',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      
+                      Text(
+                        'Enter your PIN to access your wallet',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.6),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 30),
+                      
+                      // PIN Input Display
+                      AnimatedBuilder(
+                        animation: _shakeAnimation,
+                        builder: (context, child) {
+                          return Transform.translate(
+                            offset: Offset(_shakeAnimation.value, 0),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: List.generate(6, (index) {
+                                    return Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                                      width: 16,
+                                      height: 16,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: index < _enteredPin.length
+                                            ? const Color(0xFFFF6B00)
+                                            : Colors.white.withOpacity(0.2),
+                                      ),
+                                    );
+                                  }),
+                                ),
+                                if (_isAuthenticating) ...[
+                                  const SizedBox(height: 24),
+                                  const CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B00)),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      
+                      const SizedBox(height: 30),
+                      
+                      // PIN Keypad with constrained size
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: 300,
+                        ),
+                        child: Column(
+                        children: [
+                          // Numbers 1-3
+                          Row(
+                            children: [
+                              _buildPinButton('1'),
+                              _buildPinButton('2'),
+                              _buildPinButton('3'),
+                            ],
+                          ),
+                          // Numbers 4-6
+                          Row(
+                            children: [
+                              _buildPinButton('4'),
+                              _buildPinButton('5'),
+                              _buildPinButton('6'),
+                            ],
+                          ),
+                          // Numbers 7-9
+                          Row(
+                            children: [
+                              _buildPinButton('7'),
+                              _buildPinButton('8'),
+                              _buildPinButton('9'),
+                            ],
+                          ),
+                          // Bottom row
+                          Row(
+                            children: [
+                              // Biometric button or empty space
+                              _showBiometricOption
+                                  ? _buildBiometricButton()
+                                  : _buildEmptyButton(),
+                              _buildPinButton('0'),
+                              _buildDeleteButton(),
+                            ],
+                          ),
+                        ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              
-              // PIN Keypad
-              Expanded(
-                flex: 3,
-                child: Column(
-                  children: [
-                    // Numbers 1-3
-                    Row(
-                      children: [
-                        _buildPinButton('1'),
-                        _buildPinButton('2'),
-                        _buildPinButton('3'),
-                      ],
-                    ),
-                    // Numbers 4-6
-                    Row(
-                      children: [
-                        _buildPinButton('4'),
-                        _buildPinButton('5'),
-                        _buildPinButton('6'),
-                      ],
-                    ),
-                    // Numbers 7-9
-                    Row(
-                      children: [
-                        _buildPinButton('7'),
-                        _buildPinButton('8'),
-                        _buildPinButton('9'),
-                      ],
-                    ),
-                    // Bottom row
-                    Row(
-                      children: [
-                        // Biometric button or empty space
-                        _showBiometricOption
-                            ? _buildBiometricButton()
-                            : _buildEmptyButton(),
-                        _buildPinButton('0'),
-                        _buildDeleteButton(),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -307,22 +368,26 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildPinButton(String number) {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: SizedBox(
-          height: 64,
+        padding: const EdgeInsets.all(6.0),
+        child: AspectRatio(
+          aspectRatio: 1.0,
           child: ElevatedButton(
             onPressed: _isAuthenticating ? null : () => _onPinInput(number),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              foregroundColor: Theme.of(context).colorScheme.onSurface,
-              elevation: 2,
+              backgroundColor: const Color(0xFF2A2A2A),
+              foregroundColor: Colors.white,
+              elevation: 0,
               shape: const CircleBorder(),
+              side: BorderSide(
+                color: Colors.white.withOpacity(0.1),
+                width: 1,
+              ),
             ),
             child: Text(
               number,
               style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w500,
+                fontSize: 22,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ),
@@ -334,20 +399,24 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildBiometricButton() {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: SizedBox(
-          height: 64,
+        padding: const EdgeInsets.all(6.0),
+        child: AspectRatio(
+          aspectRatio: 1.0,
           child: ElevatedButton(
             onPressed: _isAuthenticating ? null : _authenticateWithBiometrics,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              foregroundColor: Theme.of(context).colorScheme.primary,
+              backgroundColor: const Color(0xFF2A2A2A),
+              foregroundColor: const Color(0xFFFF6B00),
               elevation: 0,
               shape: const CircleBorder(),
+              side: BorderSide(
+                color: const Color(0xFFFF6B00).withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: const Icon(
               Icons.fingerprint,
-              size: 28,
+              size: 26,
             ),
           ),
         ),
@@ -358,20 +427,20 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildDeleteButton() {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: SizedBox(
-          height: 64,
+        padding: const EdgeInsets.all(6.0),
+        child: AspectRatio(
+          aspectRatio: 1.0,
           child: ElevatedButton(
             onPressed: _isAuthenticating ? null : _onPinDelete,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
-              foregroundColor: Theme.of(context).colorScheme.onSurface,
+              foregroundColor: Colors.white.withOpacity(0.6),
               elevation: 0,
               shape: const CircleBorder(),
             ),
             child: const Icon(
               Icons.backspace_outlined,
-              size: 24,
+              size: 22,
             ),
           ),
         ),
@@ -380,8 +449,14 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Widget _buildEmptyButton() {
-    return const Expanded(
-      child: SizedBox(height: 64),
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.all(6.0),
+        child: const AspectRatio(
+          aspectRatio: 1.0,
+          child: SizedBox(),
+        ),
+      ),
     );
   }
 }
