@@ -212,20 +212,41 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                 ),
                 trailing: Consumer<CurrencyProvider>(
                   builder: (context, currencyProvider, _) {
+                    final confirmations = transaction.confirmations ?? 0;
+                    final isConfirming = confirmations == 0;
+                    
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(
-                          transaction.displayAmount,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: transaction.isReceived 
-                                ? Colors.green
-                                : Colors.orange,
-                          ),
+                        // Amount with status indicator
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Show circular progress for confirming transactions
+                            if (isConfirming) ...[
+                              Container(
+                                width: 12,
+                                height: 12,
+                                margin: const EdgeInsets.only(right: 6),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                                ),
+                              ),
+                            ],
+                            Text(
+                              transaction.displayAmount,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: transaction.isReceived 
+                                    ? Colors.green
+                                    : Colors.orange,
+                              ),
+                            ),
+                          ],
                         ),
-                        // Show fiat amount if price available
+                        // Show fiat amount if price available, or status text
                         if (currencyProvider.currentPrice != null) ...[
                           const SizedBox(height: 2),
                           Text(
@@ -236,8 +257,17 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ] else
-                          _buildStatusWidget(transaction, context),
+                        ] else if (isConfirming) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Confirming',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.orange,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ],
                     );
                   },

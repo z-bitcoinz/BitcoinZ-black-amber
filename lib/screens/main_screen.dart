@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 import '../providers/wallet_provider.dart';
 import '../providers/auth_provider.dart';
 import 'wallet/wallet_dashboard_screen.dart';
-import 'wallet/send_screen.dart';
-import 'wallet/receive_screen.dart';
+import 'wallet/send_screen_modern.dart';
+import 'wallet/receive_screen_modern.dart';
 import 'wallet/paginated_transaction_history_screen.dart';
 import 'settings/settings_screen.dart';
 // import '../demo/cli_demo_page.dart'; // Removed - CLI demo no longer used
@@ -25,8 +25,8 @@ class _MainScreenState extends State<MainScreen>
 
   final List<Widget> _screens = [
     const WalletDashboardScreen(),
-    const SendScreen(),
-    const ReceiveScreen(),
+    const SendScreenModern(),
+    const ReceiveScreenModern(),
     const PaginatedTransactionHistoryScreen(),
     // CliDemoPage(), // Removed - CLI demo no longer used
     const SettingsScreen(),
