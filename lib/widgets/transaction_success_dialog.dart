@@ -111,17 +111,17 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
           _remainingSeconds--;
           if (_remainingSeconds <= 0) {
             timer.cancel();
-            Navigator.of(context).pop();
+            // Only call onClose, let parent handle navigation
             widget.onClose();
           }
         });
       }
     });
     
-    // Auto close after 15 seconds
+    // Auto close after 15 seconds (backup timer)
     _autoCloseTimer = Timer(const Duration(seconds: 15), () {
       if (mounted) {
-        Navigator.of(context).pop();
+        // Only call onClose, let parent handle navigation
         widget.onClose();
       }
     });
@@ -224,7 +224,10 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
               ScaleTransition(
                 scale: _scaleAnimation,
                 child: Container(
-                  constraints: const BoxConstraints(maxWidth: 400),
+                  constraints: BoxConstraints(
+                    maxWidth: 400,
+                    maxHeight: MediaQuery.of(context).size.height * 0.8,
+                  ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(28),
                     child: BackdropFilter(
@@ -258,9 +261,10 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                             ),
                           ],
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                             // Animated checkmark with pulse
                             AnimatedBuilder(
                               animation: _pulseAnimation,
@@ -303,7 +307,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                               },
                             ),
                             
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 16),
                             
                             // Success title
                             const Text(
@@ -316,7 +320,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                               ),
                             ),
                             
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 16),
                             
                             // Amount Card
                             Container(
@@ -383,7 +387,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                               ),
                             ),
                             
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                             
                             // Transaction details card
                             Container(
@@ -405,9 +409,9 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                                     onCopy: () => _copyToClipboard(widget.toAddress, 'Address'),
                                   ),
                                   
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 8),
                                   _buildDivider(),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 8),
                                   
                                   // Transaction ID
                                   _buildDetailRow(
@@ -431,9 +435,9 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                                     ),
                                   ],
                                   
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 8),
                                   _buildDivider(),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 8),
                                   
                                   // Status
                                   Row(
@@ -476,7 +480,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                                             ),
                                             const SizedBox(width: 6),
                                             const Text(
-                                              'Broadcasting',
+                                              'Confirming',
                                               style: TextStyle(
                                                 color: Colors.orange,
                                                 fontSize: 12,
@@ -492,7 +496,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                               ),
                             ),
                             
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 16),
                             
                             // Done button
                             Container(
@@ -520,7 +524,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                                 child: InkWell(
                                   borderRadius: BorderRadius.circular(16),
                                   onTap: () {
-                                    Navigator.of(context).pop();
+                                    // Only call onClose, let parent handle navigation
                                     widget.onClose();
                                   },
                                   child: Container(
@@ -540,7 +544,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                               ),
                             ),
                             
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             
                             // Auto-close countdown
                             Text(
@@ -550,7 +554,8 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                                 fontSize: 11,
                               ),
                             ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),

@@ -84,7 +84,7 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Future<void> _authenticateWithPin() async {
-    if (_enteredPin.length < 4 || _isAuthenticating) return;
+    if (_enteredPin.length < 6 || _isAuthenticating) return;
 
     setState(() {
       _isAuthenticating = true;
@@ -147,7 +147,7 @@ class _AuthScreenState extends State<AuthScreen>
         _enteredPin += digit;
       });
       
-      if (_enteredPin.length >= 4) {
+      if (_enteredPin.length == 6) {
         _authenticateWithPin();
       }
     }

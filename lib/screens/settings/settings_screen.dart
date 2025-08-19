@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'currency_settings_screen.dart';
+import 'change_pin_screen.dart';
 import '../../providers/currency_provider.dart';
+import '../../providers/auth_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -62,17 +64,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
               
               const SizedBox(height: 24),
               
-              // Placeholder for other settings
+              // Security settings
               _buildSettingsSection(
                 title: 'Security',
                 children: [
                   _buildSettingsTile(
                     context: context,
                     icon: Icons.lock,
-                    title: 'PIN/Biometric',
-                    subtitle: 'Manage security settings',
+                    title: 'Change PIN',
+                    subtitle: 'Update your wallet PIN',
                     onTap: () {
-                      // TODO: Navigate to security settings
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChangePinScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  Consumer<AuthProvider>(
+                    builder: (context, authProvider, child) {
+                      return FutureBuilder<bool>(
+                        future: authProvider.isBiometricsAvailable(),
+                        builder: (context, snapshot) {
+                          final isAvailable = snapshot.data ?? false;
+                          if (!isAvailable) return const SizedBox.shrink();
+                          
+                          return _buildSettingsTile(
+                            context: context,
+                            icon: Icons.fingerprint,
+                            title: 'Biometric Authentication',
+                            subtitle: authProvider.biometricsEnabled 
+                                ? 'Enabled' 
+                                : 'Disabled',
+                            trailing: Switch(
+                              value: authProvider.biometricsEnabled,
+                              onChanged: (value) async {
+                                await authProvider.setBiometricsEnabled(value);
+                              },
+                              activeColor: Theme.of(context).colorScheme.primary,
+                            ),
+                            onTap: null,
+                          );
+                        },
+                      );
                     },
                   ),
                   _buildSettingsTile(

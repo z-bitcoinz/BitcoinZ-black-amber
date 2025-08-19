@@ -146,9 +146,9 @@ class _SendScreenModernState extends State<SendScreenModern> {
             fiatAmount: fiatAmount,
             currencyCode: currencyCode,
             onClose: () {
-              // Only pop the dialog
-              if (Navigator.of(dialogContext).canPop()) {
-                Navigator.of(dialogContext).pop();
+              // Pop the dialog safely
+              if (mounted && Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
               }
             },
           ),

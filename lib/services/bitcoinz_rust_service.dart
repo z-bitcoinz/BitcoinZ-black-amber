@@ -226,9 +226,9 @@ class BitcoinzRustService {
       refresh();
     });
     
-    // 3-second update timer for change detection (reduced from 1 second to prevent UI overload)
-    // Will check more frequently only when there are unconfirmed transactions
-    updateTimerId ??= Timer.periodic(const Duration(seconds: 3), (_) {
+    // 10-second update timer for change detection (increased from 3 seconds to prevent resize timeout)
+    // This still provides responsive updates while reducing system load
+    updateTimerId ??= Timer.periodic(const Duration(seconds: 10), (_) {
       updateData();
     });
     

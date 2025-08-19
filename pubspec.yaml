@@ -22,7 +22,7 @@ dependencies:
   
   # QR Code
   qr_flutter: ^4.1.0
-  qr_code_scanner: ^1.0.1
+  mobile_scanner: ^5.1.1  # Modern QR scanner that works with latest Android
   
   # Sharing
   share_plus: ^7.2.1
@@ -45,7 +45,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   
   # Crypto utilities
-  crypto: ^3.0.3
+  crypto: ^3.0.6
   
   # BIP39 for seed phrase validation
   bip39: ^1.0.6

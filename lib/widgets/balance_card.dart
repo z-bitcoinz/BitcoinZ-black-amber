@@ -54,16 +54,10 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                     borderRadius: BorderRadius.circular(28),
                     boxShadow: [
                       BoxShadow(
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                        color: const Color(0xFFFF6B00).withOpacity(0.1),
                         blurRadius: 60,
                         spreadRadius: 0,
                         offset: const Offset(0, 20),
-                      ),
-                      BoxShadow(
-                        color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
-                        blurRadius: 40,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
@@ -79,16 +73,16 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF242424).withOpacity(0.9), // Lighter for YouTube-style
-                          const Color(0xFF1A1A1A).withOpacity(0.7), // Subtle gradient
+                          const Color(0xFF2A2A2A).withOpacity(0.95),
+                          const Color(0xFF1F1F1F).withOpacity(0.9),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(28),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.06),
-                        width: 1.5,
+                        color: Colors.white.withOpacity(0.08),
+                        width: 1,
                       ),
                       boxShadow: [
                         // Inner shadow for depth
@@ -154,7 +148,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                       Text(
                         currencyProvider.formatFiatAmount(walletProvider.balance.total),
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.9),
+                          color: const Color(0xFFFF6B00).withOpacity(0.9),
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
                           letterSpacing: -0.5,
@@ -195,7 +189,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                           child: _buildBalanceColumn(
                             context,
                             'Transparent',
-                            walletProvider.balance.formattedTransparent,  // Always show balance
+                            walletProvider.balance.formattedTransparent,
                             Icons.visibility_outlined,
                           ),
                         ),
@@ -208,12 +202,49 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                           child: _buildBalanceColumn(
                             context,
                             'Shielded',
-                            walletProvider.balance.formattedShielded,  // Always show balance
+                            walletProvider.balance.formattedShielded,
                             Icons.shield_outlined,
                           ),
                         ),
                       ],
                     ),
+                    
+                    // Show confirming balance if there are unconfirmed transactions
+                    if (walletProvider.balance.hasUnconfirmedBalance) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.orange.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              margin: const EdgeInsets.only(right: 6),
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                              ),
+                            ),
+                            Text(
+                              'Confirming: ${walletProvider.balance.formattedUnconfirmed}',
+                              style: const TextStyle(
+                                color: Colors.orange,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

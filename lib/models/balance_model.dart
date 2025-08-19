@@ -122,8 +122,12 @@ class BalanceModel {
   String _formatBalance(double balance) {
     if (balance == 0) return '0';
     
-    // Show 3 decimal places followed by ** to indicate more digits
-    String formatted = balance.toStringAsFixed(3);
+    // Check if there are significant digits beyond 3 decimal places
+    String fullPrecision = balance.toStringAsFixed(8);
+    String threePrecision = balance.toStringAsFixed(3);
+    
+    // Format to 3 decimal places
+    String formatted = threePrecision;
     
     // Remove trailing zeros after decimal point
     if (formatted.contains('.')) {
@@ -131,8 +135,15 @@ class BalanceModel {
       formatted = formatted.replaceAll(RegExp(r'\.$'), '');
     }
     
-    // Add ** to indicate there are more digits
-    formatted = '$formatted**';
+    // Only add ** if there are actually more significant digits beyond what we're showing
+    // Compare the full precision with 3 decimal places to see if we're hiding information
+    double roundedToThree = double.parse(threePrecision);
+    double difference = (balance - roundedToThree).abs();
+    
+    // If the difference is greater than 0.0001 (4th decimal place), show **
+    if (difference > 0.0001) {
+      formatted = '$formatted**';
+    }
     
     return formatted;
   }

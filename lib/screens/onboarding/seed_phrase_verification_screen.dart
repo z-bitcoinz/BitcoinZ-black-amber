@@ -5,6 +5,7 @@ import '../../providers/wallet_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/responsive.dart';
 import '../main_screen.dart';
+import 'pin_setup_screen.dart';
 
 class SeedPhraseVerificationScreen extends StatefulWidget {
   final String seedPhrase;
@@ -116,14 +117,24 @@ class _SeedPhraseVerificationScreenState extends State<SeedPhraseVerificationScr
       // Create wallet with the verified seed phrase
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await walletProvider.createWallet(widget.seedPhrase, authProvider: authProvider);
+      final walletData = await walletProvider.createWallet(widget.seedPhrase, authProvider: authProvider);
 
       if (mounted) {
-        // Navigate to main screen
+        // Generate a wallet ID from the seed phrase
+        final walletId = 'wallet_${DateTime.now().millisecondsSinceEpoch}';
+        
+        // Navigate to PIN setup screen
         Navigator.of(context).pushAndRemoveUntil(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
-                const MainScreen(),
+                PinSetupScreen(
+                  walletId: walletId,
+                  seedPhrase: widget.seedPhrase,
+                  walletData: {
+                    'birthday': widget.birthdayBlock ?? 0,
+                    'created_at': DateTime.now().toIso8601String(),
+                  },
+                ),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(
                 opacity: animation,

@@ -74,14 +74,15 @@ class _RecentTransactionsState extends State<RecentTransactions> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFF1C1C1C).withOpacity(0.95),
-                    const Color(0xFF161616).withOpacity(0.85),
+                    const Color(0xFF2A2A2A).withOpacity(0.95),
+                    const Color(0xFF1F1F1F).withOpacity(0.9),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withOpacity(0.08),
                   width: 1,
                 ),
               ),
@@ -90,13 +91,15 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                 Icon(
                   Icons.receipt_long,
                   size: 48,
-                  color: Theme.of(context).colorScheme.outline,
+                  color: Colors.white.withOpacity(0.3),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No transactions yet',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -127,7 +130,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
               child: Divider(
                 height: 1,
                 thickness: 0.5,
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                color: Colors.white.withOpacity(0.1),
               ),
             ),
             itemBuilder: (context, index) {
@@ -177,11 +180,11 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                               height: 16,
                               decoration: BoxDecoration(
                                 color: isRead
-                                    ? Theme.of(context).colorScheme.surfaceVariant
-                                    : Theme.of(context).colorScheme.primary,
+                                    ? Colors.grey.withOpacity(0.5)
+                                    : const Color(0xFFFF6B00),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: Theme.of(context).colorScheme.surface,
+                                  color: const Color(0xFF1A1A1A),
                                   width: 1.5,
                                 ),
                               ),
@@ -189,8 +192,8 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                                 Icons.message,
                                 size: 10,
                                 color: isRead
-                                    ? Theme.of(context).colorScheme.onSurfaceVariant
-                                    : Theme.of(context).colorScheme.onPrimary,
+                                    ? Colors.white.withOpacity(0.5)
+                                    : Colors.black87,
                               ),
                             ),
                           );
@@ -200,7 +203,9 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                 ),
                 title: Text(
                   transaction.isReceived ? 'Received' : 'Sent',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

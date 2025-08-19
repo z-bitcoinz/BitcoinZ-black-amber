@@ -32,7 +32,7 @@ android {
         // Configure native libraries support for FFI
         ndk {
             // Specify which native architectures to build for
-            abiFilters("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 

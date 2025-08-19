@@ -250,7 +250,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
     super.build(context);
     
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: const Color(0xFF1A1A1A),
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60),
@@ -258,7 +258,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
             child: AppBar(
-              backgroundColor: const Color(0xFF1A1A1A).withOpacity(0.8),
+              backgroundColor: const Color(0xFF1A1A1A).withOpacity(0.95),
               elevation: 0,
               toolbarHeight: 60,
               automaticallyImplyLeading: false,
@@ -266,8 +266,8 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFF1F1F1F).withOpacity(0.8),
-                      const Color(0xFF151515).withOpacity(0.6),
+                      const Color(0xFF2A2A2A).withOpacity(0.9),
+                      const Color(0xFF1A1A1A).withOpacity(0.8),
                     ],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
@@ -287,10 +287,10 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [
-                          Theme.of(context).colorScheme.primary,
-                          Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                          Color(0xFFFF6B00),
+                          Color(0xFFFFAA00),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -298,17 +298,33 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                          color: const Color(0xFFFF6B00).withOpacity(0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
                       ],
                     ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.account_balance_wallet,
-                        color: Colors.black87,
-                        size: 20,
+                    child: Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          const Icon(
+                            Icons.currency_bitcoin,
+                            color: Colors.black87,
+                            size: 20,
+                          ),
+                          const Positioned(
+                            bottom: 2,
+                            child: Text(
+                              'Z',
+                              style: TextStyle(
+                                color: Colors.black87,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -327,12 +343,12 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                         TextSpan(
                           text: 'Z',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
+                            color: const Color(0xFFFF6B00),
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             shadows: [
                               Shadow(
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                                color: const Color(0xFFFF6B00).withOpacity(0.5),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
