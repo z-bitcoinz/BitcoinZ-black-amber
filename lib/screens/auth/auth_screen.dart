@@ -51,10 +51,8 @@ class _AuthScreenState extends State<AuthScreen>
         _showBiometricOption = isAvailable && authProvider.biometricsEnabled;
       });
       
-      // Auto-trigger biometric auth if enabled and available
-      if (_showBiometricOption) {
-        _authenticateWithBiometrics();
-      }
+      // Note: Removed auto-trigger to prevent conflicts with manual button press
+      // User must explicitly tap the biometric button to authenticate
     }
   }
 
@@ -67,13 +65,61 @@ class _AuthScreenState extends State<AuthScreen>
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Check biometric availability first
+      final isAvailable = await authProvider.isBiometricsAvailable();
+      if (!isAvailable) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Biometric authentication not available on this device'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+      
       final success = await authProvider.authenticate();
       
       if (success && mounted) {
+        // Success - navigate to dashboard
         _navigateToDashboard();
+      } else {
+        // Authentication failed or was cancelled
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Authentication cancelled. Please try again or use PIN.'),
+              backgroundColor: Colors.orange.shade700,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (e) {
-      // Biometric auth failed, fall back to PIN
+      // Biometric auth error
+      if (mounted) {
+        String errorMessage = 'Biometric authentication failed. Please use PIN.';
+        
+        // Provide more specific error messages
+        if (e.toString().contains('UserCancel')) {
+          errorMessage = 'Authentication cancelled by user';
+        } else if (e.toString().contains('NotAvailable')) {
+          errorMessage = 'Biometric authentication not available';
+        } else if (e.toString().contains('NotEnrolled')) {
+          errorMessage = 'No biometrics enrolled on device';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -244,7 +290,7 @@ class _AuthScreenState extends State<AuthScreen>
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Icon(
-                          Icons.account_balance_wallet,
+                          Icons.lock,
                           size: 36,
                           color: Colors.black87,
                         ),
@@ -414,10 +460,21 @@ class _AuthScreenState extends State<AuthScreen>
                 width: 1,
               ),
             ),
-            child: const Icon(
-              Icons.fingerprint,
-              size: 26,
-            ),
+            child: _isAuthenticating 
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      const Color(0xFFFF6B00).withOpacity(0.7),
+                    ),
+                  ),
+                )
+              : const Icon(
+                  Icons.fingerprint,
+                  size: 26,
+                ),
           ),
         ),
       ),

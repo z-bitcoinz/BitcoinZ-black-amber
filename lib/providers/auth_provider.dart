@@ -60,8 +60,8 @@ class AuthProvider with ChangeNotifier {
         }
       }
       
-      // Check if biometrics are available on mobile
-      if (Platform.isAndroid || Platform.isIOS) {
+      // Check if biometrics are available on supported platforms
+      if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
         final isAvailable = await isBiometricsAvailable();
         if (!isAvailable && _biometricsEnabled) {
           // Disable biometrics if not available
@@ -172,8 +172,8 @@ class AuthProvider with ChangeNotifier {
     try {
       bool authenticated = false;
 
-      // Try biometric authentication first on mobile
-      if (_biometricsEnabled && (Platform.isAndroid || Platform.isIOS)) {
+      // Try biometric authentication first on supported platforms
+      if (_biometricsEnabled && (Platform.isAndroid || Platform.isIOS || Platform.isMacOS)) {
         authenticated = await _authenticateWithBiometrics();
       }
       
@@ -182,9 +182,9 @@ class AuthProvider with ChangeNotifier {
         authenticated = await _authenticateWithPin(pin);
       }
       
-      // For desktop or fallback, use simple authentication
-      if (!authenticated && !Platform.isAndroid && !Platform.isIOS) {
-        authenticated = true; // Simplified for desktop
+      // For unsupported desktop platforms, use simple authentication
+      if (!authenticated && !Platform.isAndroid && !Platform.isIOS && !Platform.isMacOS) {
+        authenticated = true; // Simplified for unsupported platforms
       }
 
       _isAuthenticated = authenticated;
@@ -238,17 +238,55 @@ class AuthProvider with ChangeNotifier {
   /// Authenticate with biometrics
   Future<bool> _authenticateWithBiometrics() async {
     try {
+      if (kDebugMode) {
+        print('🔒 Starting biometric authentication...');
+      }
+      
+      // Check if biometric authentication is available
       final isAvailable = await _localAuth.canCheckBiometrics;
-      if (!isAvailable) return false;
-
-      return await _localAuth.authenticate(
+      if (kDebugMode) {
+        print('📱 Biometric availability: $isAvailable');
+      }
+      
+      if (!isAvailable) {
+        if (kDebugMode) {
+          print('❌ Biometric authentication not available');
+        }
+        return false;
+      }
+      
+      // Get available biometric types
+      final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      if (kDebugMode) {
+        print('🔍 Available biometrics: $availableBiometrics');
+      }
+      
+      if (availableBiometrics.isEmpty) {
+        if (kDebugMode) {
+          print('❌ No biometric types available');
+        }
+        return false;
+      }
+      
+      // Attempt biometric authentication with proper settings for fingerprint/face dialog
+      final result = await _localAuth.authenticate(
         localizedReason: 'Authenticate to access your BitcoinZ wallet',
         options: const AuthenticationOptions(
-          biometricOnly: true,
-          stickyAuth: true,
+          biometricOnly: true,  // Show only biometric dialog (fingerprint/face)
+          stickyAuth: true,     // Keep authentication dialog sticky
+          sensitiveTransaction: false, // Standard security level
         ),
       );
+      
+      if (kDebugMode) {
+        print('🔐 Biometric authentication result: $result');
+      }
+      
+      return result;
     } catch (e) {
+      if (kDebugMode) {
+        print('❌ Biometric authentication error: $e');
+      }
       return false;
     }
   }
@@ -336,18 +374,41 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Check if biometrics are available (mobile-optimized)
+  /// Check if biometrics are available (cross-platform optimized)
   Future<bool> isBiometricsAvailable() async {
     try {
-      // Only available on mobile platforms
-      if (!Platform.isAndroid && !Platform.isIOS) return false;
+      // Support for mobile and desktop platforms
+      if (!Platform.isAndroid && !Platform.isIOS && !Platform.isMacOS) {
+        if (kDebugMode) {
+          print('🔒 Biometrics: Platform ${Platform.operatingSystem} not supported');
+        }
+        return false;
+      }
       
       final isAvailable = await _localAuth.canCheckBiometrics;
+      if (kDebugMode) {
+        print('🔒 Biometrics: Device capability check: $isAvailable');
+      }
+      
       if (!isAvailable) return false;
 
       final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      if (kDebugMode) {
+        print('🔒 Biometrics: Available types: $availableBiometrics');
+        if (Platform.isAndroid) {
+          print('🔒 Android: Supports fingerprint, face, iris recognition');
+        } else if (Platform.isIOS) {
+          print('🔒 iOS: Supports TouchID, FaceID');
+        } else if (Platform.isMacOS) {
+          print('🔒 macOS: Supports TouchID');
+        }
+      }
+      
       return availableBiometrics.isNotEmpty;
     } catch (e) {
+      if (kDebugMode) {
+        print('❌ Biometrics availability check failed: $e');
+      }
       return false;
     }
   }
@@ -355,7 +416,7 @@ class AuthProvider with ChangeNotifier {
   /// Get available biometric types
   Future<List<BiometricType>> getAvailableBiometrics() async {
     try {
-      if (!Platform.isAndroid && !Platform.isIOS) return [];
+      if (!Platform.isAndroid && !Platform.isIOS && !Platform.isMacOS) return [];
       return await _localAuth.getAvailableBiometrics();
     } catch (e) {
       return [];

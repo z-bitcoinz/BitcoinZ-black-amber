@@ -87,8 +87,8 @@ class _SplashScreenState extends State<SplashScreen>
         });
       }
       
-      // Wait minimum splash time for better UX
-      await Future.delayed(const Duration(milliseconds: 2000));
+      // Wait minimum splash time for better UX (optimized for faster loading)
+      await Future.delayed(const Duration(milliseconds: 1200));
       
       if (mounted) {
         _navigateToNextScreen(authProvider, walletProvider);
@@ -224,7 +224,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.primary,
+      backgroundColor: const Color(0xFF000000), // Pure black background
       body: Center(
         child: AnimatedBuilder(
           animation: Listenable.merge([_fadeAnimation, _scaleAnimation]),
@@ -236,59 +236,171 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // App Logo with debug reset (double tap)
+                    // BitcoinZ Logo with debug reset (double tap)
                     GestureDetector(
                       onDoubleTap: kDebugMode ? _performDebugReset : null,
                       child: Container(
                         width: 120,
                         height: 120,
                         decoration: BoxDecoration(
-                          color: Colors.white,
                           borderRadius: BorderRadius.circular(24),
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFFF6B00).withOpacity(0.1),
+                              const Color(0xFFFFAA00).withOpacity(0.05),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: const Color(0xFFFF6B00).withOpacity(0.2),
+                            width: 1,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
+                              color: const Color(0xFFFF6B00).withOpacity(0.3),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 32,
+                              offset: const Offset(0, 16),
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.currency_bitcoin,
-                          size: 64,
-                          color: Color(0xFF1976D2),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            child: Image.asset(
+                              'assets/images/bitcoinz_logo.png',
+                              width: 88,
+                              height: 88,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                // Fallback to original icon if image fails to load
+                                return Container(
+                                  width: 88,
+                                  height: 88,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFFFF6B00),
+                                        Color(0xFFFFAA00),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.currency_bitcoin,
+                                      color: Colors.black87,
+                                      size: 48,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 40),
                     
-                    // App Name
-                    Text(
-                      'BitcoinZ Wallet',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                    // App Name with BitcoinZ branding
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        children: [
+                          const TextSpan(
+                            text: 'Bitcoin',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          TextSpan(
+                            text: 'Z',
+                            style: TextStyle(
+                              color: const Color(0xFFFF6B00),
+                              fontSize: 36,
+                              fontWeight: FontWeight.w900,
+                              shadows: [
+                                Shadow(
+                                  color: const Color(0xFFFF6B00).withOpacity(0.5),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     
-                    // App Tagline
-                    Text(
-                      'Your Private & Secure Wallet',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.white.withOpacity(0.8),
-                      ),
+                    // Professional Tagline
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Decentralized',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 8),
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF6B00),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        Text(
+                          'Private',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 8),
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF6B00),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        Text(
+                          'Secure',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 56),
                     
-                    // Loading Indicator
+                    // Loading Indicator with BitcoinZ orange
                     SizedBox(
                       width: 32,
                       height: 32,
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white.withOpacity(0.8),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Color(0xFFFF6B00),
                         ),
+                        backgroundColor: Colors.white.withOpacity(0.1),
                         strokeWidth: 3,
                       ),
                     ),
