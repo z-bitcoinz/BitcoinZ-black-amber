@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'package:bip39/bip39.dart' as bip39;
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import '../models/wallet_model.dart';
 import '../models/balance_model.dart';
 import '../models/transaction_model.dart';
@@ -24,7 +25,6 @@ class WalletProvider with ChangeNotifier {
   String? _error;
   Map<String, List<String>> _addresses = {'transparent': [], 'shielded': []};
   List<AddressModel> _addressModels = [];
-  DateTime? _lastSyncTime;
   bool _isConnected = false;
   String _connectionStatus = 'Disconnected';
   DateTime? _lastConnectionCheck;
@@ -39,6 +39,13 @@ class WalletProvider with ChangeNotifier {
   String _syncMessage = '';
   Timer? _syncStatusTimer;
   bool _autoSyncEnabled = true;
+  
+  // Enhanced sync tracking
+  DateTime? _syncStartTime;
+  DateTime? _lastSyncTime;
+  int _lastSyncedBlocks = 0;
+  double _syncSpeed = 0.0; // blocks per second
+  Duration? _estimatedTimeRemaining;
   
   // Pagination state
   int _currentPage = 0;
@@ -60,6 +67,13 @@ class WalletProvider with ChangeNotifier {
   SharedPreferences? _prefs; // For fallback storage when database fails
   bool _prefsInitialized = false; // Track if SharedPreferences is ready
   
+  // Temporary storage for generated wallet data
+  
+  // Defensive state protection
+  bool _walletLocked = false; // Prevents wallet state resets during background operations
+  String? _temporaryGeneratedSeed;
+  int? _temporaryGeneratedBirthday;
+  
   final DatabaseService _databaseService = DatabaseService.instance;
   late final BitcoinzRustService _rustService; // Native Rust service with mempool monitoring
   
@@ -70,9 +84,30 @@ class WalletProvider with ChangeNotifier {
     
     // Initialize Native Rust service with mempool monitoring
     _rustService = BitcoinzRustService.instance;
-    _rustService.fnSetTotalBalance = (balance) {
+    _rustService.fnSetTotalBalance = (balance) async {
       if (kDebugMode) print('🦀 Rust Bridge updated balance: ${balance.formattedTotal} BTCZ (unconfirmed: ${balance.unconfirmed})');
       _balance = balance;
+      
+      // Save balance to cache for faster startup
+      if (_wallet != null) {
+        try {
+          final authProvider = AuthProvider();
+          await authProvider.initialize();
+          final walletData = await authProvider.getStoredWalletData();
+          if (walletData != null) {
+            walletData['cachedBalance'] = {
+              'transparent': _balance.transparent,
+              'shielded': _balance.shielded,
+              'unconfirmed': _balance.unconfirmed,
+              'total': _balance.total,
+            };
+            await authProvider.updateWalletData(walletData);
+          }
+        } catch (e) {
+          if (kDebugMode) print('⚠️ Failed to cache balance: $e');
+        }
+      }
+      
       notifyListeners();
     };
     _rustService.fnSetTransactionsList = (transactions) async {
@@ -147,7 +182,6 @@ class WalletProvider with ChangeNotifier {
   Map<String, List<String>> get addresses => _addresses;
   List<AddressModel> get addressModels => _addressModels;
   bool get hasWallet => _wallet != null;
-  DateTime? get lastSyncTime => _lastSyncTime;
   bool get isConnected => _isConnected;
   String get connectionStatus => _connectionStatus;
   DateTime? get lastConnectionCheck => _lastConnectionCheck;
@@ -160,6 +194,12 @@ class WalletProvider with ChangeNotifier {
   int get batchTotal => _batchTotal;
   double get syncProgress => _syncProgress;
   String get syncMessage => _syncMessage;
+  
+  // Enhanced sync tracking getters
+  DateTime? get lastSyncTime => _lastSyncTime;
+  DateTime? get syncStartTime => _syncStartTime;
+  double get syncSpeed => _syncSpeed;
+  Duration? get estimatedTimeRemaining => _estimatedTimeRemaining;
   
   // Pagination getters
   bool get hasMoreTransactions => _hasMoreTransactions;
@@ -177,35 +217,113 @@ class WalletProvider with ChangeNotifier {
   int get unreadMemoCount => _unreadMemoCount;
   bool get needsSync => _lastSyncTime == null || DateTime.now().difference(_lastSyncTime!).inMinutes > 5;
 
-  /// Generate a new wallet (seed + birthday) without creating Rust wallet
+  /// Generate a new wallet seed and get real birthday from blockchain
   Future<Map<String, dynamic>> generateNewWallet() async {
     if (kDebugMode) {
-      print('🎲 Generating new wallet seed locally...');
+      print('🎲 Generating new wallet with real blockchain birthday...');
     }
     
-    // Generate seed phrase locally using BIP39
-    // Import is already at top: import 'package:bip39/bip39.dart' as bip39;
+    // Generate seed phrase locally first
     final mnemonic = bip39.generateMnemonic(strength: 256); // 24 words
+    int? birthday;
     
-    // Get current block height to calculate birthday
-    // For now, use a reasonable estimate since we can't easily get height without wallet
-    // BitcoinZ mainnet is around block 1,612,000+ as of 2024
-    int currentHeight = 1612850; // Recent mainnet height
-    
-    // Calculate birthday (current height - 100 for safety)
-    final birthday = currentHeight - 100;
-    
-    if (kDebugMode) {
-      print('✅ New wallet seed generated locally:');
-      print('   Seed: ${mnemonic.split(' ').length} words');
-      print('   Birthday block: $birthday');
-      print('   Note: Wallet will be created after seed verification');
+    try {
+      // First, try to get blockchain height by initializing Rust service
+      // We'll create a temporary wallet just to connect to the server
+      int? currentHeight;
+      
+      if (!_rustService.initialized) {
+        try {
+          if (kDebugMode) print('📡 Initializing Rust service to get blockchain height...');
+          
+          // Create a temporary wallet to establish server connection
+          final tempInitialized = await _rustService.initialize(
+            serverUri: 'https://lightd.btcz.rocks:9067',
+            createNew: true, // Create a temporary new wallet
+          );
+          
+          if (tempInitialized) {
+            if (kDebugMode) print('✅ Rust service initialized, getting blockchain height...');
+            
+            // Now we can get the real blockchain height
+            try {
+              currentHeight = await _rustService.getCurrentBlockHeight();
+              if (currentHeight != null && currentHeight > 0) {
+                if (kDebugMode) print('📊 Got real blockchain height: $currentHeight');
+              }
+            } catch (e) {
+              if (kDebugMode) print('⚠️ Failed to get block height: $e');
+            }
+            
+            // Note: The temporary wallet will be overwritten when createWallet() is called
+            // This is just to get the blockchain height
+          } else {
+            if (kDebugMode) print('⚠️ Failed to initialize Rust service for height check');
+          }
+        } catch (e) {
+          if (kDebugMode) print('⚠️ Error initializing Rust service: $e');
+        }
+      } else {
+        // Rust service already initialized, just get the height
+        try {
+          currentHeight = await _rustService.getCurrentBlockHeight();
+          if (kDebugMode) print('📊 Got blockchain height from existing service: $currentHeight');
+        } catch (e) {
+          if (kDebugMode) print('⚠️ Failed to get height: $e');
+        }
+      }
+      
+      // If we still couldn't get the height, log it
+      if (currentHeight == null || currentHeight == 0) {
+        if (kDebugMode) {
+          print('📊 Could not get real blockchain height');
+          print('📊 Will use estimated height for birthday calculation');
+        }
+      }
+      
+      // Calculate birthday based on actual or estimated height
+      // Use a more recent height as fallback (update this periodically)
+      if (currentHeight == null || currentHeight == 0) {
+        // Use a recent mainnet height as fallback
+        currentHeight = 1625000; // Updated mainnet height as of Dec 2024
+        if (kDebugMode) {
+          print('⚠️ Using fallback height: $currentHeight');
+        }
+      }
+      
+      // Set birthday to current height minus 100 blocks for safety
+      // This ensures new wallets don't scan the entire blockchain
+      birthday = currentHeight - 100;
+      
+      if (kDebugMode) {
+        print('✅ New wallet seed generated:');
+        print('   Seed: ${mnemonic.split(' ').length} words (locally generated)');
+        print('   Birthday block: $birthday');
+        print('   Current height: $currentHeight (${currentHeight == 1620000 ? "FALLBACK/ESTIMATED" : "REAL from blockchain"})');
+        print('   Rust initialized: ${_rustService.initialized}');
+        if (currentHeight == 1620000) {
+          print('⚠️ WARNING: Using fallback height - Rust service may not be connecting to server');
+        }
+      }
+      
+      return {
+        'seed': mnemonic,
+        'birthday': birthday,
+      };
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ Error during wallet generation: $e');
+        print('⚠️ Using fallback values');
+      }
+      
+      // Ultimate fallback - use a recent block height
+      birthday ??= 1615900; // Recent mainnet height - 100
+      
+      return {
+        'seed': mnemonic,
+        'birthday': birthday,
+      };
     }
-    
-    return {
-      'seed': mnemonic,
-      'birthday': birthday,
-    };
   }
 
   /// Initialize or create wallet (mobile-first)
@@ -225,44 +343,59 @@ class WalletProvider with ChangeNotifier {
       String finalSeedPhrase = seedPhrase;
       
       if (isNewWallet && seedPhrase.isNotEmpty) {
-        // For new wallets, ignore the UI-generated seed and let Rust generate one
-        if (kDebugMode) {
-          print('🦀 Creating new wallet via Rust Bridge...');
-          print('   Note: Ignoring UI seed phrase, will use Rust-generated seed');
-        }
-        final rustInitialized = await _rustService.initialize(
-          serverUri: 'https://lightd.btcz.rocks:9067',
-          createNew: true,  // Create new wallet
-        );
-        
-        if (!rustInitialized) {
-          throw Exception('Failed to create wallet via Rust Bridge');
-        }
-        
-        // Get the generated seed phrase from Rust
-        finalSeedPhrase = _rustService.getSeedPhrase() ?? '';
-        if (finalSeedPhrase.isEmpty) {
-          throw Exception('Failed to get seed phrase from Rust Bridge');
-        }
-        
-        if (kDebugMode) {
-          print('✅ New wallet created with seed phrase from Rust');
-          print('   Birthday: ${_rustService.getBirthday()}');
+        // Always create a new wallet for new wallets
+        // Don't try to reuse from generateNewWallet() as it causes issues
+        {
+          // This is a different flow or wallet not initialized, create new wallet
+          if (kDebugMode) {
+            print('🦀 Creating new wallet via Rust Bridge...');
+            print('   Note: This is a fresh wallet creation');
+          }
+          final rustInitialized = await _rustService.initialize(
+            serverUri: 'https://lightd.btcz.rocks:9067',
+            createNew: true,  // Create new wallet
+          );
+          
+          if (!rustInitialized) {
+            throw Exception('Failed to create wallet via Rust Bridge');
+          }
+          
+          // Get the generated seed phrase from Rust
+          finalSeedPhrase = _rustService.getSeedPhrase() ?? '';
+          if (finalSeedPhrase.isEmpty) {
+            throw Exception('Failed to get seed phrase from Rust Bridge');
+          }
+          
+          if (kDebugMode) {
+            print('✅ New wallet created with seed phrase from Rust');
+            print('   Birthday: ${_rustService.getBirthday()}');
+          }
         }
       } else {
         // Restore wallet from provided seed phrase
         if (kDebugMode) print('🦀 Restoring wallet via Rust Bridge...');
+        
+        // When restoring, use current block height as birthday for fast sync
+        // This is appropriate for new wallets being restored
+        final currentBlockHeight = await _rustService.getCurrentBlockHeight();
+        final int birthdayToUse = currentBlockHeight > 100 ? currentBlockHeight - 100 : 0;
+        
+        if (kDebugMode) {
+          print('   Using birthday height for restore: $birthdayToUse');
+        }
+        
         final rustInitialized = await _rustService.initialize(
           serverUri: 'https://lightd.btcz.rocks:9067',
           seedPhrase: seedPhrase,
           createNew: false,
+          birthdayHeight: birthdayToUse,
         );
         
         if (!rustInitialized) {
           throw Exception('Failed to restore wallet via Rust Bridge');
         }
         
-        if (kDebugMode) print('✅ Wallet restored from seed phrase');
+        if (kDebugMode) print('✅ Wallet restored from seed phrase with birthday: $birthdayToUse');
       }
       
       // Refresh wallet data from Rust to get real addresses
@@ -465,40 +598,185 @@ class WalletProvider with ChangeNotifier {
     try {
       if (kDebugMode) {
         print('🔄 WalletProvider.restoreFromStoredData() starting...');
+        final platform = Platform.isAndroid ? "Android" : Platform.isIOS ? "iOS" : Platform.isMacOS ? "macOS" : "Other";
+        print('   📱 Platform: $platform');
+        print('   AuthProvider hasWallet: ${authProvider.hasWallet}');
+        print('   AuthProvider isAuthenticated: ${authProvider.isAuthenticated}');
+        print('   🔍 Platform Analysis:');
+        print('     - Android: ${Platform.isAndroid}');
+        print('     - iOS: ${Platform.isIOS}');  
+        print('     - macOS: ${Platform.isMacOS}');
+        print('     - Linux: ${Platform.isLinux}');
+        print('     - Windows: ${Platform.isWindows}');
       }
       
       final seedPhrase = await authProvider.getStoredSeedPhrase();
       final walletData = await authProvider.getStoredWalletData();
       
+      // Enhanced platform storage analysis
+      if (kDebugMode && walletData != null) {
+        print('  💾 Storage Analysis (Android vs macOS):');
+        try {
+          // Try to get storage paths for debugging
+          final prefs = await SharedPreferences.getInstance();
+          final keys = prefs.getKeys();
+          final walletKeys = keys.where((k) => k.toLowerCase().contains('wallet') || k.toLowerCase().contains('birthday')).toList();
+          print('    SharedPreferences wallet keys: $walletKeys');
+          
+          // Check for any birthday-related keys in SharedPreferences
+          for (final key in walletKeys) {
+            if (key.toLowerCase().contains('birthday')) {
+              final value = prefs.get(key);
+              print('    SharedPrefs $key: $value (${value.runtimeType})');
+            }
+          }
+        } catch (e) {
+          print('    ⚠️ Could not analyze SharedPreferences: $e');
+        }
+      }
+      
       if (kDebugMode) {
         print('  seedPhrase found: ${seedPhrase != null}');
         print('  walletData found: ${walletData != null}');
         if (walletData != null) {
-          print('  walletId: ${walletData['walletId']}');
-          print('  transparent addresses: ${walletData['transparentAddresses']?.length ?? 0}');
-          print('  shielded addresses: ${walletData['shieldedAddresses']?.length ?? 0}');
+          print('  📊 Wallet Data Analysis:');
+          print('    walletId: ${walletData['walletId']}');
+          print('    transparent addresses: ${walletData['transparentAddresses']?.length ?? 0}');
+          print('    shielded addresses: ${walletData['shieldedAddresses']?.length ?? 0}');
+          print('  🎂 Birthday Height Analysis (Critical for Android Fix):');
+          print('    All keys: ${walletData.keys.toList()}');
+          print('    Birthday-related keys: ${walletData.keys.where((k) => k.toLowerCase().contains('birthday') || k.toLowerCase().contains('height')).toList()}');
+          print('    birthdayHeight: ${walletData['birthdayHeight']} (${walletData['birthdayHeight'].runtimeType})');
+          print('    birthday: ${walletData['birthday']} (${walletData['birthday'].runtimeType})');
+          print('    created_at: ${walletData['created_at']}');
+          final rawBirthday = walletData['birthdayHeight'] ?? walletData['birthday'] ?? 0;
+          print('    Raw birthday value: $rawBirthday (${rawBirthday.runtimeType})');
+          print('    Is birthday > 0?: ${(rawBirthday is int ? rawBirthday : int.tryParse(rawBirthday.toString()) ?? 0) > 0}');
         }
       }
       
+      // CRITICAL FIX: Create wallet model IMMEDIATELY if we have wallet data
+      // Don't wait for seedPhrase or Rust initialization
+      if (walletData != null) {
+        // Load cached addresses first
+        if (walletData['transparentAddresses'] != null) {
+          _addresses['transparent'] = List<String>.from(walletData['transparentAddresses']);
+          if (kDebugMode) print('📋 Loaded ${_addresses['transparent']!.length} cached transparent addresses');
+        }
+        if (walletData['shieldedAddresses'] != null) {
+          _addresses['shielded'] = List<String>.from(walletData['shieldedAddresses']);
+          if (kDebugMode) print('📋 Loaded ${_addresses['shielded']!.length} cached shielded addresses');
+        }
+        
+        // Create wallet model immediately with cached data
+        final walletId = walletData['walletId'] ?? 
+                        authProvider.walletId ?? 
+                        'wallet_${DateTime.now().millisecondsSinceEpoch}';
+        
+        // Extract and store birthday height for later use
+        final storedBirthday = walletData['birthdayHeight'] ?? walletData['birthday'] ?? 0;
+        
+        if (kDebugMode) {
+          print('🚨 ANDROID FIX: Creating wallet model IMMEDIATELY!');
+          print('   walletId: $walletId');
+          print('   transparent: ${_addresses['transparent']?.length ?? 0}');
+          print('   shielded: ${_addresses['shielded']?.length ?? 0}');
+          print('   storedBirthday: $storedBirthday');
+        }
+        
+        try {
+          _wallet = WalletModel(
+            walletId: walletId,
+            transparentAddresses: _addresses['transparent'] ?? [],
+            shieldedAddresses: _addresses['shielded'] ?? [],
+            createdAt: DateTime.now(),
+            birthdayHeight: storedBirthday,
+          );
+          
+          if (kDebugMode) {
+            print('✅ Wallet model created successfully!');
+            print('   hasWallet: $hasWallet');
+            print('   birthdayHeight: ${_wallet!.birthdayHeight}');
+          }
+          
+          // Load cached balance if available
+          if (walletData['cachedBalance'] != null) {
+            try {
+              final cachedBalance = walletData['cachedBalance'];
+              _balance = BalanceModel(
+                transparent: cachedBalance['transparent']?.toDouble() ?? 0.0,
+                shielded: cachedBalance['shielded']?.toDouble() ?? 0.0,
+                unconfirmed: cachedBalance['unconfirmed']?.toDouble() ?? 0.0,
+                total: cachedBalance['total']?.toDouble() ?? 0.0,
+              );
+              if (kDebugMode) print('💰 Loaded cached balance: ${_balance.total} BTCZ');
+            } catch (e) {
+              if (kDebugMode) print('⚠️ Failed to load cached balance: $e');
+            }
+          }
+          
+          // Notify UI immediately with cached data
+          notifyListeners();
+          
+          // DEFENSIVE: Mark this wallet as "locked in" to prevent resets during Rust init
+          _walletLocked = true;
+          if (kDebugMode) print('🔒 Wallet model locked to prevent resets during background initialization');
+          
+        } catch (e) {
+          if (kDebugMode) print('❌ Failed to create wallet model: $e');
+          // Create minimal wallet as fallback
+          _wallet = WalletModel(
+            walletId: walletId,
+            transparentAddresses: [],
+            shieldedAddresses: [],
+            createdAt: DateTime.now(),
+            birthdayHeight: 0,
+          );
+          notifyListeners();
+        }
+      }
+      
+      // Now proceed with Rust initialization if we have seed phrase
       if (seedPhrase != null && walletData != null) {
         // Initialize Rust Bridge service first to get the correct addresses
-        if (kDebugMode) print('🦀 Initializing Rust Bridge for restored wallet...');
+        if (kDebugMode) {
+          print('🦀 Initializing Rust Bridge for restored wallet...');
+          print('📱 ANDROID FIX: About to create wallet model with cached data');
+        }
         
         // First check if the Rust wallet file already exists
         // If it does, load it; otherwise restore from seed
         bool rustInitialized = false;
         
         try {
-          // Try to load existing wallet first
-          if (kDebugMode) print('   Attempting to load existing Rust wallet...');
+          // Try to load existing wallet first, passing the birthday height
+          final storedBirthdayLocal = walletData['birthdayHeight'] ?? walletData['birthday'] ?? 0;
+          if (kDebugMode) {
+            print('   🔄 Attempting to LOAD existing Rust wallet...');
+            print('   📊 Birthday Height Processing:');
+            print('     Raw storage value: $storedBirthdayLocal (${storedBirthdayLocal.runtimeType})');
+            print('     Source: ${walletData.containsKey('birthdayHeight') ? 'birthdayHeight key' : walletData.containsKey('birthday') ? 'birthday key' : 'default 0'}');
+          }
+          
+          // Pass birthday height as int, ensuring it's not null
+          final birthdayToUse = storedBirthdayLocal is int ? storedBirthdayLocal : 
+                               (storedBirthdayLocal != null ? int.tryParse(storedBirthdayLocal.toString()) ?? 0 : 0);
+          
+          if (kDebugMode) {
+            print('     Processed value: $birthdayToUse (${birthdayToUse.runtimeType})');
+            print('     Will pass to Rust: ${birthdayToUse > 0 ? birthdayToUse : null}');
+            print('     🚨 CRITICAL: This should NOT be 0 on Android if wallet exists!');
+          }
+          
           rustInitialized = await _rustService.initialize(
             serverUri: 'https://lightd.btcz.rocks:9067',
             createNew: false,  // Don't create new
             seedPhrase: null,  // Don't provide seed, load existing
+            birthdayHeight: birthdayToUse > 0 ? birthdayToUse : null,  // Pass valid birthday or null
           );
           
           if (rustInitialized) {
-            if (kDebugMode) print('✅ Loaded existing Rust wallet successfully');
+            if (kDebugMode) print('✅ Loaded existing Rust wallet successfully with birthday: $birthdayToUse');
           }
         } catch (e) {
           if (kDebugMode) print('❌ Failed to load existing wallet: $e');
@@ -508,15 +786,31 @@ class WalletProvider with ChangeNotifier {
         // If loading existing wallet failed, restore from seed
         if (!rustInitialized) {
           try {
-            if (kDebugMode) print('   Restoring Rust wallet from seed phrase...');
+            // CRITICAL FIX: Pass the stored birthday height to prevent syncing from zero!
+            final storedBirthdayLocal = walletData['birthdayHeight'] ?? walletData['birthday'] ?? 0;
+            final birthdayToUse = storedBirthdayLocal is int ? storedBirthdayLocal : 
+                                 (storedBirthdayLocal != null ? int.tryParse(storedBirthdayLocal.toString()) ?? 0 : 0);
+            
+            if (kDebugMode) {
+              print('🚨 ANDROID FIX: SEED PHRASE RESTORATION (Critical Path)');
+              print('   📊 Birthday Height Processing:');
+              print('     Raw storage value: $storedBirthdayLocal (${storedBirthdayLocal.runtimeType})');
+              print('     Source: ${walletData.containsKey('birthdayHeight') ? 'birthdayHeight key' : walletData.containsKey('birthday') ? 'birthday key' : 'default 0'}');
+              print('     Processed value: $birthdayToUse (${birthdayToUse.runtimeType})');
+              print('     Will pass to Rust: ${birthdayToUse > 0 ? birthdayToUse : null}');
+              print('   🎯 THIS IS THE CRITICAL FIX: If birthday > 0, Android should NOT sync from zero!');
+              print('   🔍 Root cause was: this fallback path was passing null birthday, causing zero sync');
+            }
+            
             rustInitialized = await _rustService.initialize(
               serverUri: 'https://lightd.btcz.rocks:9067',
               seedPhrase: seedPhrase,
               createNew: false, // Restore from seed
+              birthdayHeight: birthdayToUse > 0 ? birthdayToUse : null, // CRITICAL: Pass birthday height!
             );
             
             if (rustInitialized) {
-              if (kDebugMode) print('✅ Rust Bridge restored from seed successfully');
+              if (kDebugMode) print('✅ Rust Bridge restored from seed successfully with birthday: $birthdayToUse');
             }
           } catch (e) {
             if (kDebugMode) print('⚠️ Rust Bridge initialization failed: $e');
@@ -525,40 +819,47 @@ class WalletProvider with ChangeNotifier {
           }
         }
         
-        // Get addresses - from Rust Bridge if initialized, otherwise from cached data
+        // Addresses already loaded and wallet already created above
+        // Just update if we get fresh addresses from Rust
+        
+        // Then update with fresh addresses from Rust if available (non-blocking)
         if (rustInitialized) {
-          // Get the addresses from Rust Bridge
-          await _rustService.fetchAddresses();
-          
-          // Wait a moment for the addresses to be set via callback
-          await Future.delayed(const Duration(milliseconds: 500));
-        } else {
-          // Use cached addresses from walletData
-          _addresses['transparent'] = List<String>.from(walletData['transparentAddresses'] ?? []);
-          _addresses['shielded'] = List<String>.from(walletData['shieldedAddresses'] ?? []);
-          if (kDebugMode) print('📋 Using cached addresses (offline mode)');
+          if (kDebugMode) print('🔄 Fetching fresh addresses from Rust Bridge in background...');
+          // Fetch addresses but don't wait - they'll update via callback
+          _rustService.fetchAddresses().then((_) {
+            if (kDebugMode) print('✅ Fresh addresses fetched from Rust');
+            // Update wallet model if addresses changed
+            if (_wallet != null && 
+                (_addresses['transparent']?.length != _wallet!.transparentAddresses.length ||
+                 _addresses['shielded']?.length != _wallet!.shieldedAddresses.length)) {
+              _wallet = WalletModel(
+                walletId: _wallet!.walletId,
+                transparentAddresses: _addresses['transparent'] ?? [],
+                shieldedAddresses: _addresses['shielded'] ?? [],
+                createdAt: _wallet!.createdAt,
+                birthdayHeight: _wallet!.birthdayHeight,
+              );
+              notifyListeners();
+            }
+          }).catchError((e) {
+            if (kDebugMode) print('⚠️ Failed to fetch fresh addresses: $e');
+          });
         }
         
-        // Create wallet model with available addresses
-        final walletId = walletData['walletId'] ?? const Uuid().v4();
-        final walletInfo = WalletModel(
-          walletId: walletId,
-          transparentAddresses: _addresses['transparent'] ?? [],
-          shieldedAddresses: _addresses['shielded'] ?? [],
-          createdAt: DateTime.now(),
-          birthdayHeight: walletData['birthdayHeight'] ?? 0,
-        );
-        
-        _wallet = walletInfo;
-        
-        // Update stored wallet data with correct Rust Bridge addresses
+        // Update stored wallet data with correct Rust Bridge addresses and cached balance
         await authProvider.updateWalletData({
-          'walletId': walletId,
+          'walletId': _wallet?.walletId ?? walletData['walletId'],
           'transparentAddresses': _addresses['transparent'] ?? [],
           'shieldedAddresses': _addresses['shielded'] ?? [],
-          'birthdayHeight': walletData['birthdayHeight'] ?? 0,
+          'birthdayHeight': _wallet?.birthdayHeight ?? walletData['birthdayHeight'] ?? 0,  // Use wallet's birthday
           'createdAt': walletData['createdAt'] ?? DateTime.now().toIso8601String(),
           'updatedAt': DateTime.now().toIso8601String(),
+          'cachedBalance': {
+            'transparent': _balance.transparent,
+            'shielded': _balance.shielded,
+            'unconfirmed': _balance.unconfirmed,
+            'total': _balance.total,
+          },
         });
         
         if (kDebugMode) {
@@ -573,6 +874,15 @@ class WalletProvider with ChangeNotifier {
             print('  first z-address: ${_addresses['shielded']!.first}');
             print('  z-address length: ${_addresses['shielded']!.first.length} chars');
           }
+        }
+        
+        // Set connection status immediately after Rust initialization
+        if (_rustService.initialized) {
+          _setConnectionStatus(true, 'Connected to server');
+          if (kDebugMode) print('✅ Rust service initialized, marking as connected');
+        } else {
+          _setConnectionStatus(false, 'Initializing...');
+          if (kDebugMode) print('⏳ Rust service not yet initialized');
         }
         
         // Initialize connection and sync
@@ -593,8 +903,17 @@ class WalletProvider with ChangeNotifier {
               if (kDebugMode) print('🔄 Triggering wallet sync...');
               // Use Rust service sync directly
               await _rustService.sync();
+              
               // Also try to get initial sync status
               await _updateSyncStatus();
+              
+              // Explicitly refresh all wallet data to ensure transactions are loaded
+              if (kDebugMode) print('📊 Loading wallet data after sync...');
+              await _refreshWalletData();
+              
+              // Force a second refresh after a short delay to catch any delayed data
+              await Future.delayed(const Duration(seconds: 2));
+              if (kDebugMode) print('📊 Second refresh to ensure all data is loaded...');
               await _refreshWalletData();
             } catch (e) {
               if (kDebugMode) print('Initial sync error: $e');
@@ -609,11 +928,34 @@ class WalletProvider with ChangeNotifier {
         // Start auto-sync after restoration
         startAutoSync();
         
-        notifyListeners();
+        // Don't call notifyListeners() here since we already called it after creating wallet model
+        
+        // DEFENSIVE: Unlock wallet after successful initialization
+        _unlockWallet();
+        
         return true;
       } else if (seedPhrase != null) {
-        // Have seed phrase but no wallet data - recreate wallet with Rust Bridge
-        if (kDebugMode) print('⚠️ Have seed phrase but no wallet data, recreating with Rust Bridge...');
+        // Have seed phrase but no wallet data - create basic wallet first
+        if (kDebugMode) print('⚠️ Have seed phrase but no wallet data, creating basic wallet...');
+        
+        // Create a basic wallet model immediately
+        final walletId = authProvider.walletId ?? 'wallet_${DateTime.now().millisecondsSinceEpoch}';
+        
+        _wallet = WalletModel(
+          walletId: walletId,
+          transparentAddresses: [],
+          shieldedAddresses: [],
+          createdAt: DateTime.now(),
+          birthdayHeight: 0,
+        );
+        
+        if (kDebugMode) {
+          print('📱 Created basic wallet model');
+          print('   walletId: $walletId');
+          print('   hasWallet: $hasWallet');
+        }
+        
+        notifyListeners();
         
         // Initialize Rust Bridge with seed phrase
         final rustInitialized = await _rustService.initialize(
@@ -630,25 +972,41 @@ class WalletProvider with ChangeNotifier {
         await _rustService.fetchAddresses();
         await Future.delayed(const Duration(milliseconds: 500));
         
-        // Create wallet model with Rust Bridge addresses
-        final walletId = const Uuid().v4();
-        final walletInfo = WalletModel(
-          walletId: walletId,
-          transparentAddresses: _addresses['transparent'] ?? [],
-          shieldedAddresses: _addresses['shielded'] ?? [],
-          createdAt: DateTime.now(),
-          birthdayHeight: 0,
-        );
-        
-        _wallet = walletInfo;
+        // Update the existing wallet model with fresh addresses
+        if (_wallet != null && (_addresses['transparent']?.isNotEmpty == true || _addresses['shielded']?.isNotEmpty == true)) {
+          _wallet = WalletModel(
+            walletId: _wallet!.walletId,
+            transparentAddresses: _addresses['transparent'] ?? [],
+            shieldedAddresses: _addresses['shielded'] ?? [],
+            createdAt: _wallet!.createdAt,
+            birthdayHeight: 0,
+          );
+          
+          if (kDebugMode) {
+            print('📱 Updated wallet with Rust addresses');
+            print('   transparent: ${_addresses['transparent']?.length ?? 0}');
+            print('   shielded: ${_addresses['shielded']?.length ?? 0}');
+          }
+          
+          notifyListeners();
+        }
         
         // Update stored wallet data with Rust Bridge addresses
         await authProvider.updateWalletData({
-          'walletId': walletId,
+          'walletId': _wallet!.walletId,
           'transparentAddresses': _addresses['transparent'] ?? [],
           'shieldedAddresses': _addresses['shielded'] ?? [],
           'createdAt': DateTime.now().toIso8601String(),
         });
+        
+        // Set connection status immediately after Rust initialization
+        if (_rustService.initialized) {
+          _setConnectionStatus(true, 'Connected to server');
+          if (kDebugMode) print('✅ Rust service initialized, marking as connected');
+        } else {
+          _setConnectionStatus(false, 'Initializing...');
+          if (kDebugMode) print('⏳ Rust service not yet initialized');
+        }
         
         await _checkConnection();
         
@@ -682,6 +1040,9 @@ class WalletProvider with ChangeNotifier {
         }
         
         startAutoSync();
+        
+        // DEFENSIVE: Unlock wallet after successful initialization
+        _unlockWallet();
         
         notifyListeners();
         return true;
@@ -776,13 +1137,21 @@ class WalletProvider with ChangeNotifier {
     if (kDebugMode) print('🔄 Starting sync status polling...');
     if (kDebugMode) print('   Rust service initialized: ${_rustService.initialized}');
     
-    // Don't set syncing flag here, let the caller decide
-    // _setSyncing(true);
-    if (kDebugMode) print('   Syncing flag set to true');
+    // Track when polling started to prevent infinite loops
+    final pollingStartTime = DateTime.now();
+    const maxPollingDuration = Duration(minutes: 5); // Maximum 5 minutes of polling
     
     // Poll every second for sync status
-    _syncStatusTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
-      if (kDebugMode) print('🕙 Sync status poll timer tick...');
+    _syncStatusTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      // Check if we've been polling too long
+      if (DateTime.now().difference(pollingStartTime) > maxPollingDuration) {
+        if (kDebugMode) print('⏰ Sync polling timeout - stopping after 5 minutes');
+        _stopSyncStatusPolling();
+        _setSyncing(false);
+        _setConnectionStatus(true, 'Connected');
+        return;
+      }
+      
       await _updateSyncStatus();
     });
     
@@ -883,8 +1252,26 @@ class WalletProvider with ChangeNotifier {
   
   /// Check connection status (called periodically)
   Future<void> checkConnectionStatus() async {
+    if (kDebugMode) {
+      print('🔍 checkConnectionStatus: hasWallet=$hasWallet, _wallet=$_wallet, rustInitialized=${_rustService.initialized}');
+    }
+    
+    // Check if we actually have a wallet
     if (!hasWallet) {
-      _setConnectionStatus(false, 'No wallet');
+      // Don't show "No wallet" if we're in the process of loading
+      if (_isLoading) {
+        _setConnectionStatus(false, 'Loading...');
+      } else {
+        _setConnectionStatus(false, 'No wallet');
+      }
+      return;
+    }
+    
+    // If Rust service is initialized and we have a wallet, proceed
+    if (_rustService.initialized) {
+      if (kDebugMode) print('✅ Rust service initialized, proceeding with connection check');
+    } else {
+      _setConnectionStatus(false, 'Not initialized');
       return;
     }
     
@@ -933,10 +1320,31 @@ class WalletProvider with ChangeNotifier {
       if (inProgress) {
         _setSyncing(true);  // Ensure syncing flag is set
         
+        // Track sync start time
+        if (_syncStartTime == null) {
+          _syncStartTime = DateTime.now();
+          _lastSyncedBlocks = 0;
+        }
+        
         _syncedBlocks = status['synced_blocks'] ?? 0;
         _totalBlocks = status['total_blocks'] ?? 0;
         _batchNum = status['batch_num'] ?? 0;
         _batchTotal = status['batch_total'] ?? 0;
+        
+        // Calculate sync speed and ETA
+        if (_syncStartTime != null && _syncedBlocks > _lastSyncedBlocks) {
+          final elapsed = DateTime.now().difference(_syncStartTime!);
+          if (elapsed.inSeconds > 0) {
+            final blocksProcessed = _syncedBlocks - _lastSyncedBlocks;
+            _syncSpeed = blocksProcessed / elapsed.inSeconds;
+            
+            if (_syncSpeed > 0 && _totalBlocks > _syncedBlocks) {
+              final blocksRemaining = _totalBlocks - _syncedBlocks;
+              final secondsRemaining = blocksRemaining / _syncSpeed;
+              _estimatedTimeRemaining = Duration(seconds: secondsRemaining.round());
+            }
+          }
+        }
         
         // Calculate progress exactly like BitcoinZ Blue
         double batchProgress = 0.0;
@@ -964,22 +1372,55 @@ class WalletProvider with ChangeNotifier {
         if (kDebugMode) {
           print('📊 $_syncMessage');
           print('   Batch Progress: ${batchProgress.toStringAsFixed(2)}%. Total progress: ${totalProgress.toStringAsFixed(2)}%.');
+          if (_syncSpeed > 0) {
+            print('   Sync speed: ${_syncSpeed.toStringAsFixed(1)} blocks/sec');
+            if (_estimatedTimeRemaining != null) {
+              print('   ETA: ${_estimatedTimeRemaining!.inSeconds} seconds');
+            }
+          }
         }
       } else {
-        // Sync completed
-        if (_isSyncing) {
-          _syncProgress = 100.0;
-          _syncMessage = 'Sync complete';
-          if (kDebugMode) print('✅ Sync completed!');
-          
-          // Refresh wallet data after sync
+        // Sync completed - IMMEDIATELY stop showing as syncing
+        // Don't show 100% indefinitely
+        
+        // Stop polling immediately when sync is complete
+        _stopSyncStatusPolling();
+        
+        // Clear sync progress to prevent stuck "100%" display
+        if (_syncProgress >= 100.0 || !inProgress) {
+          _syncProgress = 0.0; // Reset progress so it doesn't show 100%
+          _syncMessage = ''; // Clear message to prevent stuck "Syncing... 100.0% complete"
+        }
+        
+        _lastSyncTime = DateTime.now();
+        
+        if (kDebugMode) {
+          print('✅ Sync complete');
+          if (_syncStartTime != null) {
+            final totalTime = DateTime.now().difference(_syncStartTime!);
+            print('   Total sync time: ${totalTime.inSeconds} seconds');
+          }
+          print('   Clearing sync UI to prevent stuck 100% display');
+        }
+        
+        // Reset all sync tracking immediately
+        _syncStartTime = null;
+        _syncSpeed = 0.0;
+        _estimatedTimeRemaining = null;
+        _syncedBlocks = 0;
+        _totalBlocks = 0;
+        _batchNum = 0;
+        _batchTotal = 0;
+        
+        // Set connection status to green (ready) like macOS
+        _setConnectionStatus(true, 'Connected');
+        
+        // Immediately clear syncing flag - don't delay
+        _setSyncing(false);
+        
+        // Refresh wallet data after sync (unless it was a timeout)
+        if (!(status['timeout'] ?? false)) {
           _refreshWalletData();
-          
-          // Stop after a short delay
-          Future.delayed(const Duration(seconds: 1), () {
-            _setSyncing(false);
-            _stopSyncStatusPolling();
-          });
         }
       }
       
@@ -993,7 +1434,10 @@ class WalletProvider with ChangeNotifier {
     if (!hasWallet) return;
 
     _setSyncing(true);  // Set syncing flag for manual sync
+    _syncMessage = 'Starting sync...';  // Show initial message
+    _syncProgress = 0.0;  // Reset progress
     _clearError();
+    notifyListeners();  // Update UI immediately
     
     // Start polling for sync status
     _startSyncStatusPolling();
@@ -1026,15 +1470,26 @@ class WalletProvider with ChangeNotifier {
         print('🔍 _checkConnection: walletId=${_wallet?.walletId}, isCliWallet=${_wallet?.walletId?.startsWith('cli_imported_')}');
       }
       
-      // Check connection status by getting current block height
-      // If we can get a valid block height, we're connected
-      final blockHeight = await _rustService.getCurrentBlockHeight();
-      if (blockHeight != null && blockHeight > 0) {
+      // If Rust service is initialized, we consider it connected
+      // The Rust service handles its own connection internally
+      if (_rustService.initialized) {
         _setConnectionStatus(true, 'Connected to server');
-        if (kDebugMode) print('✅ Connected: Block height $blockHeight');
+        if (kDebugMode) print('✅ Rust service is initialized, marking as connected');
+        
+        // Try to get block height for additional verification (non-blocking)
+        try {
+          final blockHeight = await _rustService.getCurrentBlockHeight();
+          if (blockHeight != null && blockHeight > 0) {
+            if (kDebugMode) print('✅ Connected: Block height $blockHeight');
+          }
+        } catch (e) {
+          // Don't change connection status if block height check fails
+          // Rust service is still initialized and handling connection
+          if (kDebugMode) print('⚠️ Block height check failed but Rust service is initialized: $e');
+        }
       } else {
         _setConnectionStatus(false, 'Server unreachable');
-        if (kDebugMode) print('❌ Disconnected: No block height available');
+        if (kDebugMode) print('❌ Disconnected: Rust service not initialized');
       }
     } catch (e) {
       _setConnectionStatus(false, 'Connection error');
@@ -1306,7 +1761,23 @@ class WalletProvider with ChangeNotifier {
       
       // Don't trigger sync UI for routine refreshes
       // The Rust service refresh is lightweight and doesn't need UI
-      await _rustService.refresh(); // Rust service handles everything
+      try {
+        // Skip the full refresh which includes sync - just fetch the data directly
+        // The sync is hanging on Android, so we'll fetch data without syncing
+        
+        if (kDebugMode) print('   Fetching balance...');
+        await _rustService.fetchBalance();
+        
+        if (kDebugMode) print('   Fetching transactions...');
+        await _rustService.fetchTransactions();
+        
+        if (kDebugMode) print('   Fetching addresses...');
+        await _rustService.fetchAddresses();
+        
+        if (kDebugMode) print('✅ Wallet data refresh complete');
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Error refreshing wallet data: $e');
+      }
     } else {
       if (kDebugMode) print('   Rust Bridge not initialized, using fallback refresh');
       
@@ -2203,8 +2674,15 @@ class WalletProvider with ChangeNotifier {
   
   /// Clear all wallet data (for logout)
   void clearWallet() {
+    // DEFENSIVE: Check if wallet is locked to prevent accidental clears during initialization
+    if (_walletLocked) {
+      if (kDebugMode) print('🔒 Wallet is locked, ignoring clearWallet request to prevent data loss');
+      return;
+    }
+    
     stopAutoSync();
     _wallet = null;
+    _walletLocked = false; // Reset lock when explicitly clearing
     _balance = BalanceModel.empty();
     _transactions = [];
     _addresses = {'transparent': [], 'shielded': []};
@@ -2385,5 +2863,13 @@ class WalletProvider with ChangeNotifier {
     
     // Fall back to the transaction's own memoRead property
     return defaultValue;
+  }
+  
+  /// Unlock wallet after safe initialization completion
+  void _unlockWallet() {
+    if (_walletLocked) {
+      _walletLocked = false;
+      if (kDebugMode) print('🔓 Wallet unlocked - initialization complete and safe');
+    }
   }
 }

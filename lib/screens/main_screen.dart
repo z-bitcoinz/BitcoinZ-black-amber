@@ -97,10 +97,21 @@ class _MainScreenState extends State<MainScreen>
       // Set the notification context for showing memo notifications
       walletProvider.setNotificationContext(context);
       
-      // Try to restore wallet from stored data first
+      // Check if wallet is already initialized (from PIN setup)
+      if (walletProvider.hasWallet) {
+        if (kDebugMode) print('   Wallet already loaded, skipping initialization');
+        return;
+      }
+      
+      // If we're on MainScreen, user must be authenticated
+      // Try to restore wallet from stored data
       bool restored = false;
-      if (authProvider.hasWallet && authProvider.isAuthenticated) {
-        if (kDebugMode) print('   Restoring wallet from stored data...');
+      if (authProvider.hasWallet) {
+        if (kDebugMode) {
+          print('   User has wallet, attempting restoration...');
+          print('   authProvider.hasWallet: ${authProvider.hasWallet}');
+          print('   authProvider.isAuthenticated: ${authProvider.isAuthenticated}');
+        }
         restored = await walletProvider.restoreFromStoredData(authProvider);
         if (kDebugMode) print('   Wallet restored: $restored');
       }

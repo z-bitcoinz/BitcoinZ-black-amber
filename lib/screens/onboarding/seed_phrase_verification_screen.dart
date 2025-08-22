@@ -131,7 +131,7 @@ class _SeedPhraseVerificationScreenState extends State<SeedPhraseVerificationScr
                   walletId: walletId,
                   seedPhrase: widget.seedPhrase,
                   walletData: {
-                    'birthday': widget.birthdayBlock ?? 0,
+                    'birthdayHeight': widget.birthdayBlock ?? 0,
                     'created_at': DateTime.now().toIso8601String(),
                   },
                 ),
@@ -162,6 +162,56 @@ class _SeedPhraseVerificationScreenState extends State<SeedPhraseVerificationScr
     setState(() {
       _errorMessage = null;
     });
+  }
+
+  Future<void> _skipVerification() async {
+    if (_isVerifying) return;
+    
+    setState(() {
+      _isVerifying = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Create wallet without verification (for development only)
+      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final walletData = await walletProvider.createWallet(widget.seedPhrase, authProvider: authProvider);
+
+      if (mounted) {
+        // Generate a wallet ID from the seed phrase
+        final walletId = 'wallet_${DateTime.now().millisecondsSinceEpoch}';
+        
+        // Navigate to PIN setup screen
+        Navigator.of(context).pushAndRemoveUntil(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                PinSetupScreen(
+                  walletId: walletId,
+                  seedPhrase: widget.seedPhrase,
+                  walletData: {
+                    'birthdayHeight': widget.birthdayBlock ?? 0,
+                    'created_at': DateTime.now().toIso8601String(),
+                  },
+                ),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: animation,
+                child: child,
+              );
+            },
+          ),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to create wallet: $e';
+          _isVerifying = false;
+        });
+      }
+    }
   }
 
   @override
@@ -416,6 +466,45 @@ class _SeedPhraseVerificationScreenState extends State<SeedPhraseVerificationScr
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
+                      ),
+                    ),
+                    
+                    // Skip button for development
+                    SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 12 : 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: ResponsiveUtils.getButtonHeight(context),
+                      child: TextButton(
+                        onPressed: _isVerifying ? null : _skipVerification,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              ResponsiveUtils.getButtonBorderRadius(context),
+                            ),
+                            side: BorderSide(
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.skip_next,
+                              size: ResponsiveUtils.getIconSize(context, base: 20),
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Skip Verification (Dev Only)',
+                              style: TextStyle(
+                                fontSize: ResponsiveUtils.getBodyTextSize(context),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/wallet_provider.dart';
 import '../../utils/validators.dart';
 import '../main_screen.dart';
 
@@ -178,8 +180,23 @@ class _PinSetupScreenState extends State<PinSetupScreen>
         throw Exception('Failed to authenticate');
       }
       
+      // Pre-initialize the wallet BEFORE navigating to MainScreen
+      // This prevents the "no wallet" delay
       if (mounted) {
-        // Navigate to main screen
+        final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+        
+        // Restore wallet from the data we just registered
+        final restored = await walletProvider.restoreFromStoredData(authProvider);
+        
+        if (restored) {
+          // Start initial sync in background
+          walletProvider.syncWallet().catchError((e) {
+            // Don't block navigation on sync errors
+            if (kDebugMode) print('⚠️ Initial sync warning: $e');
+          });
+        }
+        
+        // Now navigate to main screen with wallet ready
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const MainScreen()),
           (route) => false,
@@ -227,30 +244,34 @@ class _PinSetupScreenState extends State<PinSetupScreen>
         ) : null,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            children: [
-              Expanded(
-                flex: 2,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: Container(
+                height: constraints.maxHeight,
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Lock Icon
+                    Flexible(
+                      flex: 1,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Lock Icon (smaller)
                     Container(
-                      width: 80,
-                      height: 80,
+                      width: 60,
+                      height: 60,
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         Icons.lock_outline,
-                        size: 40,
+                        size: 30,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
                     
                     Text(
                       title,
@@ -258,7 +279,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     
                     Text(
                       subtitle,
@@ -298,7 +319,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
               ),
               
               // PIN Input Display
-              Expanded(
+              Flexible(
                 flex: 1,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -321,18 +342,45 @@ class _PinSetupScreenState extends State<PinSetupScreen>
                     ),
                     
                     if (!_isConfirming && _biometricsAvailable) ...[
-                      const SizedBox(height: 24),
-                      CheckboxListTile(
-                        value: _enableBiometrics,
-                        onChanged: _isProcessing ? null : (value) {
-                          setState(() {
-                            _enableBiometrics = value ?? false;
-                          });
-                        },
-                        title: const Text('Enable Biometric Authentication'),
-                        subtitle: const Text('Use fingerprint or face unlock'),
-                        secondary: const Icon(Icons.fingerprint),
-                        controlAffinity: ListTileControlAffinity.leading,
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Checkbox(
+                                value: _enableBiometrics,
+                                onChanged: _isProcessing ? null : (value) {
+                                  setState(() {
+                                    _enableBiometrics = value ?? false;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Enable Biometric Authentication',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  Text(
+                                    'Use fingerprint or face unlock',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      fontSize: 10,
+                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.fingerprint, size: 20),
+                          ],
+                        ),
                       ),
                     ],
                     
@@ -345,9 +393,10 @@ class _PinSetupScreenState extends State<PinSetupScreen>
               ),
               
               // PIN Keypad
-              Expanded(
+              Flexible(
                 flex: 3,
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     // Numbers 1-3
                     Row(
@@ -384,8 +433,11 @@ class _PinSetupScreenState extends State<PinSetupScreen>
                   ],
                 ),
               ),
-            ],
-          ),
+                ],
+              ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -394,9 +446,9 @@ class _PinSetupScreenState extends State<PinSetupScreen>
   Widget _buildPinButton(String number) {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: SizedBox(
-          height: 64,
+        padding: const EdgeInsets.all(2.0),
+        child: AspectRatio(
+          aspectRatio: 1.5,
           child: ElevatedButton(
             onPressed: _isProcessing ? null : () => _onPinInput(number),
             style: ElevatedButton.styleFrom(
@@ -421,9 +473,9 @@ class _PinSetupScreenState extends State<PinSetupScreen>
   Widget _buildDeleteButton() {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: SizedBox(
-          height: 64,
+        padding: const EdgeInsets.all(2.0),
+        child: AspectRatio(
+          aspectRatio: 1.5,
           child: ElevatedButton(
             onPressed: _isProcessing ? null : _onPinDelete,
             style: ElevatedButton.styleFrom(
@@ -444,7 +496,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
 
   Widget _buildEmptyButton() {
     return const Expanded(
-      child: SizedBox(height: 64),
+      child: SizedBox(),
     );
   }
 }
