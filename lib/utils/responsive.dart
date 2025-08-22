@@ -22,6 +22,12 @@ class ResponsiveUtils {
     return MediaQuery.of(context).size.width >= tabletBreakpoint;
   }
 
+  static bool isRegularDesktop(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    // Detect larger desktop screens like MacBook Pro, iMac, etc.
+    return size.width >= 1500.0 || size.height >= 900.0;
+  }
+
   static double getScreenWidth(BuildContext context) {
     return MediaQuery.of(context).size.width;
   }
@@ -32,6 +38,19 @@ class ResponsiveUtils {
 
   static bool isSmallScreen(BuildContext context) {
     return MediaQuery.of(context).size.height < 700.0;
+  }
+
+  static bool isSmallDesktop(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    // Detect small desktop/laptop screens like MacBook Air (1366x768, 1440x900)
+    return size.width >= tabletBreakpoint && 
+           size.width < 1500.0 && 
+           size.height < 900.0;
+  }
+
+  static bool isLimitedHeight(BuildContext context) {
+    // Screens with limited vertical space that need compact layouts
+    return MediaQuery.of(context).size.height < 800.0;
   }
 
   // Responsive padding
@@ -152,5 +171,46 @@ class ResponsiveUtils {
       return const EdgeInsets.symmetric(horizontal:14, vertical: 10);
     }
     return const EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+  }
+
+  // PIN-specific responsive sizing
+  static double getPinButtonPadding(BuildContext context) {
+    // Tighter padding for all platforms for smaller overall button size
+    return 3.0;
+  }
+
+  static double getPinKeypadWidth(BuildContext context) {
+    if (isRegularDesktop(context)) return 240.0;
+    if (isSmallDesktop(context)) return 220.0;
+    if (isDesktop(context)) return 250.0;
+    return 240.0;
+  }
+
+  static double getPinButtonMinSize(BuildContext context) {
+    // Much smaller buttons for desktop, appropriate sizes for mobile
+    if (isRegularDesktop(context)) return 28.0;  // Large desktops (MacBook Pro, iMac)
+    if (isSmallDesktop(context)) return 30.0;    // Small desktops (MacBook Air)
+    if (isMobile(context)) return 36.0;          // Mobile devices need larger touch targets
+    return 32.0;  // Tablet fallback
+  }
+
+  static double getPinButtonFontSize(BuildContext context) {
+    // Proportional font sizing for smaller buttons
+    if (isRegularDesktop(context)) return 13.0;  // Large desktops
+    if (isSmallDesktop(context)) return 14.0;    // Small desktops  
+    if (isMobile(context)) return 16.0;          // Mobile
+    return 15.0;  // Tablet fallback
+  }
+
+  static double getPinVerticalSpacing(BuildContext context) {
+    if (isLimitedHeight(context)) return 16.0;
+    if (isSmallDesktop(context)) return 20.0;
+    if (isDesktop(context)) return 24.0;
+    return 32.0;
+  }
+
+  static double getSecurityWarningPadding(BuildContext context) {
+    if (isSmallDesktop(context) || isLimitedHeight(context)) return 12.0;
+    return getHorizontalPadding(context);
   }
 }

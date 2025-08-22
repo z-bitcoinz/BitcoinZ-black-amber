@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/wallet_provider.dart';
 import '../../utils/validators.dart';
+import '../../utils/responsive.dart';
 import '../main_screen.dart';
 
 class PinSetupScreen extends StatefulWidget {
@@ -446,22 +447,32 @@ class _PinSetupScreenState extends State<PinSetupScreen>
   Widget _buildPinButton(String number) {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(2.0),
-        child: AspectRatio(
-          aspectRatio: 1.5,
-          child: ElevatedButton(
-            onPressed: _isProcessing ? null : () => _onPinInput(number),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              foregroundColor: Theme.of(context).colorScheme.onSurface,
-              elevation: 2,
-              shape: const CircleBorder(),
-            ),
-            child: Text(
-              number,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w500,
+        padding: EdgeInsets.all(ResponsiveUtils.getPinButtonPadding(context)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: ResponsiveUtils.getPinButtonMinSize(context),
+            minHeight: ResponsiveUtils.getPinButtonMinSize(context),
+          ),
+          child: AspectRatio(
+            aspectRatio: 1.0,
+            child: ElevatedButton(
+              onPressed: _isProcessing ? null : () => _onPinInput(number),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                elevation: 2,
+                shape: const CircleBorder(),
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                number,
+                style: TextStyle(
+                  fontSize: ResponsiveUtils.getPinButtonFontSize(context),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ),
@@ -473,20 +484,20 @@ class _PinSetupScreenState extends State<PinSetupScreen>
   Widget _buildDeleteButton() {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(2.0),
+        padding: EdgeInsets.all(ResponsiveUtils.getPinButtonPadding(context)),
         child: AspectRatio(
-          aspectRatio: 1.5,
+          aspectRatio: 1.0,
           child: ElevatedButton(
             onPressed: _isProcessing ? null : _onPinDelete,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
-              foregroundColor: Theme.of(context).colorScheme.onSurface,
+              foregroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               elevation: 0,
               shape: const CircleBorder(),
             ),
             child: const Icon(
               Icons.backspace_outlined,
-              size: 24,
+              size: 20,
             ),
           ),
         ),
@@ -495,8 +506,14 @@ class _PinSetupScreenState extends State<PinSetupScreen>
   }
 
   Widget _buildEmptyButton() {
-    return const Expanded(
-      child: SizedBox(),
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.all(ResponsiveUtils.getPinButtonPadding(context)),
+        child: const AspectRatio(
+          aspectRatio: 1.0,
+          child: SizedBox(),
+        ),
+      ),
     );
   }
 }

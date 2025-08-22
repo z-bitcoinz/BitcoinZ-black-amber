@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/validators.dart';
+import '../../utils/responsive.dart';
 
 class ChangePinScreen extends StatefulWidget {
   const ChangePinScreen({super.key});
@@ -276,162 +277,192 @@ class _ChangePinScreenState extends State<ChangePinScreen>
         title: const Text('Change PIN'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        toolbarHeight: 48.0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: EdgeInsets.all(ResponsiveUtils.getHorizontalPadding(context)),
           child: Column(
             children: [
               Expanded(
-                flex: 2,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Progress Indicator
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                child: SingleChildScrollView(
+                  child: Column(
                       children: [
-                        _buildStageIndicator(0, 'Current'),
-                        _buildStageConnector(0),
-                        _buildStageIndicator(1, 'New'),
-                        _buildStageConnector(1),
-                        _buildStageIndicator(2, 'Confirm'),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    
-                    Text(
-                      subtitle,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                      ),
-                    ),
-                    
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      AnimatedBuilder(
-                        animation: _shakeAnimation,
-                        builder: (context, child) {
-                          return Transform.translate(
-                            offset: Offset(_shakeAnimation.value, 0),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                _errorMessage!,
-                                style: TextStyle(
-                                  color: Colors.red[700],
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              
-              // PIN Input Display
-              Expanded(
-                flex: 1,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(6, (index) {
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 8),
-                          width: 16,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: index < currentPin.length
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                        // Progress Indicator
+                        SizedBox(height: ResponsiveUtils.isDesktop(context) ? 16 : 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _buildStageIndicator(0, 'Current'),
+                            _buildStageConnector(0),
+                            _buildStageIndicator(1, 'New'),
+                            _buildStageConnector(1),
+                            _buildStageIndicator(2, 'Confirm'),
+                          ],
+                        ),
+                        SizedBox(height: ResponsiveUtils.isDesktop(context) ? 12 : 16),
+                        
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: ResponsiveUtils.getTitleTextSize(context),
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
-                        );
-                      }),
-                    ),
-                    
-                    if (_isProcessing) ...[
-                      const SizedBox(height: 24),
-                      const CircularProgressIndicator(),
-                    ],
-                  ],
-                ),
-              ),
+                        ),
+                        SizedBox(height: ResponsiveUtils.isDesktop(context) ? 6 : 8),
+                        
+                        Text(
+                          subtitle,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: ResponsiveUtils.getBodyTextSize(context),
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                        
+                        SizedBox(height: ResponsiveUtils.isDesktop(context) ? 8 : 12),
+                        
+                        // Error Message Container - Fixed height to prevent overflow
+                        SizedBox(
+                          height: ResponsiveUtils.isDesktop(context) ? 50 : 60,
+                          child: _errorMessage != null 
+                            ? AnimatedBuilder(
+                                animation: _shakeAnimation,
+                                builder: (context, child) {
+                                  return Transform.translate(
+                                    offset: Offset(_shakeAnimation.value, 0),
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: ResponsiveUtils.getHorizontalPadding(context),
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          _errorMessage!,
+                                          style: TextStyle(
+                                            color: Colors.red[700],
+                                            fontSize: ResponsiveUtils.getBodyTextSize(context),
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : const SizedBox.shrink(),
+                        ),
               
-              // PIN Keypad
-              Expanded(
-                flex: 3,
-                child: Column(
-                  children: [
-                    // Numbers 1-3
-                    Row(
-                      children: [
-                        _buildPinButton('1'),
-                        _buildPinButton('2'),
-                        _buildPinButton('3'),
+                        SizedBox(height: ResponsiveUtils.isDesktop(context) ? 8 : 12),
+                        
+                        // PIN Input Display
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(6, (index) {
+                            final dotSize = ResponsiveUtils.isDesktop(context) ? 12.0 : 16.0;
+                            final spacing = ResponsiveUtils.isDesktop(context) ? 6.0 : 8.0;
+                            return Container(
+                              margin: EdgeInsets.symmetric(horizontal: spacing),
+                              width: dotSize,
+                              height: dotSize,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: index < currentPin.length
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                              ),
+                            );
+                          }),
+                        ),
+                        
+                        if (_isProcessing) ...[
+                          SizedBox(height: ResponsiveUtils.isDesktop(context) ? 16 : 24),
+                          SizedBox(
+                            width: ResponsiveUtils.isDesktop(context) ? 20 : 24,
+                            height: ResponsiveUtils.isDesktop(context) ? 20 : 24,
+                            child: const CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ],
+                        
+                        SizedBox(height: ResponsiveUtils.isDesktop(context) ? 12 : 16),
+                        
+                        // PIN Keypad - Center it within the full width
+                        Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: ResponsiveUtils.getPinKeypadWidth(context),
+                            ),
+                            child: Column(
+                            children: [
+                              // Numbers 1-3
+                              Row(
+                                children: [
+                                  _buildPinButton('1'),
+                                  _buildPinButton('2'),
+                                  _buildPinButton('3'),
+                                ],
+                              ),
+                              // Numbers 4-6
+                              Row(
+                                children: [
+                                  _buildPinButton('4'),
+                                  _buildPinButton('5'),
+                                  _buildPinButton('6'),
+                                ],
+                              ),
+                              // Numbers 7-9
+                              Row(
+                                children: [
+                                  _buildPinButton('7'),
+                                  _buildPinButton('8'),
+                                  _buildPinButton('9'),
+                                ],
+                              ),
+                              // Bottom row
+                              Row(
+                                children: [
+                                  _buildEmptyButton(),
+                                  _buildPinButton('0'),
+                                  _buildDeleteButton(),
+                                ],
+                              ),
+                            ],
+                            ),
+                          ),
+                        ),
+                        
+                        SizedBox(height: ResponsiveUtils.isDesktop(context) ? 20 : 16),
                       ],
                     ),
-                    // Numbers 4-6
-                    Row(
-                      children: [
-                        _buildPinButton('4'),
-                        _buildPinButton('5'),
-                        _buildPinButton('6'),
-                      ],
-                    ),
-                    // Numbers 7-9
-                    Row(
-                      children: [
-                        _buildPinButton('7'),
-                        _buildPinButton('8'),
-                        _buildPinButton('9'),
-                      ],
-                    ),
-                    // Bottom row
-                    Row(
-                      children: [
-                        _buildEmptyButton(),
-                        _buildPinButton('0'),
-                        _buildDeleteButton(),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
     );
   }
 
   Widget _buildStageIndicator(int stage, String label) {
     final isActive = _stage >= stage;
     final isCompleted = _stage > stage;
+    final size = ResponsiveUtils.isDesktop(context) ? 28.0 : 32.0;
     
     return Column(
       children: [
         Container(
-          width: 32,
-          height: 32,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isActive 
@@ -440,21 +471,26 @@ class _ChangePinScreenState extends State<ChangePinScreen>
           ),
           child: Center(
             child: isCompleted
-                ? const Icon(Icons.check, color: Colors.white, size: 16)
+                ? Icon(
+                    Icons.check, 
+                    color: Colors.white, 
+                    size: ResponsiveUtils.isDesktop(context) ? 14 : 16,
+                  )
                 : Text(
                     '${stage + 1}',
                     style: TextStyle(
                       color: isActive ? Colors.white : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                       fontWeight: FontWeight.bold,
+                      fontSize: ResponsiveUtils.isDesktop(context) ? 12 : 14,
                     ),
                   ),
           ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: ResponsiveUtils.isDesktop(context) ? 3 : 4),
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: ResponsiveUtils.isDesktop(context) ? 10 : 12,
             color: isActive 
                 ? Theme.of(context).colorScheme.primary 
                 : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
@@ -466,11 +502,13 @@ class _ChangePinScreenState extends State<ChangePinScreen>
 
   Widget _buildStageConnector(int afterStage) {
     final isActive = _stage > afterStage;
+    final width = ResponsiveUtils.isDesktop(context) ? 30.0 : 40.0;
+    final bottomMargin = ResponsiveUtils.isDesktop(context) ? 17.0 : 20.0;
     
     return Container(
-      width: 40,
+      width: width,
       height: 2,
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: EdgeInsets.only(bottom: bottomMargin),
       color: isActive 
           ? Theme.of(context).colorScheme.primary 
           : Theme.of(context).colorScheme.outline.withOpacity(0.3),
@@ -480,22 +518,32 @@ class _ChangePinScreenState extends State<ChangePinScreen>
   Widget _buildPinButton(String number) {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: SizedBox(
-          height: 64,
-          child: ElevatedButton(
-            onPressed: _isProcessing ? null : () => _onPinInput(number),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              foregroundColor: Theme.of(context).colorScheme.onSurface,
-              elevation: 2,
-              shape: const CircleBorder(),
-            ),
-            child: Text(
-              number,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w500,
+        padding: EdgeInsets.all(ResponsiveUtils.getPinButtonPadding(context)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: ResponsiveUtils.getPinButtonMinSize(context),
+            minHeight: ResponsiveUtils.getPinButtonMinSize(context),
+          ),
+          child: AspectRatio(
+            aspectRatio: 1.0,
+            child: ElevatedButton(
+              onPressed: _isProcessing ? null : () => _onPinInput(number),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                elevation: 2,
+                shape: const CircleBorder(),
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                number,
+                style: TextStyle(
+                  fontSize: ResponsiveUtils.getPinButtonFontSize(context),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ),
@@ -507,20 +555,20 @@ class _ChangePinScreenState extends State<ChangePinScreen>
   Widget _buildDeleteButton() {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: SizedBox(
-          height: 64,
+        padding: EdgeInsets.all(ResponsiveUtils.getPinButtonPadding(context)),
+        child: AspectRatio(
+          aspectRatio: 1.0,
           child: ElevatedButton(
             onPressed: _isProcessing ? null : _onPinDelete,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
-              foregroundColor: Theme.of(context).colorScheme.onSurface,
+              foregroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               elevation: 0,
               shape: const CircleBorder(),
             ),
             child: const Icon(
               Icons.backspace_outlined,
-              size: 24,
+              size: 20,
             ),
           ),
         ),
@@ -529,8 +577,14 @@ class _ChangePinScreenState extends State<ChangePinScreen>
   }
 
   Widget _buildEmptyButton() {
-    return const Expanded(
-      child: SizedBox(height: 64),
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.all(ResponsiveUtils.getPinButtonPadding(context)),
+        child: const AspectRatio(
+          aspectRatio: 1.0,
+          child: SizedBox(),
+        ),
+      ),
     );
   }
 }

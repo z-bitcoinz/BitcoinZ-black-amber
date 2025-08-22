@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'currency_settings_screen.dart';
 import 'change_pin_screen.dart';
+import 'backup_wallet_screen.dart';
 import '../../providers/currency_provider.dart';
 import '../../providers/auth_provider.dart';
 
@@ -20,6 +21,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Settings'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        toolbarHeight: 48.0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
         automaticallyImplyLeading: false,
       ),
       body: Consumer<CurrencyProvider>(
@@ -116,7 +121,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Backup Wallet',
                     subtitle: 'View seed phrase',
                     onTap: () {
-                      // TODO: Navigate to backup settings
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BackupWalletScreen(),
+                        ),
+                      );
                     },
                   ),
                 ],

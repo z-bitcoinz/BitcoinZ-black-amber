@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'dart:io';
+import 'package:window_manager/window_manager.dart';
 
 import 'providers/wallet_provider.dart';
 import 'providers/auth_provider.dart';
@@ -16,6 +17,26 @@ import 'src/rust/frb_generated.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Configure window size for desktop platforms
+  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    await windowManager.ensureInitialized();
+    
+    const windowOptions = WindowOptions(
+      size: Size(480, 720),
+      minimumSize: Size(400, 600),
+      center: true,
+      backgroundColor: Colors.transparent,
+      skipTaskbar: false,
+      titleBarStyle: TitleBarStyle.normal,
+    );
+    
+    windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+      await windowManager.setTitle('BitcoinZ Black Amber');
+    });
+  }
   
   // Initialize logger
   Logger.level = Level.info;

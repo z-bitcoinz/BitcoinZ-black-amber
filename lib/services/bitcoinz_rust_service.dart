@@ -902,8 +902,45 @@ class BitcoinzRustService {
     }
   }
   
-  /// Get seed phrase
+  /// Get seed phrase (stored in memory)
   String? getSeedPhrase() => _seedPhrase;
+  
+  /// Get seed phrase from wallet using 'seed' command
+  Future<String?> getSeedPhraseFromWallet() async {
+    if (!_initialized) return null;
+    
+    try {
+      // Execute the 'seed' command to get seed phrase from wallet
+      final result = await rust_api.execute(command: 'seed', args: '').timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => '{"error": "Timeout getting seed phrase"}',
+      );
+      
+      final data = jsonDecode(result);
+      
+      // Check for error
+      if (data is Map && data.containsKey('error')) {
+        if (kDebugMode) print('❌ Seed command error: ${data['error']}');
+        return null;
+      }
+      
+      // Extract seed phrase from response
+      if (data is Map && data.containsKey('seed')) {
+        return data['seed'] as String?;
+      }
+      
+      // Some responses might have the seed directly
+      if (data is String && data.isNotEmpty) {
+        return data;
+      }
+      
+      if (kDebugMode) print('❌ Unexpected seed response format: $data');
+      return null;
+    } catch (e) {
+      if (kDebugMode) print('❌ Get seed phrase from wallet failed: $e');
+      return null;
+    }
+  }
   
   /// Get birthday block height
   int? getBirthday() => _birthday;

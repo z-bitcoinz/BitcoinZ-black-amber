@@ -2810,6 +2810,29 @@ class WalletProvider with ChangeNotifier {
     };
   }
 
+  /// Get seed phrase for backup purposes (requires prior authentication)
+  Future<String?> getSeedPhrase() async {
+    try {
+      // First try to get stored seed phrase
+      final storedSeed = _rustService.getSeedPhrase();
+      if (storedSeed != null && storedSeed.isNotEmpty) {
+        return storedSeed;
+      }
+      
+      // If not available, use the 'seed' command to get it from the wallet
+      final seedResult = await _rustService.getSeedPhraseFromWallet();
+      return seedResult;
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get seed phrase: $e');
+      return null;
+    }
+  }
+
+  /// Get wallet birthday block for backup purposes
+  int? getBirthdayBlock() {
+    return _rustService.getBirthday();
+  }
+
   /// Get transaction summary for mobile
   Map<String, dynamic> get transactionSummary {
     final sent = _transactions.where((tx) => tx.isSent).length;

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/wallet_provider.dart';
+import '../../utils/responsive.dart';
 import '../main_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -335,16 +336,16 @@ class _AuthScreenState extends State<AuthScreen>
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: index < _enteredPin.length
-                                            ? const Color(0xFFFF6B00)
-                                            : Colors.white.withOpacity(0.2),
+                                            ? Theme.of(context).colorScheme.primary
+                                            : Theme.of(context).colorScheme.outline.withOpacity(0.3),
                                       ),
                                     );
                                   }),
                                 ),
                                 if (_isAuthenticating) ...[
                                   const SizedBox(height: 24),
-                                  const CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B00)),
+                                  CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
                                   ),
                                 ],
                               ],
@@ -357,8 +358,8 @@ class _AuthScreenState extends State<AuthScreen>
                       
                       // PIN Keypad with constrained size
                       ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: 300,
+                        constraints: BoxConstraints(
+                          maxWidth: ResponsiveUtils.getPinKeypadWidth(context),
                         ),
                         child: Column(
                         children: [
@@ -414,26 +415,32 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildPinButton(String number) {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(6.0),
-        child: AspectRatio(
-          aspectRatio: 1.0,
-          child: ElevatedButton(
-            onPressed: _isAuthenticating ? null : () => _onPinInput(number),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2A2A2A),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: const CircleBorder(),
-              side: BorderSide(
-                color: Colors.white.withOpacity(0.1),
-                width: 1,
+        padding: EdgeInsets.all(ResponsiveUtils.getPinButtonPadding(context)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: ResponsiveUtils.getPinButtonMinSize(context),
+            minHeight: ResponsiveUtils.getPinButtonMinSize(context),
+          ),
+          child: AspectRatio(
+            aspectRatio: 1.0,
+            child: ElevatedButton(
+              onPressed: _isAuthenticating ? null : () => _onPinInput(number),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                elevation: 2,
+                shape: const CircleBorder(),
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                  width: 1,
+                ),
               ),
-            ),
-            child: Text(
-              number,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w400,
+              child: Text(
+                number,
+                style: TextStyle(
+                  fontSize: ResponsiveUtils.getPinButtonFontSize(context),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ),
@@ -445,18 +452,18 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildBiometricButton() {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(6.0),
+        padding: EdgeInsets.all(ResponsiveUtils.getPinButtonPadding(context)),
         child: AspectRatio(
           aspectRatio: 1.0,
           child: ElevatedButton(
             onPressed: _isAuthenticating ? null : _authenticateWithBiometrics,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2A2A2A),
-              foregroundColor: const Color(0xFFFF6B00),
-              elevation: 0,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              elevation: 2,
               shape: const CircleBorder(),
               side: BorderSide(
-                color: const Color(0xFFFF6B00).withOpacity(0.3),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
                 width: 1,
               ),
             ),
@@ -467,7 +474,7 @@ class _AuthScreenState extends State<AuthScreen>
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      const Color(0xFFFF6B00).withOpacity(0.7),
+                      Theme.of(context).colorScheme.primary.withOpacity(0.7),
                     ),
                   ),
                 )
@@ -484,20 +491,20 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildDeleteButton() {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(6.0),
+        padding: EdgeInsets.all(ResponsiveUtils.getPinButtonPadding(context)),
         child: AspectRatio(
           aspectRatio: 1.0,
           child: ElevatedButton(
             onPressed: _isAuthenticating ? null : _onPinDelete,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
-              foregroundColor: Colors.white.withOpacity(0.6),
+              foregroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               elevation: 0,
               shape: const CircleBorder(),
             ),
             child: const Icon(
               Icons.backspace_outlined,
-              size: 22,
+              size: 20,
             ),
           ),
         ),
@@ -508,7 +515,7 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildEmptyButton() {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(6.0),
+        padding: EdgeInsets.all(ResponsiveUtils.getPinButtonPadding(context)),
         child: const AspectRatio(
           aspectRatio: 1.0,
           child: SizedBox(),

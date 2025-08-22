@@ -58,6 +58,9 @@ dependencies:
   
   # Database
   sqflite: ^2.3.0
+  
+  # Desktop window management
+  window_manager: ^0.3.7
 
 dev_dependencies:
   flutter_test:
