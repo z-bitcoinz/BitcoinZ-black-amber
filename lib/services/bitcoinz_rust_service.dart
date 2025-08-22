@@ -882,9 +882,10 @@ class BitcoinzRustService {
     if (!_initialized) return null;
     
     try {
-      final command = transparent ? 'new' : 'new z';
+      final command = 'new';
+      final args = transparent ? 't' : 'z';
       // Add timeout to prevent infinite loading
-      final result = await rust_api.execute(command: command, args: '').timeout(
+      final result = await rust_api.execute(command: command, args: args).timeout(
         const Duration(seconds: 10),
         onTimeout: () => '{"error": "Timeout generating address"}',
       );
