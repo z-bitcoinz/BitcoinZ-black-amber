@@ -69,20 +69,20 @@ class _SplashScreenState extends State<SplashScreen>
       // Initialize auth provider
       await authProvider.initialize();
       
-      // Start pre-connecting to the server while showing splash
-      // This happens in background so the connection is ready when user enters PIN
+      // Start background wallet initialization while showing splash
+      // This happens in background so wallet syncs during PIN entry
       if (authProvider.hasWallet) {
         if (kDebugMode) {
-          print('🔌 Pre-connecting to server while on splash screen...');
+          print('🔄 Starting background wallet initialization during splash...');
         }
-        // Start connection in background (non-blocking)
-        walletProvider.startEarlyConnection().then((_) {
+        // Start background initialization (non-blocking)
+        walletProvider.startBackgroundInitialization(authProvider).then((_) {
           if (kDebugMode) {
-            print('✅ Early connection established');
+            print('✅ Background initialization started - wallet will sync during PIN entry');
           }
         }).catchError((e) {
           if (kDebugMode) {
-            print('⚠️ Early connection failed (will retry later): $e');
+            print('⚠️ Background initialization failed (will retry after PIN): $e');
           }
         });
       }

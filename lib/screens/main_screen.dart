@@ -97,10 +97,23 @@ class _MainScreenState extends State<MainScreen>
       // Set the notification context for showing memo notifications
       walletProvider.setNotificationContext(context);
       
-      // Check if wallet is already initialized (from PIN setup)
+      // Check if wallet is already initialized (from PIN setup or background initialization)
       if (walletProvider.hasWallet) {
         if (kDebugMode) print('   Wallet already loaded, skipping initialization');
         return;
+      }
+      
+      // Check if background initialization is in progress
+      if (walletProvider.isLoading) {
+        if (kDebugMode) print('   Background initialization in progress, waiting...');
+        // Wait a moment for background initialization to complete
+        await Future.delayed(const Duration(milliseconds: 500));
+        // Check again after waiting
+        if (walletProvider.hasWallet) {
+          if (kDebugMode) print('   ✅ Background initialization completed successfully');
+          return;
+        }
+        if (kDebugMode) print('   Background initialization still in progress, continuing with restoration...');
       }
       
       // If we're on MainScreen, user must be authenticated

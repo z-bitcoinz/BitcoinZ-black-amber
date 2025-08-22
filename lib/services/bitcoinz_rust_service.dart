@@ -416,10 +416,12 @@ class BitcoinzRustService {
         lastBalance = currentBalance;
         lastTxCount = currentTxCount;
         
-        // Fetch all data
-        await fetchBalance();
-        await fetchTransactions();
-        await fetchAddresses();
+        // Fetch all data in parallel for better performance
+        await Future.wait([
+          fetchBalance(),
+          fetchTransactions(),
+          fetchAddresses(),
+        ]);
       }
     } catch (e) {
       if (kDebugMode) print('❌ Update data failed: $e');
@@ -438,10 +440,12 @@ class BitcoinzRustService {
       // Sync with network
       await sync();
       
-      // Fetch all data
-      await fetchBalance();
-      await fetchTransactions();
-      await fetchAddresses();
+      // Fetch all data in parallel for better performance  
+      await Future.wait([
+        fetchBalance(),
+        fetchTransactions(), 
+        fetchAddresses(),
+      ]);
       
       // Save wallet
       await save();

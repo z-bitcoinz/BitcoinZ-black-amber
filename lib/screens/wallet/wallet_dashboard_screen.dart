@@ -7,6 +7,7 @@ import '../../providers/wallet_provider.dart';
 import '../../widgets/balance_card.dart';
 import '../../widgets/recent_transactions.dart';
 import '../../widgets/connection_status_widget.dart';
+import '../../widgets/sync_status_card.dart';
 import 'paginated_transaction_history_screen.dart';
 
 class WalletDashboardScreen extends StatefulWidget {
@@ -49,12 +50,15 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
     // Start auto-sync
     _startAutoSync();
     
-    // Initial sync and connection check
+    // Initial sync and connection check (parallel for better performance)
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _silentSync();
-      // Also check connection status to update UI
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-      await walletProvider.checkConnectionStatus();
+      
+      // Run sync and connection check in parallel for faster loading
+      await Future.wait([
+        _silentSync(),
+        walletProvider.checkConnectionStatus(),
+      ]);
       
       // Start periodic connection checks every 5 seconds
       _connectionCheckTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
@@ -502,6 +506,11 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                     child: const BalanceCard(),
                   ),
+                ),
+                
+                // Sync Status Card (shows when syncing or recently synced)
+                const SliverToBoxAdapter(
+                  child: SyncStatusCard(),
                 ),
                 
                 // Recent Transactions Header and List combined

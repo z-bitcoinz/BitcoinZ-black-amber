@@ -67,6 +67,11 @@ class _RecentTransactionsState extends State<RecentTransactions> {
             .toList();
 
         if (recentTransactions.isEmpty) {
+          // Show loading skeleton if wallet is loading, empty state otherwise
+          if (walletProvider.isLoading || !walletProvider.hasWallet) {
+            return _buildTransactionSkeleton();
+          }
+          
           return ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: Container(
@@ -577,6 +582,79 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                 style: Theme.of(context).textTheme.bodyMedium,
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build skeleton loading animation for better UX
+  Widget _buildTransactionSkeleton() {
+    return MediaQuery.removePadding(
+      context: context,
+      removeTop: true,
+      child: Column(
+        children: List.generate(3, (index) => _buildSkeletonItem()), // Show 3 skeleton items
+      ),
+    );
+  }
+
+  Widget _buildSkeletonItem() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A).withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          // Skeleton icon
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Skeleton amount line
+                Container(
+                  width: 120,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // Skeleton date line  
+                Container(
+                  width: 80,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Skeleton status
+          Container(
+            width: 60,
+            height: 24,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ],
       ),

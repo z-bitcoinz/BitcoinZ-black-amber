@@ -156,6 +156,25 @@ class WalletProvider with ChangeNotifier {
       // Update unread memo count when transactions are updated
       await updateUnreadMemoCount();
       
+      // Cache transactions for faster startup (limit to recent 20 transactions)
+      if (_wallet != null) {
+        try {
+          final authProvider = AuthProvider();
+          await authProvider.initialize();
+          final walletData = await authProvider.getStoredWalletData();
+          if (walletData != null) {
+            // Cache only recent transactions (last 20) to keep storage size reasonable
+            final recentTransactions = _transactions.take(20).toList();
+            walletData['cachedTransactions'] = recentTransactions.map((tx) => tx.toJson()).toList();
+            walletData['cacheTimestamp'] = DateTime.now().millisecondsSinceEpoch;
+            await authProvider.updateWalletData(walletData);
+            if (kDebugMode) print('💾 Cached ${recentTransactions.length} recent transactions');
+          }
+        } catch (e) {
+          if (kDebugMode) print('⚠️ Failed to cache transactions: $e');
+        }
+      }
+      
       notifyListeners();
     };
     _rustService.fnSetAllAddresses = (addresses) {
@@ -579,6 +598,44 @@ class WalletProvider with ChangeNotifier {
     }
   }
 
+  /// Start background wallet initialization (without authentication)
+  /// This allows wallet to sync while PIN screen is shown
+  Future<void> startBackgroundInitialization(AuthProvider authProvider) async {
+    if (!authProvider.hasWallet) return;
+    
+    if (kDebugMode) {
+      print('🔄 WalletProvider.startBackgroundInitialization() starting...');
+      print('   This allows sync during PIN entry for better UX');
+    }
+    
+    try {
+      // Ensure SharedPreferences is loaded
+      await ensurePreferencesInitialized();
+      
+      // Start server connection check
+      await startEarlyConnection();
+      
+      // Start background Rust service initialization (without seed phrase)
+      // This prepares the service and starts network sync
+      final result = await _rustService.initialize(
+        serverUri: 'https://lightd.btcz.rocks:9067',
+        createNew: false,
+        seedPhrase: null, // Don't provide seed until authenticated
+        birthdayHeight: null, // Will be set later during full restoration
+      );
+      
+      if (result && kDebugMode) {
+        print('✅ Background initialization started successfully');
+        print('   Wallet will continue syncing while PIN is entered');
+      }
+      
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ Background initialization failed (will retry after PIN): $e');
+      }
+    }
+  }
+
   /// Restore wallet from stored data
   Future<bool> restoreFromStoredData(AuthProvider authProvider) async {
     if (!authProvider.hasWallet || !authProvider.isAuthenticated) return false;
@@ -699,7 +756,7 @@ class WalletProvider with ChangeNotifier {
             print('   birthdayHeight: ${_wallet!.birthdayHeight}');
           }
           
-          // Load cached balance if available
+          // Load cached balance if available  
           if (walletData['cachedBalance'] != null) {
             try {
               final cachedBalance = walletData['cachedBalance'];
@@ -714,6 +771,23 @@ class WalletProvider with ChangeNotifier {
               if (kDebugMode) print('⚠️ Failed to load cached balance: $e');
             }
           }
+
+          // Load cached transactions if available (for instant display)
+          if (walletData['cachedTransactions'] != null) {
+            try {
+              final cachedTxList = walletData['cachedTransactions'] as List;
+              _transactions = cachedTxList.map((tx) => TransactionModel.fromJson(tx as Map<String, dynamic>)).toList();
+              if (kDebugMode) print('📋 Loaded ${_transactions.length} cached transactions');
+            } catch (e) {
+              if (kDebugMode) print('⚠️ Failed to load cached transactions: $e');
+              _transactions = [];
+            }
+          }
+
+          // Set optimistic connection status (assume connected initially for better UX)
+          _isConnected = true;
+          _connectionStatus = 'Connected';
+          if (kDebugMode) print('🔗 Set optimistic connection status: Connected');
           
           // Notify UI immediately with cached data
           notifyListeners();
