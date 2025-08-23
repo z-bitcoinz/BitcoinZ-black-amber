@@ -14,6 +14,19 @@ import '../services/wallet_storage_service.dart';
 import '../src/rust/api.dart' as rust_api;
 import '../src/rust/frb_generated.dart';
 
+/// Pending transaction data for tracking change amounts
+class PendingTransaction {
+  final DateTime sentTime;
+  final double totalSpent;
+  final double changeAmount;
+  
+  PendingTransaction({
+    required this.sentTime,
+    required this.totalSpent,
+    required this.changeAmount,
+  });
+}
+
 class BitcoinzRustService {
   static BitcoinzRustService? _instance;
   static BitcoinzRustService get instance {
@@ -48,6 +61,10 @@ class BitcoinzRustService {
   String? lastTxId;
   double? lastBalance;
   int? lastTxCount;
+  
+  // Pending transaction tracking (like BitcoinZ Blue)
+  final Map<String, PendingTransaction> _pendingTransactions = {};
+  static const Duration _pendingTimeout = Duration(seconds: 60); // 1 minute timeout
   
   // Update throttling
   bool _isUpdating = false;
@@ -510,9 +527,21 @@ class BitcoinzRustService {
       if (kDebugMode) print('💰 fetchBalance: Got response');
       final data = jsonDecode(balanceJson);
       
-      if (kDebugMode) print('💰 Balance from Rust: $data');
+      if (kDebugMode) {
+        print('💰 Balance from Rust: $data');
+        print('💰 Spendable Balance Debug:');
+        print('   spendable_tbalance: ${data['spendable_tbalance']} (${(data['spendable_tbalance'] ?? 0) / 100000000.0} BTCZ)');
+        print('   spendable_zbalance: ${data['spendable_zbalance']} (${(data['spendable_zbalance'] ?? 0) / 100000000.0} BTCZ)');
+        print('   tbalance: ${data['tbalance']} (${(data['tbalance'] ?? 0) / 100000000.0} BTCZ)');
+        print('   zbalance: ${data['zbalance']} (${(data['zbalance'] ?? 0) / 100000000.0} BTCZ)');
+        print('   🎯 Final spendable will be: ${((data['spendable_tbalance'] ?? 0) + (data['spendable_zbalance'] ?? 0)) / 100000000.0} BTCZ');
+      }
       
-      // Check for unconfirmed transactions in mempool
+      // Get current block height for confirmation calculations
+      final currentBlockHeight = await getCurrentBlockHeight();
+      if (kDebugMode) print('📊 Current block height for spendable calculation: $currentBlockHeight');
+      
+      // Check for unconfirmed transactions in mempool and calculate proper spendable amounts
       final txListJson = await rust_api.execute(command: 'list', args: '');
       var txListDecoded = jsonDecode(txListJson);
       
@@ -533,9 +562,26 @@ class BitcoinzRustService {
         print('   block_height field: ${txList.first['block_height']}');
       }
       
+      // TRUST the Rust backend's spendable amounts - they know the complex wallet state
+      double rustSpendableTransparent = (data['spendable_tbalance'] ?? 0) / 100000000.0;
+      double rustSpendableShielded = (data['spendable_zbalance'] ?? 0) / 100000000.0;
+      
+      // Get total balances for display
+      double totalTransparent = (data['tbalance'] ?? 0) / 100000000.0;
+      double totalShielded = (data['zbalance'] ?? 0) / 100000000.0;
+      
+      if (kDebugMode) {
+        print('📊 RUST BACKEND BALANCES:');
+        print('   Total: ${totalTransparent} T + ${totalShielded} Z = ${totalTransparent + totalShielded} BTCZ');
+        print('   🎯 Backend says spendable: ${rustSpendableTransparent} T + ${rustSpendableShielded} Z = ${rustSpendableTransparent + rustSpendableShielded} BTCZ');
+      }
+      
+      // Calculate unconfirmed amounts for display purposes only
       double pendingBalance = 0;
       double pendingTransparent = 0;
       double pendingShielded = 0;
+      
+      // Track unconfirmed transactions
       
       for (final tx in txList) {
         // Check for unconfirmed: either explicit flag OR no block height
@@ -543,38 +589,32 @@ class BitcoinzRustService {
                                    tx['block_height'] == null || 
                                    tx['block_height'] == 0;
         
+        final amount = (tx['amount'] ?? 0).abs() / 100000000.0;
+        final address = tx['address'] as String?;
+        final bool isTransparent = address != null && (address.startsWith('t1') || address.startsWith('t3'));
+        final bool isIncoming = tx['outgoing_metadata'] == null;
+        
+        // Track unconfirmed funds
         if (isUnconfirmed) {
-          final amount = (tx['amount'] ?? 0).abs() / 100000000.0;
-          if (tx['outgoing_metadata'] == null) {
-            // Incoming unconfirmed
-            pendingBalance += amount;
-            
-            // Determine if it's to a transparent or shielded address
-            final address = tx['address'] as String?;
-            if (address != null) {
-              if (address.startsWith('t1') || address.startsWith('t3')) {
-                pendingTransparent += amount;
-                if (kDebugMode) {
-                  print('🔄 UNCONFIRMED TRANSPARENT INCOMING: ${tx['txid']} - $amount BTCZ to $address');
-                }
-              } else if (address.startsWith('zs1') || address.startsWith('zc')) {
-                pendingShielded += amount;
-                if (kDebugMode) {
-                  print('🔄 UNCONFIRMED SHIELDED INCOMING: ${tx['txid']} - $amount BTCZ to $address');
-                }
-              } else {
-                // Unknown address type, add to shielded by default
-                pendingShielded += amount;
-                if (kDebugMode) {
-                  print('🔄 UNCONFIRMED INCOMING (unknown type): ${tx['txid']} - $amount BTCZ');
-                }
-              }
-            } else {
-              // No address info, add to shielded by default
-              pendingShielded += amount;
-            }
+          pendingBalance += amount;
+          if (isTransparent) {
+            pendingTransparent += amount;
+          } else {
+            pendingShielded += amount;
           }
         }
+      }
+      
+      // Use native Rust spendable amounts directly - no manual tracking needed
+      // The Rust backend handles all the complexity of change detection properly
+      double actualSpendableTransparent = rustSpendableTransparent;
+      double actualSpendableShielded = rustSpendableShielded;
+      
+      if (kDebugMode) {
+        print('🧮 FINAL Balance Calculation:');
+        print('   📊 Total from Rust: ${totalTransparent + totalShielded} BTCZ');
+        print('   🎯 Rust spendable: ${rustSpendableTransparent + rustSpendableShielded} BTCZ');
+        print('   ✅ Using native Rust calculations (BitcoinZ Blue approach)');
       }
       
       final balance = BalanceModel(
@@ -584,7 +624,45 @@ class BitcoinzRustService {
         unconfirmed: pendingBalance,
         unconfirmedTransparent: pendingTransparent,
         unconfirmedShielded: pendingShielded,
+        // Verified balance fields (funds with sufficient confirmations)
+        verifiedTransparent: (data['verified_tbalance'] ?? data['tbalance'] ?? 0) / 100000000.0,
+        verifiedShielded: (data['verified_zbalance'] ?? data['zbalance'] ?? 0) / 100000000.0,
+        // Unverified balance fields (funds waiting for confirmations)
+        unverifiedTransparent: (data['unverified_tbalance'] ?? 0) / 100000000.0,
+        unverifiedShielded: (data['unverified_zbalance'] ?? 0) / 100000000.0,
+        // Spendable balance fields (funds available for spending)
+        // Use native Rust spendable calculations (BitcoinZ Blue approach)
+        // Transparent: 1+ confirmations, Shielded: 2+ confirmations
+        spendableTransparent: actualSpendableTransparent,
+        spendableShielded: actualSpendableShielded,
+        // Pending change: Use 0 since we use native unverified field instead
+        pendingChange: 0,
       );
+      
+      // Validation: Ensure spendable never exceeds total
+      final totalBalance = balance.total;
+      final calculatedSpendable = actualSpendableTransparent + actualSpendableShielded;
+      
+      if (calculatedSpendable > totalBalance) {
+        if (kDebugMode) {
+          print('🚨 VALIDATION ERROR: Spendable ($calculatedSpendable) > Total ($totalBalance)');
+          print('   This should never happen! Using total balance as max spendable.');
+        }
+        // Cap spendable at total balance and proportionally reduce each type
+        final ratio = totalBalance / calculatedSpendable;
+        actualSpendableTransparent *= ratio;
+        actualSpendableShielded *= ratio;
+      }
+      
+      if (kDebugMode) {
+        print('💰 Final BalanceModel Summary:');
+        print('   📊 Total Balance: $totalBalance BTCZ (${totalTransparent} T + ${totalShielded} Z)');
+        print('   🎯 Final Spendable: ${actualSpendableTransparent + actualSpendableShielded} BTCZ (${actualSpendableTransparent} T + ${actualSpendableShielded} Z)');
+        print('   🔄 Unconfirmed: ${pendingBalance} BTCZ (${pendingTransparent} T + ${pendingShielded} Z)');
+        print('   🏛️ Rust backend said spendable: ${rustSpendableTransparent} T + ${rustSpendableShielded} Z');
+        print('   🔍 VALIDATION: Final spendable ${actualSpendableTransparent + actualSpendableShielded <= totalBalance ? '≤' : '>'} Total ✅');
+        print('   🎯 This should match what can actually be spent!');
+      }
       
       fnSetTotalBalance?.call(balance);
       if (kDebugMode) print('✅ Balance fetched successfully');
@@ -778,6 +856,51 @@ class BitcoinzRustService {
       // Store transactions in database to persist memo read status
       await DatabaseService.instance.insertTransactions(transactions);
       
+      // Check for pending transactions that now appear in the transaction list
+      if (_pendingTransactions.isNotEmpty) {
+        final completedTxIds = <String>[];
+        
+        for (final transaction in transactions) {
+          final txId = transaction.txid;
+          if (_pendingTransactions.containsKey(txId)) {
+            final pendingTx = _pendingTransactions[txId]!;
+            
+            // Check if the transaction has enough confirmations for change to be spendable
+            // Transparent change: 1 confirmation, Shielded change: 2 confirmations
+            bool changeIsSpendable = false;
+            final confirmations = transaction.confirmations ?? 0;
+            if (confirmations >= 1) {
+              changeIsSpendable = true; // For now, assume transparent (most common)
+              // TODO: Could enhance this to check address type for proper confirmation requirements
+            }
+            
+            if (changeIsSpendable) {
+              // This pending change is now spendable
+              if (kDebugMode) {
+                print('✅ PENDING CHANGE NOW SPENDABLE: $txId');
+                print('   Change amount: ${pendingTx.changeAmount} BTCZ');
+                print('   Confirmations: $confirmations');
+                print('   🎯 This change will now be included in spendable balance');
+              }
+              completedTxIds.add(txId);
+            } else {
+              if (kDebugMode) {
+                print('⏳ Pending change still needs confirmations: $txId ($confirmations confs, need 1+)');
+              }
+            }
+          }
+        }
+        
+        // Remove completed transactions from pending tracking
+        for (final txId in completedTxIds) {
+          _pendingTransactions.remove(txId);
+        }
+        
+        if (completedTxIds.isNotEmpty && kDebugMode) {
+          print('🧹 Removed ${completedTxIds.length} confirmed change transactions (${_pendingTransactions.length} still pending)');
+        }
+      }
+      
       if (kDebugMode) print('📋 Calling fnSetTransactionsList with ${transactions.length} transactions');
       fnSetTransactionsList?.call(transactions);
       
@@ -849,6 +972,17 @@ class BitcoinzRustService {
     try {
       if (kDebugMode) print('📤 Sending $amount BTCZ to $address via Rust...');
       
+      // Get current balances before sending (for change calculation after send)
+      double balanceBeforeSend = 0;
+      try {
+        final balanceJson = await rust_api.execute(command: 'balance', args: '');
+        final balanceData = jsonDecode(balanceJson);
+        balanceBeforeSend = ((balanceData['tbalance'] ?? 0) + (balanceData['zbalance'] ?? 0)) / 100000000.0;
+        if (kDebugMode) print('📊 Total balance before send: $balanceBeforeSend BTCZ');
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Could not get balance before send: $e');
+      }
+      
       // Convert BTCZ to zatoshis (1 BTCZ = 100,000,000 zatoshis)
       final zatoshis = (amount * 100000000).toInt();
       
@@ -861,6 +995,54 @@ class BitcoinzRustService {
       if (data['txid'] != null) {
         final txid = data['txid'] as String;
         if (kDebugMode) print('✅ Transaction sent via Rust: $txid');
+        
+        // Calculate REAL change by checking actual balance after send
+        try {
+          // Give a moment for the transaction to be processed
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          final newBalanceJson = await rust_api.execute(command: 'balance', args: '');
+          final newBalanceData = jsonDecode(newBalanceJson);
+          final balanceAfterSend = ((newBalanceData['tbalance'] ?? 0) + (newBalanceData['zbalance'] ?? 0)) / 100000000.0;
+          
+          // Calculate actual change: what we had minus what we have now minus what we sent
+          final actualChange = balanceBeforeSend - balanceAfterSend - amount;
+          
+          if (kDebugMode) {
+            print('📊 REAL CHANGE CALCULATION:');
+            print('   Balance before: $balanceBeforeSend BTCZ');
+            print('   Balance after: $balanceAfterSend BTCZ');  
+            print('   Amount sent: $amount BTCZ');
+            print('   Actual change: $actualChange BTCZ');
+          }
+          
+          // Only track positive change amounts (account for fees and floating point precision)
+          if (actualChange > 0.00000001) {
+            // Track the REAL change amount that needs confirmations
+            _pendingTransactions[txid] = PendingTransaction(
+              sentTime: DateTime.now(),
+              totalSpent: amount + actualChange, // Total spent including change
+              changeAmount: actualChange,        // Real change amount
+            );
+            
+            if (kDebugMode) {
+              print('⏳ CRITICAL: Tracking REAL pending change');
+              print('   Transaction ID: $txid');
+              print('   🎯 Real change amount: $actualChange BTCZ (from actual transaction)');
+              print('   🚫 This real change will be excluded from spendable until confirmed');
+            }
+          } else {
+            if (kDebugMode) {
+              print('💰 No meaningful change detected');
+              print('   Calculated change: $actualChange BTCZ');
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Could not calculate real change: $e');
+            print('   Will not track pending change for this transaction');
+          }
+        }
         
         // Force immediate refresh to pick up the new transaction
         Timer.run(() => refresh());

@@ -11,6 +11,22 @@ class BalanceModel {
   final double unconfirmed;
   final double unconfirmedTransparent;
   final double unconfirmedShielded;
+  
+  // Verified balance fields (funds with sufficient confirmations)
+  final double verifiedTransparent;
+  final double verifiedShielded;
+  
+  // Unverified balance fields (funds waiting for confirmations)
+  final double unverifiedTransparent;
+  final double unverifiedShielded;
+  
+  // Spendable balance fields (funds available for spending)
+  final double spendableTransparent;
+  final double spendableShielded;
+  
+  // Pending change from recent sends (not yet in mempool/blockchain)
+  final double pendingChange;
+  
   final DateTime? lastUpdated;
 
   const BalanceModel({
@@ -20,6 +36,13 @@ class BalanceModel {
     this.unconfirmed = 0.0,
     this.unconfirmedTransparent = 0.0,
     this.unconfirmedShielded = 0.0,
+    this.verifiedTransparent = 0.0,
+    this.verifiedShielded = 0.0,
+    this.unverifiedTransparent = 0.0,
+    this.unverifiedShielded = 0.0,
+    this.spendableTransparent = 0.0,
+    this.spendableShielded = 0.0,
+    this.pendingChange = 0.0,
     this.lastUpdated,
   });
 
@@ -36,14 +59,33 @@ class BalanceModel {
       unconfirmed: 0.0,
       unconfirmedTransparent: 0.0,
       unconfirmedShielded: 0.0,
+      verifiedTransparent: 0.0,
+      verifiedShielded: 0.0,
+      unverifiedTransparent: 0.0,
+      unverifiedShielded: 0.0,
+      spendableTransparent: 0.0,
+      spendableShielded: 0.0,
+      pendingChange: 0.0,
     );
   }
 
   /// Get confirmed balance (total - unconfirmed)
   double get confirmed => total - unconfirmed;
 
-  /// Get spendable balance (confirmed balance)
-  double get spendable => confirmed;
+  /// Get spendable balance (actually spendable funds, not just confirmed)
+  double get spendable => spendableTransparent + spendableShielded;
+  
+  /// Get effective spendable balance (includes pending change from recent sends)
+  double get effectiveSpendable => spendable + pendingChange;
+  
+  /// Get verified balance (funds with sufficient confirmations)
+  double get verified => verifiedTransparent + verifiedShielded;
+  
+  /// Get unverified balance (funds waiting for confirmations)
+  double get unverified => unverifiedTransparent + unverifiedShielded;
+  
+  /// Get pure incoming balance (unconfirmed minus change returning)
+  double get pureIncoming => unconfirmed - unverified;
 
   /// Check if wallet has any balance
   bool get hasBalance => total > 0;
@@ -69,6 +111,10 @@ class BalanceModel {
   int get shieldedZatoshis => (shielded * AppConstants.zatoshisPerBtcz).round();
   int get unconfirmedZatoshis => (unconfirmed * AppConstants.zatoshisPerBtcz).round();
   int get spendableZatoshis => (spendable * AppConstants.zatoshisPerBtcz).round();
+  int get verifiedZatoshis => (verified * AppConstants.zatoshisPerBtcz).round();
+  int get unverifiedZatoshis => (unverified * AppConstants.zatoshisPerBtcz).round();
+  int get spendableTransparentZatoshis => (spendableTransparent * AppConstants.zatoshisPerBtcz).round();
+  int get spendableShieldedZatoshis => (spendableShielded * AppConstants.zatoshisPerBtcz).round();
 
   /// Format balance for display
   String get formattedTotal => _formatBalance(total);
@@ -78,6 +124,17 @@ class BalanceModel {
   String get formattedUnconfirmedTransparent => _formatBalance(unconfirmedTransparent);
   String get formattedUnconfirmedShielded => _formatBalance(unconfirmedShielded);
   String get formattedSpendable => _formatBalance(spendable);
+  String get formattedVerified => _formatBalance(verified);
+  String get formattedUnverified => _formatBalance(unverified);
+  String get formattedPureIncoming => _formatBalance(pureIncoming);
+  String get formattedVerifiedTransparent => _formatBalance(verifiedTransparent);
+  String get formattedVerifiedShielded => _formatBalance(verifiedShielded);
+  String get formattedUnverifiedTransparent => _formatBalance(unverifiedTransparent);
+  String get formattedUnverifiedShielded => _formatBalance(unverifiedShielded);
+  String get formattedSpendableTransparent => _formatBalance(spendableTransparent);
+  String get formattedSpendableShielded => _formatBalance(spendableShielded);
+  String get formattedPendingChange => _formatBalance(pendingChange);
+  String get formattedEffectiveSpendable => _formatBalance(effectiveSpendable);
 
   /// Check if sufficient balance for amount
   bool hasSufficientBalance(double amount) => spendable >= amount;
@@ -87,6 +144,15 @@ class BalanceModel {
 
   /// Check if sufficient shielded balance for amount
   bool hasSufficientShieldedBalance(double amount) => shielded >= amount;
+  
+  /// Check if sufficient spendable transparent balance for amount
+  bool hasSufficientSpendableTransparentBalance(double amount) => spendableTransparent >= amount;
+
+  /// Check if sufficient spendable shielded balance for amount
+  bool hasSufficientSpendableShieldedBalance(double amount) => spendableShielded >= amount;
+  
+  /// Check if sufficient verified balance for amount
+  bool hasSufficientVerifiedBalance(double amount) => verified >= amount;
 
   /// Get percentage of balance in each pool
   double get transparentPercentage => total > 0 ? (transparent / total) * 100 : 0;
@@ -100,6 +166,13 @@ class BalanceModel {
     double? unconfirmed,
     double? unconfirmedTransparent,
     double? unconfirmedShielded,
+    double? verifiedTransparent,
+    double? verifiedShielded,
+    double? unverifiedTransparent,
+    double? unverifiedShielded,
+    double? spendableTransparent,
+    double? spendableShielded,
+    double? pendingChange,
     DateTime? lastUpdated,
   }) {
     return BalanceModel(
@@ -109,6 +182,13 @@ class BalanceModel {
       unconfirmed: unconfirmed ?? this.unconfirmed,
       unconfirmedTransparent: unconfirmedTransparent ?? this.unconfirmedTransparent,
       unconfirmedShielded: unconfirmedShielded ?? this.unconfirmedShielded,
+      verifiedTransparent: verifiedTransparent ?? this.verifiedTransparent,
+      verifiedShielded: verifiedShielded ?? this.verifiedShielded,
+      unverifiedTransparent: unverifiedTransparent ?? this.unverifiedTransparent,
+      unverifiedShielded: unverifiedShielded ?? this.unverifiedShielded,
+      spendableTransparent: spendableTransparent ?? this.spendableTransparent,
+      spendableShielded: spendableShielded ?? this.spendableShielded,
+      pendingChange: pendingChange ?? this.pendingChange,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }
@@ -157,6 +237,13 @@ class BalanceModel {
         other.shielded == shielded &&
         other.total == total &&
         other.unconfirmed == unconfirmed &&
+        other.verifiedTransparent == verifiedTransparent &&
+        other.verifiedShielded == verifiedShielded &&
+        other.unverifiedTransparent == unverifiedTransparent &&
+        other.unverifiedShielded == unverifiedShielded &&
+        other.spendableTransparent == spendableTransparent &&
+        other.spendableShielded == spendableShielded &&
+        other.pendingChange == pendingChange &&
         other.lastUpdated == lastUpdated;
   }
 
@@ -166,6 +253,13 @@ class BalanceModel {
         shielded.hashCode ^
         total.hashCode ^
         unconfirmed.hashCode ^
+        verifiedTransparent.hashCode ^
+        verifiedShielded.hashCode ^
+        unverifiedTransparent.hashCode ^
+        unverifiedShielded.hashCode ^
+        spendableTransparent.hashCode ^
+        spendableShielded.hashCode ^
+        pendingChange.hashCode ^
         lastUpdated.hashCode;
   }
 
@@ -176,6 +270,10 @@ class BalanceModel {
         'shielded: $shielded, '
         'total: $total, '
         'unconfirmed: $unconfirmed, '
+        'verified: $verified, '
+        'unverified: $unverified, '
+        'spendable: $spendable, '
+        'pendingChange: $pendingChange, '
         'lastUpdated: $lastUpdated'
         ')';
   }

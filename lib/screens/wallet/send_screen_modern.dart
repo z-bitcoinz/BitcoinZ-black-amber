@@ -351,7 +351,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Compact Balance Card
+                // Complete Balance Card with Clear Breakdown
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -371,210 +371,307 @@ class _SendScreenModernState extends State<SendScreenModern> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Main Balance Section
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Spendable Balance',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 12,
-                            ),
-                          ),
-                          if (walletProvider.balance.total > walletProvider.balance.spendable) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                              ),
-                              child: Text(
-                                'Funds Pending',
-                                style: TextStyle(
-                                  color: Colors.orange,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(
-                            walletProvider.balance.formattedSpendable,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          // Show pending change if available
-                          if (walletProvider.balance.pendingChange > 0) ...[
-                            Text(
-                              ' + ${walletProvider.balance.formattedPendingChange}',
-                              style: TextStyle(
-                                color: Colors.green.withOpacity(0.8),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                          if (walletProvider.balance.total > (walletProvider.balance.spendable + walletProvider.balance.pendingChange)) ...[
-                            Text(
-                              ' / ${walletProvider.balance.formattedTotal}',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
-                                fontSize: 16,
-                                fontWeight: FontWeight.normal,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      if (currencyProvider.currentPrice != null) ...[
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Text(
-                              currencyProvider.formatFiatAmount(walletProvider.balance.spendable),
-                              style: TextStyle(
-                                color: const Color(0xFFFF6B00).withOpacity(0.8),
-                                fontSize: 14,
-                              ),
-                            ),
-                            // Show pending change in fiat if available
-                            if (walletProvider.balance.pendingChange > 0) ...[
-                              Text(
-                                ' + ${currencyProvider.formatFiatAmount(walletProvider.balance.pendingChange)}',
-                                style: TextStyle(
-                                  color: Colors.green.withOpacity(0.6),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                            if (walletProvider.balance.total > (walletProvider.balance.spendable + walletProvider.balance.pendingChange)) ...[
-                              Text(
-                                ' / ${currencyProvider.formatFiatAmount(walletProvider.balance.total)}',
-                                style: TextStyle(
-                                  color: const Color(0xFFFF6B00).withOpacity(0.5),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                      // Show pending change info
-                      if (walletProvider.balance.pendingChange > 0) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.green.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.schedule,
-                                size: 14,
-                                color: Colors.green,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  '${walletProvider.balance.formattedPendingChange} BTCZ change returning from recent send (will be spendable soon)',
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Available to Send',
                                   style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.green,
+                                    color: Colors.white.withOpacity(0.6),
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  walletProvider.balance.formattedSpendable,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (currencyProvider.currentPrice != null)
+                                  Text(
+                                    currencyProvider.formatFiatAmount(walletProvider.balance.spendable),
+                                    style: TextStyle(
+                                      color: const Color(0xFFFF6B00).withOpacity(0.8),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          // Total Balance Summary
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.1),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'Total Balance',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.5),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                                Text(
+                                  walletProvider.balance.formattedTotal,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      // Balance Breakdown - Only show when there are funds needing confirmations
+                      if (walletProvider.balance.unconfirmed > 0) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1A1A),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              // Header
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.account_balance_wallet,
+                                    size: 16,
+                                    color: Colors.white.withOpacity(0.6),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Balance Breakdown',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.6),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              
+                              // Spendable
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF4CAF50),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Spendable',
+                                        style: TextStyle(
+                                          color: Colors.white.withOpacity(0.8),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    walletProvider.balance.formattedSpendable,
+                                    style: const TextStyle(
+                                      color: Color(0xFF4CAF50),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              
+                              // Pure Incoming funds (not change) - show only if > 0.001
+                              if (walletProvider.balance.pureIncoming >= 0.001) ...[
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Incoming (Confirming)',
+                                          style: TextStyle(
+                                            color: Colors.white.withOpacity(0.8),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      walletProvider.balance.formattedPureIncoming,
+                                      style: const TextStyle(
+                                        color: Colors.blue,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              
+                              // Change Returning (unverified balance) - show only if meaningful amount
+                              if (walletProvider.balance.unverified >= 0.001) ...[
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.withOpacity(0.7),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Change Returning',
+                                          style: TextStyle(
+                                            color: Colors.white.withOpacity(0.8),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      walletProvider.balance.formattedUnverified,
+                                      style: TextStyle(
+                                        color: Colors.green.withOpacity(0.7),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              
+                              // Divider and Total
+                              const SizedBox(height: 8),
+                              Container(
+                                height: 1,
+                                color: Colors.white.withOpacity(0.1),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Total',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    walletProvider.balance.formattedTotal,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
                       ],
-                      // Add unspendable balance section
-                      if (walletProvider.balance.total > (walletProvider.balance.spendable + walletProvider.balance.pendingChange)) ...[
+                      
+                      // Confirmation Requirements Explanation - Only show when there are confirming funds
+                      if (walletProvider.balance.unconfirmed > 0) ...[
                         const SizedBox(height: 12),
-                        // Unspendable Balance Header
-                        Row(
-                          children: [
-                            Text(
-                              'Unspendable Balance',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                              ),
-                              child: Text(
-                                'Need Confirmations',
-                                style: TextStyle(
-                                  color: Colors.orange,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        // Unspendable Amount
-                        Text(
-                          (walletProvider.balance.total - walletProvider.balance.spendable - walletProvider.balance.pendingChange).toStringAsFixed(8),
-                          style: TextStyle(
-                            color: Colors.orange.withOpacity(0.8),
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (currencyProvider.currentPrice != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            currencyProvider.formatFiatAmount(walletProvider.balance.total - walletProvider.balance.spendable - walletProvider.balance.pendingChange),
-                            style: TextStyle(
-                              color: Colors.orange.withOpacity(0.6),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.2),
+                            ),
                           ),
                           child: Row(
                             children: [
                               Icon(
-                                Icons.hourglass_empty,
-                                size: 14,
+                                Icons.info_outline,
+                                size: 16,
                                 color: Colors.blue,
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 8),
                               Expanded(
-                                child: Text(
-                                  'Shielded funds need 2 confirmations to become spendable (~4 minutes)',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.blue,
-                                    fontWeight: FontWeight.w500,
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      color: Colors.blue.withOpacity(0.9),
+                                      fontSize: 11,
+                                    ),
+                                    children: [
+                                      const TextSpan(
+                                        text: 'Security requirement: ',
+                                        style: TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                      const TextSpan(
+                                        text: 'Transparent funds need ',
+                                      ),
+                                      const TextSpan(
+                                        text: '1 confirmation',
+                                        style: TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                      const TextSpan(
+                                        text: ', shielded funds need ',
+                                      ),
+                                      const TextSpan(
+                                        text: '2 confirmations',
+                                        style: TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                      const TextSpan(
+                                        text: ' before spending (typically 2-6 minutes)',
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -587,79 +684,6 @@ class _SendScreenModernState extends State<SendScreenModern> {
                 ),
                 
                 const SizedBox(height: 16),
-                
-                // Confirmation Requirements Info Card
-                if (walletProvider.balance.total > 0) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.access_time,
-                              size: 16,
-                              color: Colors.blue,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'About Fund Confirmations',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'BitcoinZ uses different confirmation requirements for different transaction types to ensure security and privacy.',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 11,
-                            height: 1.4,
-                          ),
-                        ),
-                        if (walletProvider.balance.total > walletProvider.balance.spendable) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            '• Transparent funds: Ready after 1 confirmation (~2 minutes)',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 10,
-                              height: 1.3,
-                            ),
-                          ),
-                          Text(
-                            '• Shielded funds: Require 2 confirmations for privacy (~4 minutes)',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 10,
-                              height: 1.3,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'This ensures your transactions remain private and secure.',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
-                              fontSize: 9,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
                 
                 // Recipient Address Field
                 Column(
