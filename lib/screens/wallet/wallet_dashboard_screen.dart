@@ -4,11 +4,14 @@ import 'package:provider/provider.dart';
 import 'dart:async';
 import 'dart:ui';
 import '../../providers/wallet_provider.dart';
+import '../../providers/network_provider.dart';
 import '../../widgets/balance_card.dart';
 import '../../widgets/recent_transactions.dart';
 import '../../widgets/connection_status_widget.dart';
 import '../../widgets/sync_status_card.dart';
+import '../main_screen.dart';
 import 'paginated_transaction_history_screen.dart';
+import '../settings/network_settings_screen.dart';
 
 class WalletDashboardScreen extends StatefulWidget {
   const WalletDashboardScreen({super.key});
@@ -114,101 +117,189 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
   }
   
   void _showServerInfo() {
-    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.7),
+      builder: (context) => Consumer2<WalletProvider, NetworkProvider>(
+        builder: (context, walletProvider, networkProvider, child) {
+          final serverInfo = networkProvider.currentServerInfo;
+          final isConnected = walletProvider.isConnected;
+          
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Stack(
                 children: [
-                  Text(
-                    'Connection Details',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  // Glassmorphism background
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withOpacity(0.1),
+                          Colors.white.withOpacity(0.05),
+                        ],
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 1,
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                        child: Container(
+                          padding: const EdgeInsets.all(28),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Header with title and close button
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.orange.withOpacity(0.2),
+                                    ),
+                                    child: const Icon(
+                                      Icons.settings_ethernet,
+                                      color: Colors.orange,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Connection Details',
+                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close, color: Colors.white70),
+                                    onPressed: () => Navigator.of(context).pop(),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                  ),
+                                ],
+                              ),
+                              
+                              const SizedBox(height: 24),
+                              
+                              // Status Card
+                              _buildStatusCard(context, isConnected),
+                              
+                              const SizedBox(height: 16),
+                              
+                              // Server Information
+                              _buildInfoCard(
+                                context,
+                                'Server Information',
+                                [
+                                  _InfoItem(
+                                    icon: Icons.dns,
+                                    label: 'Server',
+                                    value: serverInfo?.displayName ?? networkProvider.currentServerUrl,
+                                    copyable: false,
+                                  ),
+                                  _InfoItem(
+                                    icon: Icons.public,
+                                    label: 'Network',
+                                    value: serverInfo?.chainName == 'main' ? 'Mainnet' : 'Testnet',
+                                  ),
+                                  if (serverInfo?.version != null)
+                                    _InfoItem(
+                                      icon: Icons.info_outline,
+                                      label: 'Version',
+                                      value: serverInfo!.version ?? 'Unknown',
+                                    ),
+                                ],
+                              ),
+                              
+                              const SizedBox(height: 16),
+                              
+                              // Blockchain Information
+                              _buildInfoCard(
+                                context,
+                                'Blockchain Status',
+                                [
+                                  if (serverInfo?.latestBlockHeight != null)
+                                    _InfoItem(
+                                      icon: Icons.layers,
+                                      label: 'Block Height',
+                                      value: '#${serverInfo!.latestBlockHeight!.toString()}',
+                                      valueColor: Colors.orange,
+                                    ),
+                                  if (walletProvider.lastConnectionCheck != null)
+                                    _InfoItem(
+                                      icon: Icons.access_time,
+                                      label: 'Last Sync',
+                                      value: _formatTime(walletProvider.lastConnectionCheck!),
+                                    ),
+                                  _InfoItem(
+                                    icon: Icons.autorenew,
+                                    label: 'Auto-sync',
+                                    value: 'Every ${_autoSyncInterval.inSeconds}s',
+                                    valueColor: Colors.blue,
+                                  ),
+                                ],
+                              ),
+                              
+                              const SizedBox(height: 24),
+                              
+                              // Action Buttons
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildActionButton(
+                                      context,
+                                      'Network Settings',
+                                      Icons.settings,
+                                      Colors.grey.withOpacity(0.2),
+                                      () {
+                                        Navigator.of(context).pop();
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) => const NetworkSettingsScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildActionButton(
+                                      context,
+                                      'Sync Now',
+                                      Icons.sync,
+                                      Colors.orange.withOpacity(0.2),
+                                      () {
+                                        Navigator.of(context).pop();
+                                        _silentSync();
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              
-              _buildInfoRow(
-                context,
-                'Status',
-                walletProvider.isConnected ? 'Connected' : 'Disconnected',
-                walletProvider.isConnected ? Colors.green : Colors.red,
-              ),
-              const SizedBox(height: 12),
-              
-              _buildInfoRow(
-                context,
-                'Server',
-                'lightd.btcz.rocks:9067',
-                null,
-              ),
-              const SizedBox(height: 12),
-              
-              _buildInfoRow(
-                context,
-                'Network',
-                'Mainnet',
-                null,
-              ),
-              const SizedBox(height: 12),
-              
-              if (walletProvider.lastConnectionCheck != null) ...[
-                _buildInfoRow(
-                  context,
-                  'Last Sync',
-                  _formatTime(walletProvider.lastConnectionCheck!),
-                  null,
-                ),
-                const SizedBox(height: 12),
-              ],
-              
-              _buildInfoRow(
-                context,
-                'Auto-sync',
-                'Every ${_autoSyncInterval.inSeconds} seconds',
-                Colors.blue,
-              ),
-              
-              const SizedBox(height: 20),
-              
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _silentSync();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Sync Now'),
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -249,13 +340,231 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
     }
   }
 
+  String _formatNumber(int number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    } else {
+      return number.toString();
+    }
+  }
+
+  Widget _buildStatusCard(BuildContext context, bool isConnected) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isConnected
+              ? [
+                  Colors.green.withOpacity(0.2),
+                  Colors.green.withOpacity(0.1),
+                ]
+              : [
+                  Colors.red.withOpacity(0.2),
+                  Colors.red.withOpacity(0.1),
+                ],
+        ),
+        border: Border.all(
+          color: isConnected ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isConnected ? Colors.green : Colors.red,
+              boxShadow: [
+                BoxShadow(
+                  color: (isConnected ? Colors.green : Colors.red).withOpacity(0.5),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isConnected ? 'Connected' : 'Disconnected',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isConnected ? Colors.green : Colors.red,
+                ),
+              ),
+              Text(
+                isConnected ? 'Wallet is synced' : 'Connection failed',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(BuildContext context, String title, List<_InfoItem> items) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white.withOpacity(0.05),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withOpacity(0.8),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...items.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            return Column(
+              children: [
+                _buildInfoItem(context, item),
+                if (index < items.length - 1) const SizedBox(height: 12),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(BuildContext context, _InfoItem item) {
+    return GestureDetector(
+      onTap: item.copyable ? () => _copyToClipboard(item.copyValue ?? item.value) : null,
+      child: Row(
+        children: [
+          Icon(
+            item.icon,
+            size: 16,
+            color: Colors.white.withOpacity(0.6),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              item.label,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.white.withOpacity(0.7),
+              ),
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item.value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: item.valueColor ?? Colors.white,
+                ),
+              ),
+              if (item.copyable) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.copy,
+                  size: 12,
+                  color: Colors.white.withOpacity(0.5),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color backgroundColor,
+    VoidCallback onPressed,
+  ) {
+    return Container(
+      height: 48,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: Colors.white.withOpacity(0.1),
+              width: 1,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Copied to clipboard: $text'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
-      extendBodyBehindAppBar: true,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60),
         child: ClipRRect(
@@ -291,14 +600,6 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFFFF6B00),
-                          Color(0xFFFFAA00),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
@@ -308,27 +609,38 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                         ),
                       ],
                     ),
-                    child: Center(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const Icon(
-                            Icons.currency_bitcoin,
-                            color: Colors.black87,
-                            size: 20,
-                          ),
-                          const Positioned(
-                            bottom: 2,
-                            child: Text(
-                              'Z',
-                              style: TextStyle(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.asset(
+                        'assets/images/bitcoinz_logo.png',
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Fallback to original logo if image fails to load
+                          return Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFFFF6B00),
+                                  Color(0xFFFFAA00),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.currency_bitcoin,
                                 color: Colors.black87,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                                size: 20,
                               ),
                             ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -363,8 +675,6 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                     ),
                   ),
                   const Spacer(),
-                  const ConnectionStatusWidget(),
-                  const SizedBox(width: 8),
                 ],
               ),
               actions: [
@@ -442,8 +752,8 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                                             _connectionPulseController.isAnimating;
                       
                       return Container(
-                        width: 40,
-                        height: 40,
+                        width: 24,
+                        height: 24,
                         decoration: BoxDecoration(
                           color: walletProvider.isConnected
                               ? (isSyncing 
@@ -456,8 +766,8 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                           child: Transform.scale(
                             scale: isSyncing ? _connectionPulseAnimation.value : 1.0,
                             child: Container(
-                              width: 12,
-                              height: 12,
+                              width: 8,
+                              height: 8,
                               decoration: BoxDecoration(
                                 color: walletProvider.isConnected
                                     ? (isSyncing ? Colors.blue : Colors.green)
@@ -467,9 +777,9 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                                   BoxShadow(
                                     color: (walletProvider.isConnected
                                         ? (isSyncing ? Colors.blue : Colors.green)
-                                        : Colors.red).withOpacity(0.4),
-                                    blurRadius: 8,
-                                    spreadRadius: 2,
+                                        : Colors.red).withOpacity(0.3),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
                                   ),
                                 ],
                               ),
@@ -496,14 +806,14 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                // Spacing for extended AppBar
+                // Top spacing for clean separation from header
                 const SliverToBoxAdapter(
-                  child: SizedBox(height: 60),
+                  child: SizedBox(height: 24),
                 ),
-                // Balance Card
+                // Balance Card with enhanced spacing
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                     child: const BalanceCard(),
                   ),
                 ),
@@ -513,16 +823,18 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                   child: SyncStatusCard(),
                 ),
                 
-                // Recent Transactions Header and List combined
+                // Recent Activity Section with enhanced spacing
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // Section header with improved styling
                         Container(
-                          height: 30,
+                          height: 32,
+                          margin: const EdgeInsets.only(bottom: 12),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -531,19 +843,35 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                                 'Recent Activity',
                                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 18,
                                 ),
                               ),
                               TextButton(
                                 style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                   minimumSize: Size.zero,
                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  backgroundColor: Colors.white.withOpacity(0.05),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
                                 onPressed: () {
-                                  // Navigate to full transaction history
-                                  DefaultTabController.of(context)?.animateTo(3);
+                                  // Navigate to History tab (index 3) in bottom navigation
+                                  final mainScreen = MainScreen.of(context);
+                                  if (mainScreen != null) {
+                                    mainScreen.onNavItemTapped(3);
+                                  }
                                 },
-                                child: const Text('View All'),
+                                child: Text(
+                                  'View All',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 13,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -565,4 +893,22 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
       ),
     );
   }
+}
+
+class _InfoItem {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool copyable;
+  final String? copyValue;
+
+  const _InfoItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.copyable = false,
+    this.copyValue,
+  });
 }
