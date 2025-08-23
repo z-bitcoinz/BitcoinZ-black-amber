@@ -209,42 +209,8 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                       ],
                     ),
                     
-                    // Show confirming balance if there are unconfirmed transactions
-                    if (walletProvider.balance.hasUnconfirmedBalance) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Colors.orange.withOpacity(0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              margin: const EdgeInsets.only(right: 6),
-                              child: const CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                              ),
-                            ),
-                            Text(
-                              'Confirming: ${walletProvider.balance.formattedUnconfirmed}',
-                              style: const TextStyle(
-                                color: Colors.orange,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                    // Removed redundant "Confirming:" display from balance card
+                    // This is already shown on the main dashboard
                   ],
                 ),
               ),
@@ -300,35 +266,8 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
               letterSpacing: -0.5,
             ),
           ),
-          // Show confirming amount if there are unconfirmed transactions
-          if (hasUnconfirmed) ...[
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 10,
-                  height: 10,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Colors.orange.withOpacity(0.8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Confirming: $unconfirmedAmount',
-                  style: TextStyle(
-                    color: Colors.orange.shade200,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          // Removed redundant "Confirming:" display from balance columns
+          // This is already shown on the main dashboard
         ],
       ),
     );

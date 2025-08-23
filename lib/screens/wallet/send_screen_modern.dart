@@ -7,6 +7,7 @@ import '../../providers/currency_provider.dart';
 import '../../widgets/transaction_success_dialog.dart';
 import '../../widgets/transaction_confirmation_dialog.dart';
 import '../../widgets/sending_progress_overlay.dart';
+import 'qr_scanner_screen.dart';
 
 class SendScreenModern extends StatefulWidget {
   const SendScreenModern({super.key});
@@ -75,13 +76,154 @@ class _SendScreenModernState extends State<SendScreenModern> {
   }
 
   Future<void> _scanQRCode() async {
-    // Placeholder for QR scanner
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('QR scanner would open here'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    try {
+      final result = await Navigator.of(context).push<String>(
+        MaterialPageRoute(
+          builder: (context) => const QRScannerScreen(),
+          fullscreenDialog: true,
+        ),
+      );
+      
+      if (result != null && result.isNotEmpty && result != 'manual_entry') {
+        _processQRCodeData(result);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Scanner error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+  
+  void _processQRCodeData(String qrData) {
+    try {
+      final parsedData = _parseQRCode(qrData);
+      
+      if (parsedData['address'] != null) {
+        _addressController.text = parsedData['address']!;
+        
+        // Validate the address to set transaction type
+        _isValidBitcoinZAddress(parsedData['address']!);
+      }
+      
+      if (parsedData['amount'] != null && parsedData['amount']!.isNotEmpty) {
+        _amountController.text = parsedData['amount']!;
+      }
+      
+      if (parsedData['memo'] != null && parsedData['memo']!.isNotEmpty && _isShieldedTransaction) {
+        _memoController.text = parsedData['memo']!;
+      }
+      
+      // Show success feedback
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('QR code scanned successfully'),
+          backgroundColor: const Color(0xFF4CAF50),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      
+      // Rebuild to update UI
+      setState(() {});
+      
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Invalid QR code format'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
+  
+  Map<String, String?> _parseQRCode(String qrData) {
+    final result = <String, String?>{
+      'address': null,
+      'amount': null,
+      'memo': null,
+    };
+    
+    // Clean the QR data
+    final cleanData = qrData.trim();
+    
+    // Check if it's a BitcoinZ URI (bitcoinz:address?params)
+    if (cleanData.toLowerCase().startsWith('bitcoinz:')) {
+      final uri = Uri.tryParse(cleanData);
+      if (uri != null) {
+        // Extract address (everything after bitcoinz: and before ?)
+        String address = uri.path;
+        if (address.isEmpty && uri.host.isNotEmpty) {
+          address = uri.host; // Handle bitcoinz://address format
+        }
+        
+        result['address'] = address;
+        result['amount'] = uri.queryParameters['amount'];
+        result['memo'] = uri.queryParameters['memo'] ?? uri.queryParameters['message'];
+        
+        return result;
+      }
+    }
+    
+    // Check if it's a generic crypto URI (bitcoin:, zcash:, etc.)
+    if (cleanData.contains(':')) {
+      final uri = Uri.tryParse(cleanData);
+      if (uri != null && uri.scheme.isNotEmpty) {
+        String address = uri.path;
+        if (address.isEmpty && uri.host.isNotEmpty) {
+          address = uri.host;
+        }
+        
+        result['address'] = address;
+        result['amount'] = uri.queryParameters['amount'];
+        result['memo'] = uri.queryParameters['memo'] ?? uri.queryParameters['message'];
+        
+        return result;
+      }
+    }
+    
+    // Assume it's a plain address
+    if (_isValidAddressFormat(cleanData)) {
+      result['address'] = cleanData;
+      return result;
+    }
+    
+    throw Exception('Unsupported QR code format');
+  }
+  
+  bool _isValidAddressFormat(String address) {
+    // BitcoinZ transparent addresses start with 't1' and are ~34 chars
+    if (address.startsWith('t1') && address.length >= 32 && address.length <= 40) {
+      return true;
+    }
+    
+    // BitcoinZ shielded addresses start with 'zs' and are longer
+    if (address.startsWith('zs') && address.length >= 60 && address.length <= 80) {
+      return true;
+    }
+    
+    // Legacy shielded addresses start with 'zc'
+    if (address.startsWith('zc') && address.length >= 60 && address.length <= 80) {
+      return true;
+    }
+    
+    return false;
   }
 
   Future<void> _sendTransaction() async {
@@ -229,29 +371,214 @@ class _SendScreenModernState extends State<SendScreenModern> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Available Balance',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
-                          fontSize: 12,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'Spendable Balance',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (walletProvider.balance.total > walletProvider.balance.spendable) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                              ),
+                              child: Text(
+                                'Funds Pending',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        walletProvider.balance.formattedSpendable,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            walletProvider.balance.formattedSpendable,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          // Show pending change if available
+                          if (walletProvider.balance.pendingChange > 0) ...[
+                            Text(
+                              ' + ${walletProvider.balance.formattedPendingChange}',
+                              style: TextStyle(
+                                color: Colors.green.withOpacity(0.8),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                          if (walletProvider.balance.total > (walletProvider.balance.spendable + walletProvider.balance.pendingChange)) ...[
+                            Text(
+                              ' / ${walletProvider.balance.formattedTotal}',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.5),
+                                fontSize: 16,
+                                fontWeight: FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       if (currencyProvider.currentPrice != null) ...[
                         const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Text(
+                              currencyProvider.formatFiatAmount(walletProvider.balance.spendable),
+                              style: TextStyle(
+                                color: const Color(0xFFFF6B00).withOpacity(0.8),
+                                fontSize: 14,
+                              ),
+                            ),
+                            // Show pending change in fiat if available
+                            if (walletProvider.balance.pendingChange > 0) ...[
+                              Text(
+                                ' + ${currencyProvider.formatFiatAmount(walletProvider.balance.pendingChange)}',
+                                style: TextStyle(
+                                  color: Colors.green.withOpacity(0.6),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                            if (walletProvider.balance.total > (walletProvider.balance.spendable + walletProvider.balance.pendingChange)) ...[
+                              Text(
+                                ' / ${currencyProvider.formatFiatAmount(walletProvider.balance.total)}',
+                                style: TextStyle(
+                                  color: const Color(0xFFFF6B00).withOpacity(0.5),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                      // Show pending change info
+                      if (walletProvider.balance.pendingChange > 0) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.green.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.schedule,
+                                size: 14,
+                                color: Colors.green,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '${walletProvider.balance.formattedPendingChange} BTCZ change returning from recent send (will be spendable soon)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      // Add unspendable balance section
+                      if (walletProvider.balance.total > (walletProvider.balance.spendable + walletProvider.balance.pendingChange)) ...[
+                        const SizedBox(height: 12),
+                        // Unspendable Balance Header
+                        Row(
+                          children: [
+                            Text(
+                              'Unspendable Balance',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                              ),
+                              child: Text(
+                                'Need Confirmations',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        // Unspendable Amount
                         Text(
-                          currencyProvider.formatFiatAmount(walletProvider.balance.spendable),
+                          (walletProvider.balance.total - walletProvider.balance.spendable - walletProvider.balance.pendingChange).toStringAsFixed(8),
                           style: TextStyle(
-                            color: const Color(0xFFFF6B00).withOpacity(0.8),
-                            fontSize: 14,
+                            color: Colors.orange.withOpacity(0.8),
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (currencyProvider.currentPrice != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            currencyProvider.formatFiatAmount(walletProvider.balance.total - walletProvider.balance.spendable - walletProvider.balance.pendingChange),
+                            style: TextStyle(
+                              color: Colors.orange.withOpacity(0.6),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.hourglass_empty,
+                                size: 14,
+                                color: Colors.blue,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Shielded funds need 2 confirmations to become spendable (~4 minutes)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.blue,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -259,7 +586,80 @@ class _SendScreenModernState extends State<SendScreenModern> {
                   ),
                 ),
                 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                
+                // Confirmation Requirements Info Card
+                if (walletProvider.balance.total > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 16,
+                              color: Colors.blue,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'About Fund Confirmations',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'BitcoinZ uses different confirmation requirements for different transaction types to ensure security and privacy.',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 11,
+                            height: 1.4,
+                          ),
+                        ),
+                        if (walletProvider.balance.total > walletProvider.balance.spendable) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            '• Transparent funds: Ready after 1 confirmation (~2 minutes)',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 10,
+                              height: 1.3,
+                            ),
+                          ),
+                          Text(
+                            '• Shielded funds: Require 2 confirmations for privacy (~4 minutes)',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 10,
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'This ensures your transactions remain private and secure.',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 9,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 
                 // Recipient Address Field
                 Column(
@@ -416,36 +816,49 @@ class _SendScreenModernState extends State<SendScreenModern> {
                             fontSize: 18,
                           ),
                           prefixIcon: Padding(
-                            padding: const EdgeInsets.only(left: 16, right: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             child: _isFiatInput 
                                 ? Icon(
                                     Icons.attach_money,
                                     color: Colors.white.withOpacity(0.5),
-                                    size: 20,
+                                    size: 24,
                                   )
-                                : SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.currency_bitcoin,
-                                          color: Colors.white.withOpacity(0.5),
-                                          size: 20,
-                                        ),
-                                        Positioned(
-                                          bottom: 3,
-                                          child: Text(
-                                            'Z',
-                                            style: TextStyle(
-                                              color: Colors.white.withOpacity(0.7),
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
+                                : Container(
+                                    width: 28,
+                                    height: 28,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: Image.asset(
+                                        'assets/images/bitcoinz_logo.png',
+                                        width: 28,
+                                        height: 28,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          // Fallback to bitcoin icon if image fails to load
+                                          return Container(
+                                            width: 28,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              gradient: const LinearGradient(
+                                                colors: [
+                                                  Color(0xFFFF6B00),
+                                                  Color(0xFFFFAA00),
+                                                ],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              borderRadius: BorderRadius.circular(4),
                                             ),
-                                          ),
-                                        ),
-                                      ],
+                                            child: Center(
+                                              child: Icon(
+                                                Icons.currency_bitcoin,
+                                                color: Colors.white.withOpacity(0.9),
+                                                size: 18,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                           ),
@@ -470,6 +883,9 @@ class _SendScreenModernState extends State<SendScreenModern> {
                           }
                           if (!_canSend(walletProvider)) {
                             final totalNeeded = amount + _estimatedFee;
+                            if (walletProvider.balance.total >= totalNeeded && walletProvider.balance.spendable < totalNeeded) {
+                              return 'Funds need confirmations before spending';
+                            }
                             return 'Need ${totalNeeded.toStringAsFixed(8)} BTCZ (includes fee)';
                           }
                           return null;
@@ -572,13 +988,29 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                       ),
                                       const SizedBox(width: 6),
                                       Expanded(
-                                        child: Text(
-                                          'Need ${totalNeeded.toStringAsFixed(8)} BTCZ total (${amount.toStringAsFixed(8)} + ${_estimatedFee.toStringAsFixed(8)} fee)',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.orange,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Need ${totalNeeded.toStringAsFixed(8)} BTCZ total (${amount.toStringAsFixed(8)} + ${_estimatedFee.toStringAsFixed(8)} fee)',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.orange,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            if (walletProvider.balance.total > walletProvider.balance.spendable)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 2),
+                                                child: Text(
+                                                  '${(walletProvider.balance.total - walletProvider.balance.spendable).toStringAsFixed(8)} BTCZ awaiting confirmations (typically 2-6 minutes)',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.orange.withOpacity(0.8),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       ),
                                     ],
