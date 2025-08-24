@@ -393,43 +393,52 @@ class _PinSetupScreenState extends State<PinSetupScreen>
                 ),
               ),
               
-              // PIN Keypad
+              // PIN Keypad with constrained size
               Flexible(
                 flex: 3,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    // Numbers 1-3
-                    Row(
-                      children: [
-                        _buildPinButton('1'),
-                        _buildPinButton('2'),
-                        _buildPinButton('3'),
-                      ],
-                    ),
-                    // Numbers 4-6
-                    Row(
-                      children: [
-                        _buildPinButton('4'),
-                        _buildPinButton('5'),
-                        _buildPinButton('6'),
-                      ],
-                    ),
-                    // Numbers 7-9
-                    Row(
-                      children: [
-                        _buildPinButton('7'),
-                        _buildPinButton('8'),
-                        _buildPinButton('9'),
-                      ],
-                    ),
-                    // Bottom row
-                    Row(
-                      children: [
-                        _buildEmptyButton(),
-                        _buildPinButton('0'),
-                        _buildDeleteButton(),
-                      ],
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: ResponsiveUtils.getPinKeypadWidth(context),
+                      ),
+                      child: Column(
+                        children: [
+                          // Numbers 1-3
+                          Row(
+                            children: [
+                              _buildPinButton('1'),
+                              _buildPinButton('2'),
+                              _buildPinButton('3'),
+                            ],
+                          ),
+                          // Numbers 4-6
+                          Row(
+                            children: [
+                              _buildPinButton('4'),
+                              _buildPinButton('5'),
+                              _buildPinButton('6'),
+                            ],
+                          ),
+                          // Numbers 7-9
+                          Row(
+                            children: [
+                              _buildPinButton('7'),
+                              _buildPinButton('8'),
+                              _buildPinButton('9'),
+                            ],
+                          ),
+                          // Bottom row
+                          Row(
+                            children: [
+                              _buildEmptyButton(),
+                              _buildPinButton('0'),
+                              _buildDeleteButton(),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

@@ -5,6 +5,7 @@ import 'package:bip39/bip39.dart' as bip39;
 import '../../providers/auth_provider.dart';
 import '../../providers/wallet_provider.dart';
 import '../../utils/constants.dart';
+import '../../widgets/wallet_creation_progress_dialog.dart';
 import 'seed_phrase_display_screen.dart';
 
 class CreateWalletScreen extends StatefulWidget {
@@ -19,7 +20,6 @@ class _CreateWalletScreenState extends State<CreateWalletScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   
-  bool _isGenerating = false;
   String? _generatedSeedPhrase;
   int? _birthdayBlock;
 
@@ -50,38 +50,45 @@ class _CreateWalletScreenState extends State<CreateWalletScreen>
   }
 
   Future<void> _generateWallet() async {
-    setState(() {
-      _isGenerating = true;
-    });
-
-    try {
-      // Get wallet provider
-      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-      
-      // Generate new wallet via Rust Bridge (gets seed + birthday)
-      final walletData = await walletProvider.generateNewWallet();
-      
-      // Add a small delay for better UX
-      await Future.delayed(const Duration(milliseconds: 1500));
-      
-      setState(() {
-        _generatedSeedPhrase = walletData['seed'] as String;
-        _birthdayBlock = walletData['birthday'] as int;
-        _isGenerating = false;
-      });
-
-      if (mounted) {
-        _navigateToSeedDisplay();
-      }
-    } catch (e) {
-      setState(() {
-        _isGenerating = false;
-      });
-      
-      if (mounted) {
-        _showErrorDialog('Failed to generate wallet: $e');
-      }
-    }
+    HapticFeedback.lightImpact();
+    
+    // Show professional progress dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WalletCreationProgressDialog(
+          onCreateWallet: () async {
+            final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+            return await walletProvider.generateNewWallet();
+          },
+          onSuccess: (walletData) {
+            // Close progress dialog
+            Navigator.of(context).pop();
+            
+            // Set the generated data
+            setState(() {
+              _generatedSeedPhrase = walletData['seed'] as String;
+              _birthdayBlock = walletData['birthday'] as int?;
+            });
+            
+            // Navigate to seed display after a brief delay
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                _navigateToSeedDisplay();
+              }
+            });
+          },
+          onError: (String error) {
+            // Close progress dialog
+            Navigator.of(context).pop();
+            
+            // Show error dialog
+            _showErrorDialog('Failed to generate wallet: $error');
+          },
+        );
+      },
+    );
   }
 
   void _navigateToSeedDisplay() {
@@ -231,7 +238,7 @@ class _CreateWalletScreenState extends State<CreateWalletScreen>
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: _isGenerating ? null : _generateWallet,
+                          onPressed: _generateWallet,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Colors.white,
@@ -240,37 +247,13 @@ class _CreateWalletScreenState extends State<CreateWalletScreen>
                             ),
                             elevation: 4,
                           ),
-                          child: _isGenerating
-                              ? Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    const Text(
-                                      'Generating Wallet...',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : const Text(
-                                  'Generate New Wallet',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                          child: const Text(
+                            'Generate New Wallet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),

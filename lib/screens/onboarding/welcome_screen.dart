@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../utils/constants.dart';
 import '../../providers/wallet_provider.dart';
+import '../../widgets/wallet_creation_progress_dialog.dart';
 import 'seed_phrase_display_screen.dart';
 import 'restore_wallet_screen.dart';
 
@@ -65,103 +66,77 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   void _navigateToCreateWallet() async {
     HapticFeedback.lightImpact();
     
-    // Show loading dialog
+    // Show professional progress dialog
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return Center(
-          child: Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2A2A2A),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B00)),
+        return WalletCreationProgressDialog(
+          onCreateWallet: () async {
+            final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+            return await walletProvider.generateNewWallet();
+          },
+          onSuccess: (walletData) {
+            // Store the navigator reference before closing the dialog
+            final navigator = Navigator.of(context);
+            
+            // Close progress dialog
+            navigator.pop();
+            
+            // Navigate to seed display immediately without delay to prevent navigation issues
+            if (mounted) {
+              navigator.push(
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      SeedPhraseDisplayScreen(
+                        seedPhrase: walletData['seed'] as String,
+                        birthdayBlock: walletData['birthday'] as int?,
+                      ),
+                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(1.0, 0.0),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    );
+                  },
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Creating Your Wallet...',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+              );
+            }
+          },
+          onError: (String error) {
+            // Close progress dialog
+            Navigator.of(context).pop();
+            
+            // Show error dialog
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                backgroundColor: const Color(0xFF2A2A2A),
+                title: const Text(
+                  'Error',
+                  style: TextStyle(color: Colors.white),
+                ),
+                content: Text(
+                  'Failed to generate wallet: $error',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(color: Color(0xFFFF6B00)),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
-    
-    try {
-      // Get wallet provider and generate new wallet
-      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-      final walletData = await walletProvider.generateNewWallet();
-      
-      // Add a small delay for better UX
-      await Future.delayed(const Duration(milliseconds: 1500));
-      
-      // Close loading dialog
-      if (mounted) Navigator.of(context).pop();
-      
-      // Navigate directly to seed display
-      if (mounted) {
-        Navigator.of(context).push(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                SeedPhraseDisplayScreen(
-                  seedPhrase: walletData['seed'] as String,
-                  birthdayBlock: walletData['birthday'] as int?,
-                ),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(1.0, 0.0),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              );
-            },
-          ),
-        );
-      }
-    } catch (e) {
-      // Close loading dialog
-      if (mounted) Navigator.of(context).pop();
-      
-      // Show error dialog
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: const Color(0xFF2A2A2A),
-            title: const Text(
-              'Error',
-              style: TextStyle(color: Colors.white),
-            ),
-            content: Text(
-              'Failed to generate wallet: $e',
-              style: TextStyle(color: Colors.white70),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text(
-                  'OK',
-                  style: TextStyle(color: Color(0xFFFF6B00)),
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-    }
   }
 
   void _navigateToRestoreWallet() {
