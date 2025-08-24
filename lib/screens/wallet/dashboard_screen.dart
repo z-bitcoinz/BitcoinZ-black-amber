@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../providers/wallet_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/balance_card.dart';
 import 'send_screen.dart';
 import 'receive_screen.dart';
 import 'transactions_screen.dart';
@@ -127,7 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             slivers: [
               // App Bar
               SliverAppBar(
-                expandedHeight: 120,
+                expandedHeight: 100,  // Reduced height for more content space
                 floating: false,
                 pinned: true,
                 backgroundColor: Theme.of(context).colorScheme.primary,
@@ -169,9 +170,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ],
               ),
 
-              // Balance Section
+              // Professional Balance Card
               SliverToBoxAdapter(
-                child: _buildBalanceSection(walletProvider),
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),  // Reduced margins for compactness
+                  child: const BalanceCard(),
+                ),
               ),
 
               // Quick Actions
@@ -190,179 +194,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildBalanceSection(WalletProvider walletProvider) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: Card(
-        elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                Theme.of(context).colorScheme.secondary.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              // Total Balance
-              Text(
-                'Total Balance',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${Formatters.formatBtcz(walletProvider.balance.total)} BTCZ',
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
 
-              // Balance Breakdown
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildBalanceItem(
-                      'Transparent',
-                      walletProvider.balance.transparent,
-                      Icons.visibility,
-                      Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildBalanceItem(
-                      'Shielded',
-                      walletProvider.balance.shielded,
-                      Icons.security,
-                      Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-
-              // Sync Status
-              if (walletProvider.needsSync) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.sync_problem,
-                        size: 16,
-                        color: Colors.orange,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Sync recommended',
-                        style: TextStyle(
-                          color: Colors.orange,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBalanceItem(String title, double amount, IconData icon, Color color) {
-    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    final isTransparent = title == 'Transparent';
-    final hasUnconfirmed = isTransparent 
-        ? walletProvider.balance.hasUnconfirmedTransparentBalance
-        : walletProvider.balance.hasUnconfirmedShieldedBalance;
-    final unconfirmedAmount = isTransparent
-        ? walletProvider.balance.unconfirmedTransparent
-        : walletProvider.balance.unconfirmedShielded;
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            Formatters.formatBtcz(amount),
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          // Show confirming indicator if there are unconfirmed transactions
-          if (hasUnconfirmed) ...[
-            const SizedBox(height: 6),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 10,
-                  height: 10,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    'Confirming: ${Formatters.formatBtcz(unconfirmedAmount)}',
-                    style: TextStyle(
-                      color: Colors.orange.shade700,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _buildQuickActions() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),  // Consistent reduced margins
       child: Row(
         children: [
           Expanded(
@@ -434,9 +270,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     final recentTransactions = walletProvider.recentTransactions;
     
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 16),  // Consistent margins, extra bottom
       child: Card(
         elevation: 4,
+        color: Theme.of(context).colorScheme.surface,  // Explicit background to prevent blur bleeding
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),

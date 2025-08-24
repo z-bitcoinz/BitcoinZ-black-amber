@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui';
+import 'dart:io';
 import '../providers/wallet_provider.dart';
 import '../providers/currency_provider.dart';
+import '../utils/responsive.dart';
 
 class BalanceCard extends StatefulWidget {
   const BalanceCard({super.key});
@@ -63,84 +65,82 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                   ),
                 ),
               ),
-              // Main card with glassmorphism
-              ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF2A2A2A).withOpacity(0.95),
-                          const Color(0xFF1F1F1F).withOpacity(0.9),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.08),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        // Inner shadow for depth
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 20,
-                          offset: const Offset(0, 4),
-                        ),
+              // Main card with clean glassmorphism - NO BackdropFilter!
+              Container(
+                  padding: EdgeInsets.fromLTRB(
+                    24, 
+                    ResponsiveUtils.getBalanceTopPadding(context), 
+                    24, 
+                    24
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF2A2A2A).withOpacity(0.95),
+                        const Color(0xFF1F1F1F).withOpacity(0.9),
                       ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Total Balance Section
-                    Text(
-                      'Total Balance',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.5,
+                    borderRadius: BorderRadius.circular(28), // Visual rounding only, no clipping
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.08),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      // Multiple shadow layers for depth without blur bleeding
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 15,
+                        spreadRadius: -5,
+                        offset: const Offset(0, 8),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    
-                    AnimatedBuilder(
-                      animation: _shimmerAnimation,
-                      builder: (context, child) {
-                        return ShaderMask(
-                          shaderCallback: (bounds) {
-                            return LinearGradient(
-                              colors: [
-                                Colors.white,
-                                Colors.white.withOpacity(0.9),
-                                Colors.white,
-                              ],
-                              stops: [
-                                _shimmerAnimation.value - 0.3,
-                                _shimmerAnimation.value,
-                                _shimmerAnimation.value + 0.3,
-                              ],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ).createShader(bounds);
-                          },
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.1),
+                        blurRadius: 10,
+                        spreadRadius: -8,
+                        offset: const Offset(0, -2),
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFFFF6B00).withOpacity(0.1),
+                        blurRadius: 20,
+                        spreadRadius: -10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Total Balance Section
+                      Text(
+                        'Total Balance',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      
+                      // Simplified balance text with explicit height - NO COMPLEX EFFECTS!
+                      Container(
+                        height: ResponsiveUtils.getBalanceContainerHeight(context),
+                        child: Center(
                           child: Text(
-                            walletProvider.balance.formattedTotal,  // Always show balance (defaults to 0)
-                            style: const TextStyle(
+                            walletProvider.balance.formattedTotal,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
                               color: Colors.white,
-                              fontSize: 32,
+                              fontSize: ResponsiveUtils.getBalanceTextSize(context),
                               fontWeight: FontWeight.bold,
-                              letterSpacing: -1,
-                              height: 1.2,
+                              letterSpacing: Platform.isIOS || Platform.isAndroid ? -0.5 : -1, // Less aggressive on mobile
+                              height: ResponsiveUtils.getBalanceTextHeight(context),
                             ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
                     
                     // Show fiat value if available
                     if (walletProvider.hasWallet && currencyProvider.currentPrice != null) ...[
@@ -214,11 +214,9 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                   ],
                 ),
               ),
-            ),
+            ],
           ),
-          ],
-        ),
-      );
+        );
       },
     );
   }

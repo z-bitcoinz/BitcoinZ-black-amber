@@ -213,4 +213,27 @@ class ResponsiveUtils {
     if (isSmallDesktop(context) || isLimitedHeight(context)) return 12.0;
     return getHorizontalPadding(context);
   }
+
+  // Balance-specific responsive sizing
+  static double getBalanceTextSize(BuildContext context) {
+    if (isSmallMobile(context)) return 24.0;  // Smaller for tight screens
+    if (isMobile(context)) return 28.0;       // Reduced from 32px for mobile
+    return 32.0;                              // Keep desktop size
+  }
+
+  static double getBalanceTextHeight(BuildContext context) {
+    if (isMobile(context)) return 1.2;        // Tighter line height for mobile
+    return 1.4;                               // Desktop line height
+  }
+
+  static double getBalanceContainerHeight(BuildContext context) {
+    if (isSmallMobile(context)) return 35.0;  // More compact for small screens
+    if (isMobile(context)) return 40.0;       // Reduced mobile height
+    return 50.0;                              // Reduced desktop height
+  }
+
+  static double getBalanceTopPadding(BuildContext context) {
+    if (isMobile(context)) return 40.0;       // Reduced mobile padding for compactness
+    return 36.0;                              // Reduced desktop padding
+  }
 }
