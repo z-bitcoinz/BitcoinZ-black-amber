@@ -25,10 +25,10 @@ This is a Flutter-based BitcoinZ wallet app that replicates the functionality of
   - 1-second background updates for all wallet data
   - Cached state for instant synchronous access
 
-### 4. BitcoinZ Light CLI Service
-- **BtczCliService** (`lib/services/btcz_cli_service.dart`)
-  - Direct interface to bitcoinz-light-cli executable
-  - Path: `/Users/name/Documents/code/bitcoinz-mobile-wallet/btcz-light-cli/bitcoinz-light-cli-v1.0.0-macos-arm64/bitcoinz-light-cli-new`
+### 4. Flutter Rust Bridge Service
+- **BitcoinzRustService** (`lib/services/bitcoinz_rust_service.dart`)
+  - Direct interface to Rust native library via Flutter Rust Bridge
+  - Native library: `flutter_app/rust/` (Flutter Rust Bridge implementation)
   - Server: `https://lightd.btcz.rocks:9067`
 
 ## Important Implementation Details
@@ -92,12 +92,12 @@ flutter run -d macos
 
 ## Future Improvements
 
-### Phase 5: Native Module Integration
-When ready to integrate the actual native Rust/C++ library:
-1. Build `libzecwalletlitelib.dylib` from BitcoinZ Blue source
-2. Place in appropriate platform directories
-3. Update NativeBridge to use FFI calls instead of CLI bridge
-4. Remove CLI dependencies once native module is stable
+### Phase 5: Flutter Rust Bridge Integration ✅ COMPLETE
+Native Rust library integration has been successfully implemented:
+1. ✅ Flutter Rust Bridge (`flutter_app/rust/`) with full BitcoinZ wallet functionality
+2. ✅ Native libraries for all platforms (Android, iOS, macOS, Windows, Linux)
+3. ✅ Direct FFI calls to Rust for all wallet operations
+4. ✅ Server connection and sync working properly
 
 ### Additional Features to Port
 - Price fetching and currency conversion
@@ -135,4 +135,4 @@ When ready to integrate the actual native Rust/C++ library:
 - Light Wallet Server: https://lightd.btcz.rocks:9067
 
 ## Last Updated
-2025-08-08 - Complete BitcoinZ Blue logic integration with CLI bridge
+2025-08-24 - Complete Flutter Rust Bridge integration with native library, server connection working

@@ -36,6 +36,8 @@ class AppConstants {
   static const String autoLockEnabledKey = 'auto_lock_enabled';
   static const String themeKey = 'theme_mode';
   static const String languageKey = 'language';
+  static const String currentServerKey = 'current_server_url';
+  static const String customServersKey = 'custom_servers_list';
   
   // API Configuration
   static const Duration requestTimeout = Duration(seconds: 30);

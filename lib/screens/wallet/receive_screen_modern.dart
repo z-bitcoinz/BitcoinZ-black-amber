@@ -563,10 +563,46 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
                                 color: Colors.white.withOpacity(0.3),
                                 fontSize: 16,
                               ),
-                              prefixIcon: Icon(
-                                Icons.currency_bitcoin,
-                                color: Colors.white.withOpacity(0.5),
-                                size: 20,
+                              prefixIcon: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                child: Container(
+                                  width: 28,
+                                  height: 28,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Image.asset(
+                                      'assets/images/bitcoinz_logo.png',
+                                      width: 28,
+                                      height: 28,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        // Fallback to bitcoin icon if image fails to load
+                                        return Container(
+                                          width: 28,
+                                          height: 28,
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFFFF6B00),
+                                                Color(0xFFFFAA00),
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.currency_bitcoin,
+                                              color: Colors.white.withOpacity(0.9),
+                                              size: 18,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
                               ),
                               suffixText: 'BTCZ',
                               suffixStyle: TextStyle(

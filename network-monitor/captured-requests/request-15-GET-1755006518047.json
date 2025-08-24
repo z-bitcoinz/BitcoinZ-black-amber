@@ -1,0 +1,53 @@
+{
+  "id": 15,
+  "timestamp": "2025-08-12T13:48:37.968Z",
+  "url": "https://top-fwz1.mail.ru/tracker?_=0.09321869785298587;id=3676037;u=https%3A%2F%2Fstreaming-elbrus.su%2Fdillers%2F;r=https%3A%2F%2Fstreaming-elbrus.su%2Fuser%2FSimbav911%2F;title=Yo!;s=1280*800;vp=5760*3240;touch=0;hds=0.3333333432674408;sid=fe463e46cfffae69;ver=60.6.0;tz=-60%2FEurope%2FDublin;st=1755006458746;ct=281/284/284/285/259;rt=260/20/278/0/0/260/260/260/260/260/260/278/278/280;gl=u;ni=10//4g/100/0/;detect=0;lvid=1755006391354%3A1755006517966%3A21%3A923ddb694575aada422f9b0664624069;opts=wda%2Ccdt%3Dcache%2Ccnhp%3Dh2%2Ccs%3D19408-47823-0;fpid=ZRo_mSf8Kg4JJqqRMeAgZ;visible=true;js=13;e=CE%3A%2F_click%3Boutgoing%3Bjavascript%3ABillingTariff.TariffSelect(46259)",
+  "method": "GET",
+  "headers": {
+    "sec-ch-ua-platform": "\"macOS\"",
+    "referer": "https://streaming-elbrus.su/",
+    "accept-language": "en-US,en;q=0.9",
+    "sec-ch-ua": "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "sec-ch-ua-mobile": "?0",
+    "accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+  },
+  "queryParams": "_=0.09321869785298587%3Bid%3D3676037%3Bu%3Dhttps%3A%2F%2Fstreaming-elbrus.su%2Fdillers%2F%3Br%3Dhttps%3A%2F%2Fstreaming-elbrus.su%2Fuser%2FSimbav911%2F%3Btitle%3DYo%21%3Bs%3D1280*800%3Bvp%3D5760*3240%3Btouch%3D0%3Bhds%3D0.3333333432674408%3Bsid%3Dfe463e46cfffae69%3Bver%3D60.6.0%3Btz%3D-60%2FEurope%2FDublin%3Bst%3D1755006458746%3Bct%3D281%2F284%2F284%2F285%2F259%3Brt%3D260%2F20%2F278%2F0%2F0%2F260%2F260%2F260%2F260%2F260%2F260%2F278%2F278%2F280%3Bgl%3Du%3Bni%3D10%2F%2F4g%2F100%2F0%2F%3Bdetect%3D0%3Blvid%3D1755006391354%3A1755006517966%3A21%3A923ddb694575aada422f9b0664624069%3Bopts%3Dwda%2Ccdt%3Dcache%2Ccnhp%3Dh2%2Ccs%3D19408-47823-0%3Bfpid%3DZRo_mSf8Kg4JJqqRMeAgZ%3Bvisible%3Dtrue%3Bjs%3D13%3Be%3DCE%3A%2F_click%3Boutgoing%3Bjavascript%3ABillingTariff.TariffSelect%2846259%29",
+  "triggeredBy": {
+    "tagName": "A",
+    "text": "Тариф",
+    "href": "javascript:BillingTariff.TariffSelect(46259)",
+    "onclick": null,
+    "className": "btn btn-tariff",
+    "id": "",
+    "timestamp": "2025-08-12T13:48:37.962Z"
+  },
+  "actionGroup": "Click_15_Тариф",
+  "isBillingRequest": true,
+  "response": {
+    "status": 200,
+    "headers": {
+      "accept-ch": "DPR, Width, Viewport-Width, Downlink, Device-Memory, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA, Sec-CH-UA-Full-Version",
+      "accept-ch-lifetime": "86400",
+      "access-control-allow-credentials": "true",
+      "access-control-allow-headers": "*",
+      "access-control-allow-methods": "GET, POST, HEAD, PUT, OPTIONS",
+      "access-control-allow-origin": "*",
+      "access-control-expose-headers": "AMP-Access-Control-Allow-Source-Origin",
+      "amp-access-control-allow-source-origin": "*",
+      "cache-control": "private, no-cache, no-store, max-age=0",
+      "content-length": "43",
+      "content-type": "image/gif",
+      "date": "Tue, 12 Aug 2025 13:48:38 GMT",
+      "p3p": "CP=\"NOI DSP COR NID CUR PSA OUR NOR\"",
+      "pragma": "no-cache",
+      "server": "nginx",
+      "set-cookie": "FTID=2DOlpP2yHeYY:1755006518:3676037:::; path=/; expires=Thu, 13-Aug-26 13:48:38 GMT; domain=.mail.ru; HttpOnly; SameSite=None; Secure\ntmr_lvid=316b196f1b076fc026e037a11c98fdd5; path=/; expires=Thu, 13-Aug-26 13:48:38 GMT; domain=.mail.ru; Secure\ntmr_lvidTS=1755006518000; path=/; expires=Thu, 13-Aug-26 13:48:38 GMT; domain=.mail.ru; Secure",
+      "timing-allow-origin": "*",
+      "x-content-type-options": "nosniff"
+    },
+    "body": "GIF89a\u0001\u0000\u0001\u0000�\u0000\u0000���\u0000\u0000\u0000!�\u0004\u0001\u0000\u0000\u0000\u0000,\u0000\u0000\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0002\u0002D\u0001\u0000;",
+    "type": "text",
+    "fullLength": 43
+  }
+}

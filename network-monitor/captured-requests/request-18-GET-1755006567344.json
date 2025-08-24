@@ -1,0 +1,47 @@
+{
+  "id": 18,
+  "timestamp": "2025-08-12T13:49:22.488Z",
+  "url": "https://streaming-elbrus.su/engine/ajax/controller.php?mod=BillingAjax&plugin=tariff&tariff_id=17&utariff_id=0&days=32&pay=1&reseller_id=46259",
+  "method": "GET",
+  "headers": {
+    "sec-ch-ua-platform": "\"macOS\"",
+    "referer": "https://streaming-elbrus.su/dillers/",
+    "accept-language": "en-US,en;q=0.9",
+    "sec-ch-ua": "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "sec-ch-ua-mobile": "?0",
+    "x-requested-with": "XMLHttpRequest",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "accept": "*/*",
+    "cookie": "LWvddos-ZX=0f1f3c0da6f0cfd49db484130447be9b; tmr_lvid=923ddb694575aada422f9b0664624069; tmr_lvidTS=1755006391354; domain_sid=ZRo_mSf8Kg4JJqqRMeAgZ%3A1755006392115; dle_user_id=38615; dle_password=7ee415ead58eb861d90cf13f0a0cea69; dle_newpm=91; tmr_detect=0%7C1755006461063; PHPSESSID=27smjghmc6oceoriiofov2sk4d"
+  },
+  "queryParams": "mod=BillingAjax&plugin=tariff&tariff_id=17&utariff_id=0&days=32&pay=1&reseller_id=46259",
+  "triggeredBy": {
+    "tagName": "SPAN",
+    "text": "АКТИВИРОВАТЬ ТАРИФ",
+    "onclick": null,
+    "className": "",
+    "id": "",
+    "timestamp": "2025-08-12T13:49:22.478Z"
+  },
+  "actionGroup": "Click_18_АКТИВИРОВАТЬ_ТАРИФ",
+  "isBillingRequest": true,
+  "module": "BillingAjax",
+  "plugin": "tariff",
+  "response": {
+    "status": 200,
+    "headers": {
+      "cache-control": "no-store, no-cache, must-revalidate",
+      "content-encoding": "gzip",
+      "content-length": "453",
+      "content-type": "text/html; charset=utf-8",
+      "date": "Tue, 12 Aug 2025 13:49:27 GMT",
+      "expires": "Thu, 19 Nov 1981 08:52:00 GMT",
+      "pragma": "no-cache",
+      "server": "Tengine",
+      "vary": "Accept-Encoding"
+    },
+    "body": "<div id='paytarifftpl' title='Активация тарифа \"Yosso Premium\"' style='    background: #26262b;display:none'>\n\n\t<link media=\"screen\" href=\"/templates/Default/billing/css/styles.css\" type=\"text/css\" rel=\"stylesheet\" />\n\n\t\n\n\t\n\n\t\n\n\t\n\n\t\n\n\t\n\n\t\n\n\t\n\n\t\n\n\t\n\t\t<center style=\"    color: #fff;\"><p><b>Оплата выполнена</b><br>\n\t\tВы подключили тариф Yosso Premium  до 13.09.2025 16:49   Для его активации перезайдите в личный кабинет.\n\t\t<br>\n\t\t\t\t<a href=\"/dillers/\" class=\"price__btn\" >\n\t\t\t\t\tОбновить страницу\n\t\t\t\t</a>\t\t\n\t\t</p></center>\n\t\n</div>\n",
+    "type": "text",
+    "fullLength": 532
+  }
+}

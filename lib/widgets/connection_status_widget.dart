@@ -22,8 +22,13 @@ class ConnectionStatusWidget extends StatelessWidget {
         IconData statusIcon;
         bool showSpinner = false;
         
-        if (isSyncing && syncProgress < 100) {
-          // Show sync progress inline (not as overlay)
+        if (!isConnected) {
+          // Show disconnected status - RED
+          statusText = provider.connectionStatus;
+          statusColor = Colors.red;
+          statusIcon = Icons.wifi_off;
+        } else if (isSyncing) {
+          // Show sync progress - BLUE (only when actively syncing)
           if (batchTotal > 0) {
             statusText = 'Batch ${batchNum}/${batchTotal}';
           } else {
@@ -32,14 +37,12 @@ class ConnectionStatusWidget extends StatelessWidget {
           statusColor = Colors.blue;
           statusIcon = Icons.sync;
           showSpinner = true;
-        } else if (!isConnected) {
-          // Show disconnected status
-          statusText = provider.connectionStatus;
-          statusColor = Colors.orange;
-          statusIcon = Icons.wifi_off;
         } else {
-          // Connected and not syncing - hide widget
-          return const SizedBox.shrink();
+          // Connected and not syncing - GREEN (ready state)
+          // Don't show text for ready state - the green check icon is sufficient
+          statusText = '';
+          statusColor = Colors.green;
+          statusIcon = Icons.check_circle;
         }
         
         return Container(
@@ -71,16 +74,18 @@ class ConnectionStatusWidget extends StatelessWidget {
                   color: statusColor,
                 ),
               ],
-              const SizedBox(width: 6),
-              Text(
-                statusText,
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+              if (statusText.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              if (isSyncing && syncProgress > 0) ...[
+              ],
+              if (isSyncing && syncProgress > 0 && syncProgress < 100) ...[
                 const SizedBox(width: 4),
                 Text(
                   '${syncProgress.toStringAsFixed(0)}%',

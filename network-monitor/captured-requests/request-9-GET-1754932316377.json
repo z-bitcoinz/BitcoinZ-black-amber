@@ -1,0 +1,40 @@
+{
+  "id": 9,
+  "timestamp": "2025-08-11T17:11:56.271Z",
+  "url": "https://top-fwz1.mail.ru/tracker?_=0.7771413987441862;id=3676037;u=https%3A%2F%2Fstreaming-elbrus.su%2F;title=Yosso%20TV%20Billing%20(by%20citrus);s=1280*800;vp=1920*1080;touch=0;hds=1;sid=06650996618ed092;ver=60.6.0;tz=-60%2FEurope%2FDublin;st=1754932316001;nt=0/0/1754932315491/427/427///8/8/8/8/8//214/419/422/429/510/520/522/775/775/775;ct=529/532/532/534/489;rt=490/0/0/0/0/490/490/490/490/490/490/490/490/490;gl=u;ni=6.5//4g/200/0/;detect=0;lvid=1754932298728%3A1754932316267%3A6%3A2778cea403ccf6b99767791980312e2b;opts=wda%2Ccdt%3Dcache%2Ccnhp%3Dh2%2Ccs%3D19408-47823-0;fpid=zNDV4oed0yCsMNrL_Kdm5;visible=true;js=13;e=RT%2Fload;et=1754932316266",
+  "method": "GET",
+  "headers": {
+    "sec-ch-ua-platform": "\"macOS\"",
+    "referer": "https://streaming-elbrus.su/",
+    "accept-language": "en-US,en;q=0.9",
+    "sec-ch-ua": "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "sec-ch-ua-mobile": "?0",
+    "accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+  },
+  "queryParams": "_=0.7771413987441862%3Bid%3D3676037%3Bu%3Dhttps%3A%2F%2Fstreaming-elbrus.su%2F%3Btitle%3DYosso+TV+Billing+%28by+citrus%29%3Bs%3D1280*800%3Bvp%3D1920*1080%3Btouch%3D0%3Bhds%3D1%3Bsid%3D06650996618ed092%3Bver%3D60.6.0%3Btz%3D-60%2FEurope%2FDublin%3Bst%3D1754932316001%3Bnt%3D0%2F0%2F1754932315491%2F427%2F427%2F%2F%2F8%2F8%2F8%2F8%2F8%2F%2F214%2F419%2F422%2F429%2F510%2F520%2F522%2F775%2F775%2F775%3Bct%3D529%2F532%2F532%2F534%2F489%3Brt%3D490%2F0%2F0%2F0%2F0%2F490%2F490%2F490%2F490%2F490%2F490%2F490%2F490%2F490%3Bgl%3Du%3Bni%3D6.5%2F%2F4g%2F200%2F0%2F%3Bdetect%3D0%3Blvid%3D1754932298728%3A1754932316267%3A6%3A2778cea403ccf6b99767791980312e2b%3Bopts%3Dwda%2Ccdt%3Dcache%2Ccnhp%3Dh2%2Ccs%3D19408-47823-0%3Bfpid%3DzNDV4oed0yCsMNrL_Kdm5%3Bvisible%3Dtrue%3Bjs%3D13%3Be%3DRT%2Fload%3Bet%3D1754932316266",
+  "response": {
+    "status": 200,
+    "headers": {
+      "accept-ch": "DPR, Width, Viewport-Width, Downlink, Device-Memory, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA, Sec-CH-UA-Full-Version",
+      "accept-ch-lifetime": "86400",
+      "access-control-allow-credentials": "true",
+      "access-control-allow-headers": "*",
+      "access-control-allow-methods": "GET, POST, HEAD, PUT, OPTIONS",
+      "access-control-allow-origin": "*",
+      "access-control-expose-headers": "AMP-Access-Control-Allow-Source-Origin",
+      "amp-access-control-allow-source-origin": "*",
+      "cache-control": "private, no-cache, no-store, max-age=0",
+      "content-length": "43",
+      "content-type": "image/gif",
+      "date": "Mon, 11 Aug 2025 17:11:56 GMT",
+      "p3p": "CP=\"NOI DSP COR NID CUR PSA OUR NOR\"",
+      "pragma": "no-cache",
+      "server": "nginx",
+      "set-cookie": "FTID=2v-5Kj1VUeIY:1754932316:3676037:::; path=/; expires=Wed, 12-Aug-26 17:11:56 GMT; domain=.mail.ru; HttpOnly; SameSite=None; Secure\ntmr_lvid=21a860f07caad51c3cecac250b7dbe5a; path=/; expires=Wed, 12-Aug-26 17:11:56 GMT; domain=.mail.ru; Secure\ntmr_lvidTS=1754932316000; path=/; expires=Wed, 12-Aug-26 17:11:56 GMT; domain=.mail.ru; Secure",
+      "timing-allow-origin": "*",
+      "x-content-type-options": "nosniff"
+    },
+    "body": "GIF89a\u0001\u0000\u0001\u0000�\u0000\u0000���\u0000\u0000\u0000!�\u0004\u0001\u0000\u0000\u0000\u0000,\u0000\u0000\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0002\u0002D\u0001\u0000;"
+  }
+}

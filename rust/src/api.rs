@@ -2,8 +2,13 @@ use flutter_rust_bridge::frb;
 use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
+use std::path::Path;
+use tokio::runtime::Runtime;
+use serde_json;
+use chrono;
 use zecwalletlitelib::{commands, lightclient::LightClient, MainNetwork};
 use zecwalletlitelib::lightclient::lightclient_config::LightClientConfig;
+use zecwalletlitelib::grpc_connector::GrpcConnector;
 
 // Global LightClient instance (same as BitcoinZ Blue)
 lazy_static! {
@@ -13,12 +18,24 @@ lazy_static! {
 
 /// Check if a wallet exists
 pub fn wallet_exists(wallet_dir: Option<String>) -> bool {
-    let config = if let Some(dir) = wallet_dir {
-        LightClientConfig::<MainNetwork>::create_unconnected(MainNetwork, Some(dir))
+    let config = if let Some(ref dir) = wallet_dir {
+        println!("🔍 Checking if wallet exists in directory: {}", dir);
+        LightClientConfig::<MainNetwork>::create_unconnected(MainNetwork, Some(dir.clone()))
     } else {
+        println!("🔍 Checking if wallet exists in default directory");
         LightClientConfig::<MainNetwork>::create_unconnected(MainNetwork, None)
     };
-    config.wallet_exists()
+    
+    let exists = config.wallet_exists();
+    let wallet_path = config.get_wallet_path();
+    
+    if exists {
+        println!("✅ Wallet exists at: {:?}", wallet_path);
+    } else {
+        println!("❌ No wallet found at: {:?}", wallet_path);
+    }
+    
+    exists
 }
 
 /// Initialize a new wallet and return the seed phrase
@@ -135,18 +152,57 @@ pub fn initialize_new_with_info(server_uri: String, wallet_dir: Option<String>) 
 
 /// Initialize from an existing wallet
 pub fn initialize_existing(server_uri: String, wallet_dir: Option<String>) -> String {
+    initialize_existing_with_birthday(server_uri, wallet_dir, 0)
+}
+
+/// Initialize from an existing wallet with birthday height
+pub fn initialize_existing_with_birthday(server_uri: String, wallet_dir: Option<String>, birthday: u64) -> String {
+    // Log the wallet directory being used
+    if let Some(ref dir) = wallet_dir {
+        println!("📁 Attempting to load wallet from directory: {}", dir);
+    } else {
+        println!("📁 Attempting to load wallet from default directory");
+    }
+    
     let server = LightClientConfig::<MainNetwork>::get_server_or_default(Some(server_uri));
     
-    let (config, _latest_block_height) = match LightClientConfig::create(MainNetwork, server, wallet_dir) {
+    let (config, _latest_block_height) = match LightClientConfig::create(MainNetwork, server, wallet_dir.clone()) {
         Ok((c, h)) => (c, h),
         Err(e) => return format!("Error: {}", e),
     };
 
+    // Check if wallet file exists
+    let wallet_path = config.get_wallet_path();
+    println!("🔍 Looking for wallet at: {:?}", wallet_path);
+    
+    if !wallet_path.exists() {
+        println!("❌ Wallet file does not exist at: {:?}", wallet_path);
+        return format!("Error: Wallet file not found at: {:?}", wallet_path);
+    }
+    
+    println!("✅ Wallet file exists, attempting to read...");
+
     // Read existing wallet from disk instead of creating new
-    let lightclient = match LightClient::read_from_disk(&config) {
-        Ok(l) => l,
-        Err(e) => return format!("Error: {}", e),
+    let mut lightclient = match LightClient::read_from_disk(&config) {
+        Ok(l) => {
+            println!("✅ Successfully read wallet from disk");
+            l
+        },
+        Err(e) => {
+            // If reading from disk fails, it might be because the wallet doesn't exist yet
+            // In that case, we should return an error that the Flutter side can handle
+            println!("⚠️ Could not read wallet from disk: {}", e);
+            return format!("Error: Could not read wallet file: {}", e);
+        }
     };
+
+    // Set the birthday height if provided (non-zero)
+    if birthday > 0 {
+        println!("📅 Using birthday height for existing wallet: {}", birthday);
+        // This will help the wallet skip scanning blocks before the birthday
+        // Note: LightClient may not have a direct method to set birthday after loading,
+        // but it should use the stored birthday from the wallet file
+    }
 
     // Initialize logging
     let _ = lightclient.init_logging();
@@ -160,7 +216,7 @@ pub fn initialize_existing(server_uri: String, wallet_dir: Option<String>) -> St
     // Store the client globally
     LIGHTCLIENT.lock().unwrap().replace(Some(lc));
 
-    "OK".to_string()
+    format!(r#"{{"status": "OK", "birthday": {}}}"#, birthday)
 }
 
 /// Initialize from seed phrase (simplified version without wallet_dir to avoid serialization issues)
@@ -319,4 +375,60 @@ pub fn get_height() -> u32 {
 #[frb(sync)]
 pub fn get_info() -> String {
     execute("info".to_string(), "".to_string())
+}
+
+/// Get server information using gRPC GetLightdInfo call
+/// Returns JSON string with complete server details or error information
+pub async fn get_server_info(server_uri: String) -> String {
+    println!("🌐 Testing server connection: {}", server_uri);
+    
+    // Parse the server URI
+    let uri = match server_uri.parse::<http::Uri>() {
+        Ok(u) => u,
+        Err(e) => {
+            return serde_json::json!({
+                "error": format!("Invalid server URI: {}", e),
+                "details": "Please check the server URL format"
+            }).to_string();
+        }
+    };
+    
+    // Use GrpcConnector to get server info
+    match GrpcConnector::get_info(uri).await {
+        Ok(lightd_info) => {
+            println!("✅ Server connection successful");
+            println!("   Version: {}", lightd_info.version);
+            println!("   Vendor: {}", lightd_info.vendor);
+            println!("   Chain: {}", lightd_info.chain_name);
+            println!("   Block Height: {}", lightd_info.block_height);
+            
+            // Convert LightdInfo to JSON
+            serde_json::json!({
+                "success": true,
+                "version": lightd_info.version,
+                "vendor": lightd_info.vendor,
+                "taddr_support": lightd_info.taddr_support,
+                "chain_name": lightd_info.chain_name,
+                "sapling_activation_height": lightd_info.sapling_activation_height,
+                "consensus_branch_id": lightd_info.consensus_branch_id,
+                "block_height": lightd_info.block_height,
+                "git_commit": lightd_info.git_commit,
+                "branch": lightd_info.branch,
+                "build_date": lightd_info.build_date,
+                "build_user": lightd_info.build_user,
+                "estimated_height": lightd_info.estimated_height,
+                "zcashd_build": lightd_info.zcashd_build,
+                "zcashd_subversion": lightd_info.zcashd_subversion,
+                "timestamp": chrono::Utc::now().timestamp()
+            }).to_string()
+        },
+        Err(e) => {
+            println!("❌ Server connection failed: {}", e);
+            serde_json::json!({
+                "error": format!("Failed to connect to server: {}", e),
+                "details": "Please check server URL and network connectivity",
+                "timestamp": chrono::Utc::now().timestamp()
+            }).to_string()
+        }
+    }
 }

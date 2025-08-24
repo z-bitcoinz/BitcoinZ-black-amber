@@ -15,6 +15,11 @@ class MainScreen extends StatefulWidget {
 
   @override
   State<MainScreen> createState() => _MainScreenState();
+
+  // Static method to access the current instance
+  static _MainScreenState? of(BuildContext context) {
+    return context.findAncestorStateOfType<_MainScreenState>();
+  }
 }
 
 class _MainScreenState extends State<MainScreen>
@@ -151,7 +156,7 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
-  void _onNavItemTapped(int index) {
+  void onNavItemTapped(int index) {
     if (_currentIndex == index) return;
     
     setState(() {
@@ -219,7 +224,7 @@ class _MainScreenState extends State<MainScreen>
             ),
             child: BottomNavigationBar(
               currentIndex: _currentIndex,
-              onTap: _onNavItemTapped,
+              onTap: onNavItemTapped,
               items: _navItems,
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.transparent,

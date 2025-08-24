@@ -14,7 +14,9 @@ import '../models/address_model.dart';
 import '../services/database_service.dart';
 import '../services/bitcoinz_rust_service.dart';
 import '../providers/auth_provider.dart';
+import '../providers/network_provider.dart';
 import '../screens/wallet/paginated_transaction_history_screen.dart';
+import '../utils/constants.dart';
 
 class WalletProvider with ChangeNotifier {
   WalletModel? _wallet;
@@ -29,6 +31,9 @@ class WalletProvider with ChangeNotifier {
   String _connectionStatus = 'Disconnected';
   DateTime? _lastConnectionCheck;
   Timer? _syncTimer;
+  
+  // Network provider reference
+  NetworkProvider? _networkProvider;
   
   // Sync progress tracking (like BitcoinZ Blue)
   int _syncedBlocks = 0;
@@ -220,6 +225,15 @@ class WalletProvider with ChangeNotifier {
   double get syncSpeed => _syncSpeed;
   Duration? get estimatedTimeRemaining => _estimatedTimeRemaining;
   
+  // Network provider methods
+  void setNetworkProvider(NetworkProvider networkProvider) {
+    _networkProvider = networkProvider;
+  }
+  
+  String get currentServerUrl {
+    return _networkProvider?.currentServerUrl ?? AppConstants.defaultLightwalletdServer;
+  }
+  
   // Pagination getters
   bool get hasMoreTransactions => _hasMoreTransactions;
   bool get isLoadingMore => _isLoadingMore;
@@ -257,7 +271,7 @@ class WalletProvider with ChangeNotifier {
           
           // Create a temporary wallet to establish server connection
           final tempInitialized = await _rustService.initialize(
-            serverUri: 'https://lightd.btcz.rocks:9067',
+            serverUri: currentServerUrl,
             createNew: true, // Create a temporary new wallet
           );
           
@@ -371,7 +385,7 @@ class WalletProvider with ChangeNotifier {
             print('   Note: This is a fresh wallet creation');
           }
           final rustInitialized = await _rustService.initialize(
-            serverUri: 'https://lightd.btcz.rocks:9067',
+            serverUri: currentServerUrl,
             createNew: true,  // Create new wallet
           );
           
@@ -404,7 +418,7 @@ class WalletProvider with ChangeNotifier {
         }
         
         final rustInitialized = await _rustService.initialize(
-          serverUri: 'https://lightd.btcz.rocks:9067',
+          serverUri: currentServerUrl,
           seedPhrase: seedPhrase,
           createNew: false,
           birthdayHeight: birthdayToUse,
@@ -487,7 +501,7 @@ class WalletProvider with ChangeNotifier {
       // Restore wallet directly via Rust Bridge
       if (kDebugMode) print('🦀 Restoring wallet via Rust Bridge...');
       final rustInitialized = await _rustService.initialize(
-        serverUri: 'https://lightd.btcz.rocks:9067',
+        serverUri: currentServerUrl,
         seedPhrase: seedPhrase,
         createNew: false,
       );
@@ -618,7 +632,7 @@ class WalletProvider with ChangeNotifier {
       // Start background Rust service initialization (without seed phrase)
       // This prepares the service and starts network sync
       final result = await _rustService.initialize(
-        serverUri: 'https://lightd.btcz.rocks:9067',
+        serverUri: currentServerUrl,
         createNew: false,
         seedPhrase: null, // Don't provide seed until authenticated
         birthdayHeight: null, // Will be set later during full restoration
@@ -843,7 +857,7 @@ class WalletProvider with ChangeNotifier {
           }
           
           rustInitialized = await _rustService.initialize(
-            serverUri: 'https://lightd.btcz.rocks:9067',
+            serverUri: currentServerUrl,
             createNew: false,  // Don't create new
             seedPhrase: null,  // Don't provide seed, load existing
             birthdayHeight: birthdayToUse > 0 ? birthdayToUse : null,  // Pass valid birthday or null
@@ -877,7 +891,7 @@ class WalletProvider with ChangeNotifier {
             }
             
             rustInitialized = await _rustService.initialize(
-              serverUri: 'https://lightd.btcz.rocks:9067',
+              serverUri: currentServerUrl,
               seedPhrase: seedPhrase,
               createNew: false, // Restore from seed
               birthdayHeight: birthdayToUse > 0 ? birthdayToUse : null, // CRITICAL: Pass birthday height!
@@ -1033,7 +1047,7 @@ class WalletProvider with ChangeNotifier {
         
         // Initialize Rust Bridge with seed phrase
         final rustInitialized = await _rustService.initialize(
-          serverUri: 'https://lightd.btcz.rocks:9067',
+          serverUri: currentServerUrl,
           seedPhrase: seedPhrase,
           createNew: false, // Restore from seed
         );
@@ -1256,7 +1270,7 @@ class WalletProvider with ChangeNotifier {
           
           if (seedPhrase != null) {
             final connected = await _rustService.initialize(
-              serverUri: 'https://lightd.btcz.rocks:9067',
+              serverUri: currentServerUrl,
               seedPhrase: seedPhrase,
               createNew: false,
             );

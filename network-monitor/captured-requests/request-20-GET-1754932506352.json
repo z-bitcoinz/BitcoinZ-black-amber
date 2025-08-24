@@ -1,0 +1,18 @@
+{
+  "id": 20,
+  "timestamp": "2025-08-11T17:15:06.351Z",
+  "url": "https://streaming-elbrus.su/engine/ajax/controller.php?mod=BillingAjax&plugin=tariff&tariff_id=19&utariff_id=0&days=0&pay=0&reseller_id=44881",
+  "method": "GET",
+  "headers": {
+    "sec-ch-ua-platform": "\"macOS\"",
+    "referer": "https://streaming-elbrus.su/dillers/",
+    "accept-language": "en-US,en;q=0.9",
+    "sec-ch-ua": "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "sec-ch-ua-mobile": "?0",
+    "x-requested-with": "XMLHttpRequest",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "accept": "*/*",
+    "cookie": "LWvddos-ZX=5c3d6ece1df6d0dbd4271fc7bb3e9ad0; tmr_lvid=2778cea403ccf6b99767791980312e2b; tmr_lvidTS=1754932298728; domain_sid=zNDV4oed0yCsMNrL_Kdm5%3A1754932299589; dle_user_id=38615; dle_password=7ee415ead58eb861d90cf13f0a0cea69; dle_newpm=89; tmr_detect=0%7C1754932408263; PHPSESSID=hlvgssoetme6da5vtib5s40p09"
+  },
+  "queryParams": "mod=BillingAjax&plugin=tariff&tariff_id=19&utariff_id=0&days=0&pay=0&reseller_id=44881"
+}

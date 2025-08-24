@@ -3,8 +3,11 @@ import 'package:provider/provider.dart';
 import 'currency_settings_screen.dart';
 import 'change_pin_screen.dart';
 import 'backup_wallet_screen.dart';
+import 'help_screen.dart';
+import 'network_settings_screen.dart';
 import '../../providers/currency_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/network_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -69,6 +72,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
               
               const SizedBox(height: 24),
               
+              // Network settings
+              Consumer<NetworkProvider>(
+                builder: (context, networkProvider, child) {
+                  final currentServer = networkProvider.getServerInfo(networkProvider.currentServerUrl);
+                  return _buildSettingsSection(
+                    title: 'Network',
+                    children: [
+                      _buildSettingsTile(
+                        context: context,
+                        icon: Icons.wifi,
+                        title: 'Server Settings',
+                        subtitle: currentServer?.displayName ?? 'Unknown Server',
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (networkProvider.currentServerInfo != null)
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Colors.green,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NetworkSettingsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
+              
+              const SizedBox(height: 24),
+              
               // Security settings
               _buildSettingsSection(
                 title: 'Security',
@@ -125,6 +172,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => const BackupWalletScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Help & Support section
+              _buildSettingsSection(
+                title: 'Help & Support',
+                children: [
+                  _buildSettingsTile(
+                    context: context,
+                    icon: Icons.help_outline,
+                    title: 'Balance & Transactions Guide',
+                    subtitle: 'Learn about balance types and transaction states',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HelpScreen(),
                         ),
                       );
                     },

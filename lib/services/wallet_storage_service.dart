@@ -15,10 +15,11 @@ class WalletStorageService {
     Directory baseDir;
     
     if (Platform.isAndroid) {
-      // Android: Use app's document directory
-      // Path: /data/data/com.bitcoinz.blackamber/app_flutter/bitcoinz-black-amber/
-      final docDir = await getApplicationDocumentsDirectory();
-      baseDir = Directory(path.join(docDir.path, appDirName));
+      // Android: Use app's support directory for persistent storage
+      // Documents directory can be cleared by system, use application support instead
+      // Path: /data/data/com.bitcoinz.wallet/files/bitcoinz-black-amber/
+      final appSupportDir = await getApplicationSupportDirectory();
+      baseDir = Directory(path.join(appSupportDir.path, appDirName));
     } else if (Platform.isIOS) {
       // iOS: Use documents directory (backed up to iCloud by default)
       // Path: ../Documents/bitcoinz-black-amber/

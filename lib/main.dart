@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import 'providers/wallet_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/currency_provider.dart';
+import 'providers/network_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/constants.dart';
 import 'services/bitcoinz_service.dart';
@@ -110,7 +111,15 @@ class BitcoinZWalletApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => WalletProvider()),
+        ChangeNotifierProvider(create: (_) => NetworkProvider()),
+        ChangeNotifierProvider(
+          create: (context) {
+            final walletProvider = WalletProvider();
+            final networkProvider = Provider.of<NetworkProvider>(context, listen: false);
+            walletProvider.setNetworkProvider(networkProvider);
+            return walletProvider;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => CurrencyProvider()),
       ],
       child: Consumer<AuthProvider>(

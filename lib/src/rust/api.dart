@@ -30,6 +30,14 @@ Future<String> initializeExisting(
     RustLib.instance.api
         .crateApiInitializeExisting(serverUri: serverUri, walletDir: walletDir);
 
+/// Initialize from an existing wallet with birthday height
+Future<String> initializeExistingWithBirthday(
+        {required String serverUri,
+        String? walletDir,
+        required BigInt birthday}) =>
+    RustLib.instance.api.crateApiInitializeExistingWithBirthday(
+        serverUri: serverUri, walletDir: walletDir, birthday: birthday);
+
 /// Initialize from seed phrase (simplified version without wallet_dir to avoid serialization issues)
 Future<String> initializeFromPhraseSimple(
         {required String serverUri, required String seedPhrase}) =>
@@ -87,3 +95,8 @@ int getHeight() => RustLib.instance.api.crateApiGetHeight();
 
 /// Get info
 String getInfo() => RustLib.instance.api.crateApiGetInfo();
+
+/// Get server information using gRPC GetLightdInfo call
+/// Returns JSON string with complete server details or error information
+Future<String> getServerInfo({required String serverUri}) =>
+    RustLib.instance.api.crateApiGetServerInfo(serverUri: serverUri);

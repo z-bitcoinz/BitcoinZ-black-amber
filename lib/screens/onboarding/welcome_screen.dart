@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../utils/constants.dart';
-import 'create_wallet_screen.dart';
+import '../../providers/wallet_provider.dart';
+import 'seed_phrase_display_screen.dart';
 import 'restore_wallet_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -60,23 +62,106 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     super.dispose();
   }
 
-  void _navigateToCreateWallet() {
+  void _navigateToCreateWallet() async {
     HapticFeedback.lightImpact();
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const CreateWalletScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(1.0, 0.0),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          );
-        },
-      ),
+    
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Center(
+          child: Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2A2A2A),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B00)),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Creating Your Wallet...',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
+    
+    try {
+      // Get wallet provider and generate new wallet
+      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+      final walletData = await walletProvider.generateNewWallet();
+      
+      // Add a small delay for better UX
+      await Future.delayed(const Duration(milliseconds: 1500));
+      
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+      
+      // Navigate directly to seed display
+      if (mounted) {
+        Navigator.of(context).push(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                SeedPhraseDisplayScreen(
+                  seedPhrase: walletData['seed'] as String,
+                  birthdayBlock: walletData['birthday'] as int?,
+                ),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              );
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show error dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: const Color(0xFF2A2A2A),
+            title: const Text(
+              'Error',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: Text(
+              'Failed to generate wallet: $e',
+              style: TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(color: Color(0xFFFF6B00)),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 
   void _navigateToRestoreWallet() {
@@ -101,6 +186,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF1A1A1A),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -120,10 +206,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           width: 100,
                           height: 100,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
+                            gradient: const LinearGradient(
                               colors: [
-                                Theme.of(context).colorScheme.primary,
-                                Theme.of(context).colorScheme.secondary,
+                                Color(0xFFFF6B00),
+                                Color(0xFFFFAA00),
                               ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -131,7 +217,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                color: const Color(0xFFFF6B00).withOpacity(0.3),
                                 blurRadius: 20,
                                 offset: const Offset(0, 10),
                               ),
@@ -140,16 +226,18 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           child: const Icon(
                             Icons.account_balance_wallet,
                             size: 48,
-                            color: Colors.white,
+                            color: Colors.black87,
                           ),
                         ),
                         const SizedBox(height: 12),
                         
-                        Text(
+                        const Text(
                           'Welcome to\nBitcoinZ Wallet',
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          style: TextStyle(
+                            fontSize: 28,
                             fontWeight: FontWeight.bold,
+                            color: Colors.white,
                             height: 1.2,
                           ),
                         ),
@@ -158,8 +246,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         Text(
                           'Your secure, private, and decentralized\ncryptocurrency wallet',
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white.withOpacity(0.7),
                             height: 1.4,
                           ),
                         ),
@@ -205,24 +294,39 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   mainAxisSize: MainAxisSize.min,
                     children: [
                       // Create New Wallet Button
-                      SizedBox(
+                      Container(
                         width: double.infinity,
                         height: 56,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF6B00), Color(0xFFFFAA00)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF6B00).withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
                         child: ElevatedButton(
                           onPressed: _navigateToCreateWallet,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(28),
                             ),
-                            elevation: 4,
                           ),
                           child: const Text(
                             'Create New Wallet',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
+                              color: Colors.white,
                             ),
                           ),
                         ),
@@ -236,17 +340,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         child: OutlinedButton(
                           onPressed: _navigateToRestoreWallet,
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Theme.of(context).colorScheme.primary,
-                            side: BorderSide(
-                              color: Theme.of(context).colorScheme.primary,
+                            foregroundColor: const Color(0xFFFF6B00),
+                            side: const BorderSide(
+                              color: Color(0xFFFF6B00),
                               width: 2,
                             ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(28),
                             ),
                           ),
                           child: const Text(
-                            'Restore Existing Wallet',
+                            'Restore Wallet',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -272,12 +376,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            color: const Color(0xFFFF6B00).withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
             icon,
-            color: Theme.of(context).colorScheme.primary,
+            color: const Color(0xFFFF6B00),
             size: 20,
           ),
         ),
@@ -288,7 +392,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             children: [
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                style: const TextStyle(
+                  color: Colors.white,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
@@ -296,8 +401,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               const SizedBox(height: 2),
               Text(
                 description,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
                   fontSize: 12,
                 ),
               ),

@@ -1,0 +1,22 @@
+{
+  "id": 4,
+  "timestamp": "2025-08-12T13:46:33.182Z",
+  "url": "https://privacy-cs.mail.ru/fp/?id=ZRo_mSf8Kg4JJqqRMeAgZ",
+  "method": "POST",
+  "headers": {
+    "sec-ch-ua-platform": "\"macOS\"",
+    "referer": "https://streaming-elbrus.su/",
+    "accept-language": "en-US,en;q=0.9",
+    "sec-ch-ua": "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "content-type": "application/json",
+    "sec-ch-ua-mobile": "?0",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "accept": "*/*",
+    "origin": "https://streaming-elbrus.su"
+  },
+  "postData": "{\"asyncMetrics\":{\"testWebGL\":{\"extensionsParams_hash\":\"a7298b9481f0081225c12a82f279cb86\",\"_status\":\"0\"},\"testAudio\":{\"total_hash\":\"d81b43cfdecec797a1e97b8170410a99\",\"_status\":\"0\"},\"testFontPreferences\":{\"total_hash\":\"d1fd242a287d8c17f25e818d3b03bca1\"},\"testCanvas2d\":{\"paintCpuURI_hash\":\"c1576ec7ded3b2f857a61a6b5e274f3f\",\"_status\":\"0\"}},\"script\":{\"v\":\"v4.0.0\",\"b_id\":\"152552442\"},\"navigator\":{\"language\":\"en-US (en-US)\",\"plugins_hash\":\"f8a4506236a7ac2d7ac1251468bbdc2b\",\"properties_hash\":\"9f4537995651c24c72cb717f06bbb76e\",\"userAgent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36\"},\"screen\":{\"availableScreenResolution\":\"800;1280\",\"screenResolution\":\"800;1280\"},\"asyncMetricsStrategy\":\"immediate\",\"sendReason\":3}",
+  "queryParams": "id=ZRo_mSf8Kg4JJqqRMeAgZ",
+  "triggeredBy": null,
+  "actionGroup": null,
+  "isBillingRequest": false
+}

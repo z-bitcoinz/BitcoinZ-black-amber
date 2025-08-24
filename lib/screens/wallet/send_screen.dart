@@ -425,40 +425,8 @@ class _SendScreenState extends State<SendScreen>
                                       ),
                                     ],
                                     
-                                    if (walletProvider.balance.hasUnconfirmedBalance) ...[
-                                      const SizedBox(height: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange.withOpacity(0.15),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            SizedBox(
-                                              width: 10,
-                                              height: 10,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 1.5,
-                                                valueColor: AlwaysStoppedAnimation<Color>(
-                                                  Colors.orange,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              'Confirming: ${walletProvider.balance.formattedUnconfirmed}',
-                                              style: const TextStyle(
-                                                color: Colors.orange,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
+                                    // Removed redundant "Confirming:" display from send screen
+                                    // This is already shown on the main dashboard
                                   ],
                                 ),
                               ),

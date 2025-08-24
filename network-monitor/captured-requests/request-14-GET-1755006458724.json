@@ -1,0 +1,27 @@
+{
+  "id": 14,
+  "timestamp": "2025-08-12T13:47:38.724Z",
+  "url": "https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js",
+  "method": "GET",
+  "headers": {
+    "sec-ch-ua-platform": "\"macOS\"",
+    "referer": "https://streaming-elbrus.su/",
+    "accept-language": "en-US,en;q=0.9",
+    "sec-ch-ua": "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "sec-ch-ua-mobile": "?0",
+    "accept": "*/*"
+  },
+  "queryParams": "",
+  "triggeredBy": {
+    "tagName": "A",
+    "text": "ДИЛ-ПАНЕЛЬ",
+    "href": "https://streaming-elbrus.su/dillers/",
+    "onclick": null,
+    "className": "nav-link",
+    "id": "",
+    "timestamp": "2025-08-12T13:47:38.478Z"
+  },
+  "actionGroup": "Click_13_ДИЛ-ПАНЕЛЬ",
+  "isBillingRequest": false
+}

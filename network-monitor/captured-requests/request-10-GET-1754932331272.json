@@ -1,0 +1,16 @@
+{
+  "id": 10,
+  "timestamp": "2025-08-11T17:12:11.271Z",
+  "url": "https://top-fwz1.mail.ru/tracker?_=0.9643963120350989;id=3676037;u=https%3A%2F%2Fstreaming-elbrus.su%2F;title=Yosso%20TV%20Billing%20(by%20citrus);s=1280*800;vp=1920*1080;touch=0;hds=1;sid=06650996618ed092;ver=60.6.0;tz=-60%2FEurope%2FDublin;st=1754932316001;ct=529/532/532/534/489;rt=490/0/0/0/0/490/490/490/490/490/490/490/490/490;gl=u;ni=6.5//4g/200/0/;detect=0;lvid=1754932298728%3A1754932331268%3A7%3A2778cea403ccf6b99767791980312e2b;opts=wda%2Ccdt%3Dcache%2Ccnhp%3Dh2%2Ccs%3D19408-47823-0;fpid=zNDV4oed0yCsMNrL_Kdm5;visible=true;js=13;e=PVT%2F15",
+  "method": "GET",
+  "headers": {
+    "sec-ch-ua-platform": "\"macOS\"",
+    "referer": "https://streaming-elbrus.su/",
+    "accept-language": "en-US,en;q=0.9",
+    "sec-ch-ua": "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "sec-ch-ua-mobile": "?0",
+    "accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+  },
+  "queryParams": "_=0.9643963120350989%3Bid%3D3676037%3Bu%3Dhttps%3A%2F%2Fstreaming-elbrus.su%2F%3Btitle%3DYosso+TV+Billing+%28by+citrus%29%3Bs%3D1280*800%3Bvp%3D1920*1080%3Btouch%3D0%3Bhds%3D1%3Bsid%3D06650996618ed092%3Bver%3D60.6.0%3Btz%3D-60%2FEurope%2FDublin%3Bst%3D1754932316001%3Bct%3D529%2F532%2F532%2F534%2F489%3Brt%3D490%2F0%2F0%2F0%2F0%2F490%2F490%2F490%2F490%2F490%2F490%2F490%2F490%2F490%3Bgl%3Du%3Bni%3D6.5%2F%2F4g%2F200%2F0%2F%3Bdetect%3D0%3Blvid%3D1754932298728%3A1754932331268%3A7%3A2778cea403ccf6b99767791980312e2b%3Bopts%3Dwda%2Ccdt%3Dcache%2Ccnhp%3Dh2%2Ccs%3D19408-47823-0%3Bfpid%3DzNDV4oed0yCsMNrL_Kdm5%3Bvisible%3Dtrue%3Bjs%3D13%3Be%3DPVT%2F15"
+}

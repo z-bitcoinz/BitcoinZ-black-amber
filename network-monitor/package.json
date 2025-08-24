@@ -1,0 +1,18 @@
+{
+  "name": "network-monitor",
+  "version": "1.0.0",
+  "description": "Network request monitor for IPTV provider API endpoint discovery",
+  "main": "network-monitor.js",
+  "scripts": {
+    "start": "node network-monitor.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["puppeteer", "network", "monitoring", "api"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer": "^23.10.0",
+    "fs-extra": "^11.2.0",
+    "chalk": "^4.1.2"
+  }
+}

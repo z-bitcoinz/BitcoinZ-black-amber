@@ -1,0 +1,31 @@
+{
+  "id": 8,
+  "timestamp": "2025-08-12T13:47:30.838Z",
+  "url": "https://streaming-elbrus.su/?do=dillers&d=2",
+  "method": "POST",
+  "headers": {
+    "accept-language": "en-US,en;q=0.9",
+    "content-type": "application/x-www-form-urlencoded",
+    "origin": "https://streaming-elbrus.su",
+    "referer": "https://streaming-elbrus.su/?do=dillers&d=2",
+    "upgrade-insecure-requests": "1",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "sec-ch-ua": "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"macOS\"",
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "cookie": "LWvddos-ZX=0f1f3c0da6f0cfd49db484130447be9b; tmr_lvid=923ddb694575aada422f9b0664624069; tmr_lvidTS=1755006391354; domain_sid=ZRo_mSf8Kg4JJqqRMeAgZ%3A1755006392115; PHPSESSID=fqrmqisjqn87k80vqtvtgleakl; dle_user_id=38615; dle_password=7ee415ead58eb861d90cf13f0a0cea69; dle_newpm=91; tmr_detect=0%7C1755006398156"
+  },
+  "postData": "login_name=Simbav911&login_password=8g9a505hfh8&remember=on&login=submit",
+  "queryParams": "do=dillers&d=2",
+  "triggeredBy": {
+    "tagName": "SPAN",
+    "text": "close",
+    "onclick": null,
+    "className": "ui-icon ui-icon-closethick",
+    "id": "",
+    "timestamp": "2025-08-12T13:46:43.060Z"
+  },
+  "actionGroup": "Click_8_close",
+  "isBillingRequest": false
+}

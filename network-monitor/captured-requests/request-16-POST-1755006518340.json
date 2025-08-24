@@ -1,0 +1,50 @@
+{
+  "id": 16,
+  "timestamp": "2025-08-12T13:48:37.974Z",
+  "url": "https://streaming-elbrus.su/?do=dillers",
+  "method": "POST",
+  "headers": {
+    "sec-ch-ua-platform": "\"macOS\"",
+    "referer": "https://streaming-elbrus.su/dillers/",
+    "accept-language": "en-US,en;q=0.9",
+    "sec-ch-ua": "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+    "sec-ch-ua-mobile": "?0",
+    "x-requested-with": "XMLHttpRequest",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "accept": "*/*",
+    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "cookie": "LWvddos-ZX=0f1f3c0da6f0cfd49db484130447be9b; tmr_lvid=923ddb694575aada422f9b0664624069; tmr_lvidTS=1755006391354; domain_sid=ZRo_mSf8Kg4JJqqRMeAgZ%3A1755006392115; dle_user_id=38615; dle_password=7ee415ead58eb861d90cf13f0a0cea69; dle_newpm=91; PHPSESSID=09e0svpq0ruu9k93u4v27nlm48; tmr_detect=0%7C1755006461063",
+    "origin": "https://streaming-elbrus.su"
+  },
+  "postData": "action=TariffSelect&user_id=46259",
+  "queryParams": "do=dillers",
+  "triggeredBy": {
+    "tagName": "A",
+    "text": "Тариф",
+    "href": "javascript:BillingTariff.TariffSelect(46259)",
+    "onclick": null,
+    "className": "btn btn-tariff",
+    "id": "",
+    "timestamp": "2025-08-12T13:48:37.962Z"
+  },
+  "actionGroup": "Click_15_Тариф",
+  "isBillingRequest": false,
+  "response": {
+    "status": 200,
+    "headers": {
+      "cache-control": "no-store, no-cache, must-revalidate",
+      "content-encoding": "gzip",
+      "content-length": "491",
+      "content-type": "text/html; charset=UTF-8",
+      "date": "Tue, 12 Aug 2025 13:48:38 GMT",
+      "expires": "Thu, 19 Nov 1981 08:52:00 GMT",
+      "pragma": "no-cache",
+      "server": "Tengine",
+      "set-cookie": "PHPSESSID=27smjghmc6oceoriiofov2sk4d; path=/; HttpOnly\ndle_newpm=91; expires=Wed, 12-Aug-2026 13:48:38 GMT; Max-Age=31536000; path=/; HttpOnly",
+      "vary": "Accept-Encoding"
+    },
+    "body": "<div id='paytarifftpl' title='Выбор тарифа' style='    background: #26262b;display:none'>\r\n\r\n\t<link media=\"screen\" href=\"/templates/Default/billing/css/styles.css\" type=\"text/css\" rel=\"stylesheet\" />\r\n\r\n\t\t\t\t\t\t\t\t\t<div class=\"col-12 col-md-6 col-lg-12 col-xl-12\">\r\n\t\t\t\t\t\t\t\t\t\t<div class=\"profile__group\">\r\n\t\t\t\t\t\t\t\t\t\t\t<label class=\"profile__label\" for=\"firstname\">Выберите тариф:</label>\r\n\t\t\t\t\t\t\t\t\t\t\t<select class=\"profile__input\" id=\"diller_select_tariff\">\r\n\t\t\t\t\t\t\t\t\t\t\t\r\n\t\t\t\t\t\t\t\t\t\t\t<option value=\"17\">Yosso Premium</option>\r\n\t\t\t\t\t\t\t\t\t\t\t\r\n\t\t\t\t\t\t\t\t\t\t\t<option value=\"19\">Yosso Premium (with 18+)</option>\r\n\t\t\t\t\t\t\t\t\t\t\t\r\n\t\t\t\t\t\t\t\t\t\t\t\r\n\t\t\t\t\t\t\t\t\t\t\t</select>\r\n\t\t\t\t\t\t\t\t\t\t\t<input type=\"hidden\" id=\"diller_tariff_user_id\" value=\"46259\">\r\n\t\t\t\t\t\t\t\t\t\t</div>\r\n\t\t\t\t\t\t\t\t\t</div>\r\n\r\n<button type=\"button\" class=\"price__btn\" id=\"BillingTariffBtnPayClick\" onclick=\"BillingTariff_Form()\">\r\n\t\t\t\t\t<span>Далее </span>\r\n\t\t\t\t</button>\t\r\n</div>\r\n",
+    "type": "text",
+    "fullLength": 914
+  }
+}

@@ -52,13 +52,9 @@ class WalletCommands {
   Future<void> _loadLibrary() async {
     if (Platform.isMacOS) {
       try {
-        _lib = DynamicLibrary.open('/Users/name/Documents/code/bitcoinz-mobile-wallet/rust_core/target/release/libbitcoinz_mobile.dylib');
+        _lib = DynamicLibrary.open('libbitcoinz_mobile.dylib');
       } catch (e) {
-        try {
-          _lib = DynamicLibrary.open('libbitcoinz_mobile.dylib');
-        } catch (e2) {
-          _lib = DynamicLibrary.open('@executable_path/../Frameworks/libbitcoinz_mobile.dylib');
-        }
+        _lib = DynamicLibrary.open('@executable_path/../Frameworks/libbitcoinz_mobile.dylib');
       }
     } else if (Platform.isAndroid) {
       _lib = DynamicLibrary.open('libbitcoinz_mobile.so');

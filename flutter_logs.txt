@@ -1,0 +1,1379 @@
+[  +12 ms] executing: [/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/] /opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart pub --suppress-analytics deps --json
+                   "flutter",
+                   "flutter_secure_storage",
+                   "qr_flutter",
+                   "flutter_rust_bridge",
+                   "flutter_test",
+                   "flutter_lints",
+                   "flutter",
+                   "flutter_secure_storage",
+                   "qr_flutter",
+                   "flutter_rust_bridge",
+                   "flutter_test",
+                   "flutter_lints",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async"
+                   "async"
+                 "name": "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async"
+                   "async"
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                 "name": "flutter_lints",
+                 "name": "flutter_test",
+                   "flutter",
+                   "fake_async",
+                   "leak_tracker_flutter_testing",
+                   "async",
+                   "flutter",
+                   "fake_async",
+                   "leak_tracker_flutter_testing",
+                   "async",
+                 "name": "leak_tracker_flutter_testing",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter",
+                 "name": "fake_async",
+                   "flutter",
+                   "flutter",
+                   "synchronized",
+                   "synchronized",
+                 "name": "synchronized",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "async",
+                   "async",
+                 "name": "flutter_rust_bridge",
+                   "async",
+                   "async",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                 "name": "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                 "name": "qr_flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_plugin_android_lifecycle",
+                   "flutter",
+                   "flutter_plugin_android_lifecycle",
+                 "name": "flutter_plugin_android_lifecycle",
+                   "flutter"
+                   "flutter"
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter_secure_storage",
+                   "flutter",
+                   "flutter_secure_storage_linux",
+                   "flutter_secure_storage_macos",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_secure_storage_web",
+                   "flutter_secure_storage_windows",
+                   "flutter",
+                   "flutter_secure_storage_linux",
+                   "flutter_secure_storage_macos",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_secure_storage_web",
+                   "flutter_secure_storage_windows",
+                 "name": "flutter_secure_storage_windows",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                 "name": "flutter_secure_storage_platform_interface",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter_secure_storage_web",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_web_plugins",
+                 "name": "flutter_secure_storage_macos",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                 "name": "flutter_secure_storage_linux",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter",
+                   "flutter"
+                   "flutter"
+               "flutter_rust_bridge",
+[ +433 ms] Found plugin flutter_plugin_android_lifecycle at /Users/name/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.28/
+[  +35 ms] Found plugin flutter_secure_storage at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/
+[  +15 ms] Found plugin flutter_secure_storage_linux at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_linux-1.2.3/
+[   +2 ms] Found plugin flutter_secure_storage_macos at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_macos-3.1.3/
+[   +5 ms] Found plugin flutter_secure_storage_web at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_web-1.2.1/
+[   +7 ms] Found plugin flutter_secure_storage_windows at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_windows-3.1.2/
+[  +62 ms] executing: [/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/] /opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart pub --suppress-analytics deps --json
+                   "flutter",
+                   "flutter_secure_storage",
+                   "qr_flutter",
+                   "flutter_rust_bridge",
+                   "flutter_test",
+                   "flutter_lints",
+                   "flutter",
+                   "flutter_secure_storage",
+                   "qr_flutter",
+                   "flutter_rust_bridge",
+                   "flutter_test",
+                   "flutter_lints",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async"
+                   "async"
+                 "name": "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async"
+                   "async"
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                 "name": "flutter_lints",
+                 "name": "flutter_test",
+                   "flutter",
+                   "fake_async",
+                   "leak_tracker_flutter_testing",
+                   "async",
+                   "flutter",
+                   "fake_async",
+                   "leak_tracker_flutter_testing",
+                   "async",
+                 "name": "leak_tracker_flutter_testing",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter",
+                 "name": "fake_async",
+                   "flutter",
+                   "flutter",
+                   "synchronized",
+                   "synchronized",
+                 "name": "synchronized",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "async",
+                   "async",
+                 "name": "flutter_rust_bridge",
+                   "async",
+                   "async",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                 "name": "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                 "name": "qr_flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_plugin_android_lifecycle",
+                   "flutter",
+                   "flutter_plugin_android_lifecycle",
+                 "name": "flutter_plugin_android_lifecycle",
+                   "flutter"
+                   "flutter"
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter_secure_storage",
+                   "flutter",
+                   "flutter_secure_storage_linux",
+                   "flutter_secure_storage_macos",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_secure_storage_web",
+                   "flutter_secure_storage_windows",
+                   "flutter",
+                   "flutter_secure_storage_linux",
+                   "flutter_secure_storage_macos",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_secure_storage_web",
+                   "flutter_secure_storage_windows",
+                 "name": "flutter_secure_storage_windows",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                 "name": "flutter_secure_storage_platform_interface",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter_secure_storage_web",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_web_plugins",
+                 "name": "flutter_secure_storage_macos",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                 "name": "flutter_secure_storage_linux",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter",
+                   "flutter"
+                   "flutter"
+               "flutter_rust_bridge",
+[  +27 ms] Found plugin flutter_plugin_android_lifecycle at /Users/name/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.28/
+[   +1 ms] Found plugin flutter_secure_storage at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/
+[        ] Found plugin flutter_secure_storage_linux at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_linux-1.2.3/
+[        ] Found plugin flutter_secure_storage_macos at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_macos-3.1.3/
+[   +2 ms] Found plugin flutter_secure_storage_web at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_web-1.2.1/
+[   +1 ms] Found plugin flutter_secure_storage_windows at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_windows-3.1.2/
+[  +23 ms] executing: [/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/] /opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart pub --suppress-analytics deps --json
+                   "flutter",
+                   "flutter_secure_storage",
+                   "qr_flutter",
+                   "flutter_rust_bridge",
+                   "flutter_test",
+                   "flutter_lints",
+                   "flutter",
+                   "flutter_secure_storage",
+                   "qr_flutter",
+                   "flutter_rust_bridge",
+                   "flutter_test",
+                   "flutter_lints",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async"
+                   "async"
+                 "name": "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async"
+                   "async"
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                 "name": "flutter_lints",
+                 "name": "flutter_test",
+                   "flutter",
+                   "fake_async",
+                   "leak_tracker_flutter_testing",
+                   "async",
+                   "flutter",
+                   "fake_async",
+                   "leak_tracker_flutter_testing",
+                   "async",
+                 "name": "leak_tracker_flutter_testing",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter",
+                 "name": "fake_async",
+                   "flutter",
+                   "flutter",
+                   "synchronized",
+                   "synchronized",
+                 "name": "synchronized",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "async",
+                   "async",
+                 "name": "flutter_rust_bridge",
+                   "async",
+                   "async",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                 "name": "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                 "name": "qr_flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_plugin_android_lifecycle",
+                   "flutter",
+                   "flutter_plugin_android_lifecycle",
+                 "name": "flutter_plugin_android_lifecycle",
+                   "flutter"
+                   "flutter"
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter_secure_storage",
+                   "flutter",
+                   "flutter_secure_storage_linux",
+                   "flutter_secure_storage_macos",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_secure_storage_web",
+                   "flutter_secure_storage_windows",
+                   "flutter",
+                   "flutter_secure_storage_linux",
+                   "flutter_secure_storage_macos",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_secure_storage_web",
+                   "flutter_secure_storage_windows",
+                 "name": "flutter_secure_storage_windows",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                 "name": "flutter_secure_storage_platform_interface",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter_secure_storage_web",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_web_plugins",
+                 "name": "flutter_secure_storage_macos",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                 "name": "flutter_secure_storage_linux",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter",
+                   "flutter"
+                   "flutter"
+               "flutter_rust_bridge",
+[  +20 ms] Found plugin flutter_plugin_android_lifecycle at /Users/name/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.28/
+[        ] Found plugin flutter_secure_storage at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/
+[        ] Found plugin flutter_secure_storage_linux at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_linux-1.2.3/
+[        ] Found plugin flutter_secure_storage_macos at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_macos-3.1.3/
+[        ] Found plugin flutter_secure_storage_web at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_web-1.2.1/
+[        ] Found plugin flutter_secure_storage_windows at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_windows-3.1.2/
+[  +21 ms] Generating /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+[   +2 ms] gen_dart_plugin_registrant: Starting due to {InvalidatedReasonKind.inputChanged: The following inputs have updated contents: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/.dart_tool/package_config_subset,/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/.dart_tool/flutter_build/dart_plugin_registrant.dart}
+[  +10 ms] executing: [/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/] /opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart pub --suppress-analytics deps --json
+[ +262 ms] executing: /usr/bin/arch -arm64e xcrun devicectl list devices --timeout 5 --json-output /var/folders/r7/yrd33jyx3rx_txsnr_1g3xsr0000gn/T/flutter_tools.l0999b/core_devices.LjdHEn/core_device_list.json
+[   +1 ms] executing: /usr/bin/arch -arm64e xcrun devicectl list devices --timeout 5 --json-output /var/folders/r7/yrd33jyx3rx_txsnr_1g3xsr0000gn/T/flutter_tools.l0999b/core_devices.KzOAHW/core_device_list.json
+                   "flutter",
+                   "flutter_secure_storage",
+                   "qr_flutter",
+                   "flutter_rust_bridge",
+                   "flutter_test",
+                   "flutter_lints",
+                   "flutter",
+                   "flutter_secure_storage",
+                   "qr_flutter",
+                   "flutter_rust_bridge",
+                   "flutter_test",
+                   "flutter_lints",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async"
+                   "async"
+                 "name": "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async"
+                   "async"
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                   "async",
+                 "name": "flutter_lints",
+                 "name": "flutter_test",
+                   "flutter",
+                   "fake_async",
+                   "leak_tracker_flutter_testing",
+                   "async",
+                   "flutter",
+                   "fake_async",
+                   "leak_tracker_flutter_testing",
+                   "async",
+                 "name": "leak_tracker_flutter_testing",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter",
+                 "name": "fake_async",
+                   "flutter",
+                   "flutter",
+                   "synchronized",
+                   "synchronized",
+                 "name": "synchronized",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "async",
+                   "async",
+                 "name": "flutter_rust_bridge",
+                   "async",
+                   "async",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                 "name": "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                 "name": "qr_flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_plugin_android_lifecycle",
+                   "flutter",
+                   "flutter_plugin_android_lifecycle",
+                 "name": "flutter_plugin_android_lifecycle",
+                   "flutter"
+                   "flutter"
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter_secure_storage",
+                   "flutter",
+                   "flutter_secure_storage_linux",
+                   "flutter_secure_storage_macos",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_secure_storage_web",
+                   "flutter_secure_storage_windows",
+                   "flutter",
+                   "flutter_secure_storage_linux",
+                   "flutter_secure_storage_macos",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_secure_storage_web",
+                   "flutter_secure_storage_windows",
+                 "name": "flutter_secure_storage_windows",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                 "name": "flutter_secure_storage_platform_interface",
+                   "flutter",
+                   "flutter",
+                 "name": "flutter_secure_storage_web",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_web_plugins",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface",
+                   "flutter_web_plugins",
+                 "name": "flutter_secure_storage_macos",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                 "name": "flutter_secure_storage_linux",
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter_secure_storage_platform_interface"
+                   "flutter",
+                   "flutter",
+                   "flutter"
+                   "flutter"
+               "flutter_rust_bridge",
+[  +96 ms] Found plugin flutter_plugin_android_lifecycle at /Users/name/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.28/
+[   +2 ms] Found plugin flutter_secure_storage at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/
+[   +1 ms] Found plugin flutter_secure_storage_linux at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_linux-1.2.3/
+[        ] Found plugin flutter_secure_storage_macos at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_macos-3.1.3/
+[        ] Found plugin flutter_secure_storage_web at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_web-1.2.1/
+[        ] Found plugin flutter_secure_storage_windows at /Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage_windows-3.1.2/
+                 "/var/folders/r7/yrd33jyx3rx_txsnr_1g3xsr0000gn/T/flutter_tools.l0999b/core_devices.LjdHEn/core_device_list.json"
+                 "/var/folders/r7/yrd33jyx3rx_txsnr_1g3xsr0000gn/T/flutter_tools.l0999b/core_devices.KzOAHW/core_device_list.json"
+[   +2 ms] /opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dartaotruntime /opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot --sdk-root /opt/homebrew/share/flutter/bin/cache/artifacts/engine/common/flutter_patched_sdk/ --incremental --target=flutter --experimental-emit-debug-metadata -DFLUTTER_VERSION=3.32.8 -DFLUTTER_CHANNEL=stable -DFLUTTER_GIT_URL=https://github.com/flutter/flutter.git -DFLUTTER_FRAMEWORK_REVISION=edada7c56e -DFLUTTER_ENGINE_REVISION=ef0cd00091 -DFLUTTER_DART_VERSION=3.8.1 --output-dill /var/folders/r7/yrd33jyx3rx_txsnr_1g3xsr0000gn/T/flutter_tools.l0999b/flutter_tool.FTMpzl/app.dill --packages /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/.dart_tool/package_config.json -Ddart.vm.profile=false -Ddart.vm.product=false --enable-asserts --track-widget-creation --filesystem-scheme org-dartlang-root --initialize-from-dill build/d7b177071baaf4ee18da1044770cbdc7.cache.dill.track.dill --source file:///Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/.dart_tool/flutter_build/dart_plugin_registrant.dart --source package:flutter/src/dart_plugin_registrant.dart -Dflutter.dart_plugin_registrant=file:///Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/.dart_tool/flutter_build/dart_plugin_registrant.dart --verbosity=error --enable-experiment=alternative-invalidation-strategy
+[   +7 ms] executing: /Users/name/Library/Android/sdk/build-tools/36.0.0/aapt dump xmltree /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/outputs/flutter-apk/app-debug.apk AndroidManifest.xml
+[ +335 ms] Exit code 0 from: /Users/name/Library/Android/sdk/build-tools/36.0.0/aapt dump xmltree /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/outputs/flutter-apk/app-debug.apk AndroidManifest.xml
+               A: package="com.bitcoinz.wallet" (Raw: "com.bitcoinz.wallet")
+                 A: android:name(0x01010003)="com.bitcoinz.wallet.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" (Raw: "com.bitcoinz.wallet.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+                 A: android:name(0x01010003)="com.bitcoinz.wallet.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" (Raw: "com.bitcoinz.wallet.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+                 A: android:label(0x01010001)="BitcoinZ Wallet" (Raw: "BitcoinZ Wallet")
+                   A: android:name(0x01010003)="com.example.flutter_app.MainActivity" (Raw: "com.example.flutter_app.MainActivity")
+                     A: android:name(0x01010003)="io.flutter.embedding.android.NormalTheme" (Raw: "io.flutter.embedding.android.NormalTheme")
+                   A: android:name(0x01010003)="flutterEmbedding" (Raw: "flutterEmbedding")
+                   A: android:name(0x01010003)="dev.fluttercommunity.plus.share.ShareFileProvider" (Raw: "dev.fluttercommunity.plus.share.ShareFileProvider")
+                   A: android:authorities(0x01010018)="com.bitcoinz.wallet.flutter.share_provider" (Raw: "com.bitcoinz.wallet.flutter.share_provider")
+                   A: android:name(0x01010003)="dev.fluttercommunity.plus.share.SharePlusPendingIntent" (Raw: "dev.fluttercommunity.plus.share.SharePlusPendingIntent")
+                   A: android:authorities(0x01010018)="com.bitcoinz.wallet.mlkitinitprovider" (Raw: "com.bitcoinz.wallet.mlkitinitprovider")
+                   A: android:authorities(0x01010018)="com.bitcoinz.wallet.androidx-startup" (Raw: "com.bitcoinz.wallet.androidx-startup")
+[   +3 ms] Using gradle from /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/gradlew.
+[   +1 ms] executing: [/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/] /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/gradlew --full-stacktrace --info -Pverbose=true -Ptarget-platform=android-arm64 -Ptarget=/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/lib/main.dart -Pbase-application-name=android.app.Application -Pdart-defines=RkxVVFRFUl9WRVJTSU9OPTMuMzIuOA==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049ZWRhZGE3YzU2ZQ==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049ZWYwY2QwMDA5MQ==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My44LjE= -Pdart-obfuscation=false -Ptrack-widget-creation=true -Ptree-shake-icons=false -Pfilesystem-scheme=org-dartlang-root assembleDebug
+[   +2 ms] executing: /usr/bin/arch -arm64e xcrun devicectl list devices --timeout 5 --json-output /var/folders/r7/yrd33jyx3rx_txsnr_1g3xsr0000gn/T/flutter_tools.l0999b/core_devices.9AYfDO/core_device_list.json
+                 "/var/folders/r7/yrd33jyx3rx_txsnr_1g3xsr0000gn/T/flutter_tools.l0999b/core_devices.9AYfDO/core_device_list.json"
+[ +503 ms] Now considering [/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android, /opt/homebrew/share/flutter/packages/flutter_tools/gradle] as hierarchies to watch
+[ +399 ms] Now considering [/opt/homebrew/share/flutter/packages/flutter_tools/gradle, /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android] as hierarchies to watch
+[ +372 ms] I/flutter (21297): 🔍 checkConnectionStatus: hasWallet=false, _wallet=null, rustInitialized=true
+[   +4 ms] Evaluating project ':gradle' using build file '/opt/homebrew/share/flutter/packages/flutter_tools/gradle/build.gradle.kts'.
+[        ] file or directory '/opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/java', not found
+[        ] Resolved plugin [id: 'dev.flutter.flutter-plugin-loader', version: '1.0.0']
+[ +187 ms] Settings evaluated using settings file '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/settings.gradle.kts'.
+[        ] Projects loaded. Root project using build file '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/build.gradle.kts'.
+[        ] Included projects: [root project 'android', project ':app', project ':flutter_plugin_android_lifecycle', project ':flutter_secure_storage', project ':local_auth_android', project ':mobile_scanner', project ':path_provider_android', project ':share_plus', project ':shared_preferences_android', project ':sqflite_android']
+[        ] Evaluating project ':app' using build file '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/app/build.gradle.kts'.
+[        ] Resolved plugin [id: 'dev.flutter.flutter-gradle-plugin']
+[        ] Evaluating root project 'android' using build file '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/build.gradle.kts'.
+[ +369 ms] > Configure project :flutter_plugin_android_lifecycle
+[        ] Evaluating project ':flutter_plugin_android_lifecycle' using build file '/Users/name/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.28/android/build.gradle'.
+[ +102 ms] > Configure project :flutter_secure_storage
+[        ] Evaluating project ':flutter_secure_storage' using build file '/Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/android/build.gradle'.
+[ +720 ms] Tasks to be executed: [task ':app:DebugMinSdkCheck', task ':app:preBuild', task ':app:preDebugBuild', task ':app:mergeDebugNativeDebugMetadata', task ':app:checkKotlinGradlePluginConfigurationErrors', task ':app:compileFlutterBuildDebug', task ':app:packJniLibsflutterBuildDebug', task ':flutter_plugin_android_lifecycle:preBuild', task ':flutter_plugin_android_lifecycle:preDebugBuild', task ':flutter_plugin_android_lifecycle:writeDebugAarMetadata', task ':flutter_secure_storage:preBuild', task ':flutter_secure_storage:preDebugBuild', task ':flutter_secure_storage:writeDebugAarMetadata', task ':local_auth_android:preBuild', task ':local_auth_android:preDebugBuild', task ':local_auth_android:writeDebugAarMetadata', task ':mobile_scanner:preBuild', task ':mobile_scanner:preDebugBuild', task ':mobile_scanner:writeDebugAarMetadata', task ':path_provider_android:preBuild', task ':path_provider_android:preDebugBuild', task ':path_provider_android:writeDebugAarMetadata', task ':share_plus:preBuild', task ':share_plus:preDebugBuild', task ':share_plus:writeDebugAarMetadata', task ':shared_preferences_android:preBuild', task ':shared_preferences_android:preDebugBuild', task ':shared_preferences_android:writeDebugAarMetadata', task ':sqflite_android:preBuild', task ':sqflite_android:preDebugBuild', task ':sqflite_android:writeDebugAarMetadata', task ':app:checkDebugAarMetadata', task ':app:cleanMergeDebugAssets', task ':app:mergeDebugShaders', task ':app:compileDebugShaders', task ':app:generateDebugAssets', task ':flutter_plugin_android_lifecycle:mergeDebugShaders', task ':flutter_plugin_android_lifecycle:compileDebugShaders', task ':flutter_plugin_android_lifecycle:generateDebugAssets', task ':flutter_plugin_android_lifecycle:packageDebugAssets', task ':flutter_secure_storage:mergeDebugShaders', task ':flutter_secure_storage:compileDebugShaders', task ':flutter_secure_storage:generateDebugAssets', task ':flutter_secure_storage:packageDebugAssets', task ':local_auth_android:mergeDebugShaders', task ':local_auth_android:compileDebugShaders', task ':local_auth_android:generateDebugAssets', task ':local_auth_android:packageDebugAssets', task ':mobile_scanner:mergeDebugShaders', task ':mobile_scanner:compileDebugShaders', task ':mobile_scanner:generateDebugAssets', task ':mobile_scanner:packageDebugAssets', task ':path_provider_android:mergeDebugShaders', task ':path_provider_android:compileDebugShaders', task ':path_provider_android:generateDebugAssets', task ':path_provider_android:packageDebugAssets', task ':share_plus:mergeDebugShaders', task ':share_plus:compileDebugShaders', task ':share_plus:generateDebugAssets', task ':share_plus:packageDebugAssets', task ':shared_preferences_android:mergeDebugShaders', task ':shared_preferences_android:compileDebugShaders', task ':shared_preferences_android:generateDebugAssets', task ':shared_preferences_android:packageDebugAssets', task ':sqflite_android:mergeDebugShaders', task ':sqflite_android:compileDebugShaders', task ':sqflite_android:generateDebugAssets', task ':sqflite_android:packageDebugAssets', task ':app:mergeDebugAssets', task ':app:copyFlutterAssetsDebug', task ':app:generateDebugResValues', task ':flutter_plugin_android_lifecycle:generateDebugResValues', task ':flutter_plugin_android_lifecycle:generateDebugResources', task ':flutter_plugin_android_lifecycle:packageDebugResources', task ':flutter_secure_storage:generateDebugResValues', task ':flutter_secure_storage:generateDebugResources', task ':flutter_secure_storage:packageDebugResources', task ':local_auth_android:generateDebugResValues', task ':local_auth_android:generateDebugResources', task ':local_auth_android:packageDebugResources', task ':mobile_scanner:generateDebugResValues', task ':mobile_scanner:generateDebugResources', task ':mobile_scanner:packageDebugResources', task ':path_provider_android:generateDebugResValues', task ':path_provider_android:generateDebugResources', task ':path_provider_android:packageDebugResources', task ':share_plus:generateDebugResValues', task ':share_plus:generateDebugResources', task ':share_plus:packageDebugResources', task ':shared_preferences_android:generateDebugResValues', task ':shared_preferences_android:generateDebugResources', task ':shared_preferences_android:packageDebugResources', task ':sqflite_android:generateDebugResValues', task ':sqflite_android:generateDebugResources', task ':sqflite_android:packageDebugResources', task ':app:mapDebugSourceSetPaths', task ':app:generateDebugResources', task ':app:mergeDebugResources', task ':app:packageDebugResources', task ':app:parseDebugLocalResources', task ':app:createDebugCompatibleScreenManifests', task ':app:extractDeepLinksDebug', task ':flutter_plugin_android_lifecycle:extractDeepLinksDebug', task ':flutter_plugin_android_lifecycle:processDebugManifest', task ':flutter_secure_storage:extractDeepLinksDebug', task ':flutter_secure_storage:processDebugManifest', task ':local_auth_android:extractDeepLinksDebug', task ':local_auth_android:processDebugManifest', task ':mobile_scanner:extractDeepLinksDebug', task ':mobile_scanner:processDebugManifest', task ':path_provider_android:extractDeepLinksDebug', task ':path_provider_android:processDebugManifest', task ':share_plus:extractDeepLinksDebug', task ':share_plus:processDebugManifest', task ':shared_preferences_android:extractDeepLinksDebug', task ':shared_preferences_android:processDebugManifest', task ':sqflite_android:extractDeepLinksDebug', task ':sqflite_android:processDebugManifest', task ':app:processDebugMainManifest', task ':app:processDebugManifest', task ':app:processDebugManifestForPackage', task ':flutter_plugin_android_lifecycle:compileDebugLibraryResources', task ':flutter_plugin_android_lifecycle:parseDebugLocalResources', task ':flutter_plugin_android_lifecycle:generateDebugRFile', task ':flutter_secure_storage:compileDebugLibraryResources', task ':flutter_secure_storage:parseDebugLocalResources', task ':flutter_secure_storage:generateDebugRFile', task ':local_auth_android:compileDebugLibraryResources', task ':local_auth_android:parseDebugLocalResources', task ':local_auth_android:generateDebugRFile', task ':mobile_scanner:compileDebugLibraryResources', task ':mobile_scanner:parseDebugLocalResources', task ':mobile_scanner:generateDebugRFile', task ':path_provider_android:compileDebugLibraryResources', task ':path_provider_android:parseDebugLocalResources', task ':path_provider_android:generateDebugRFile', task ':share_plus:compileDebugLibraryResources', task ':share_plus:parseDebugLocalResources', task ':share_plus:generateDebugRFile', task ':shared_preferences_android:compileDebugLibraryResources', task ':shared_preferences_android:parseDebugLocalResources', task ':shared_preferences_android:generateDebugRFile', task ':sqflite_android:compileDebugLibraryResources', task ':sqflite_android:parseDebugLocalResources', task ':sqflite_android:generateDebugRFile', task ':app:processDebugResources', task ':flutter_plugin_android_lifecycle:javaPreCompileDebug', task ':flutter_plugin_android_lifecycle:compileDebugJavaWithJavac', task ':flutter_plugin_android_lifecycle:bundleLibCompileToJarDebug', task ':flutter_secure_storage:generateDebugBuildConfig', task ':flutter_secure_storage:javaPreCompileDebug', task ':flutter_secure_storage:compileDebugJavaWithJavac', task ':flutter_secure_storage:bundleLibCompileToJarDebug', task ':local_auth_android:javaPreCompileDebug', task ':local_auth_android:compileDebugJavaWithJavac', task ':local_auth_android:bundleLibCompileToJarDebug', task ':mobile_scanner:checkKotlinGradlePluginConfigurationErrors', task ':mobile_scanner:compileDebugKotlin', task ':mobile_scanner:javaPreCompileDebug', task ':mobile_scanner:compileDebugJavaWithJavac', task ':mobile_scanner:bundleLibCompileToJarDebug', task ':path_provider_android:javaPreCompileDebug', task ':path_provider_android:compileDebugJavaWithJavac', task ':path_provider_android:bundleLibCompileToJarDebug', task ':share_plus:checkKotlinGradlePluginConfigurationErrors', task ':share_plus:compileDebugKotlin', task ':share_plus:javaPreCompileDebug', task ':share_plus:compileDebugJavaWithJavac', task ':share_plus:bundleLibCompileToJarDebug', task ':shared_preferences_android:checkKotlinGradlePluginConfigurationErrors', task ':shared_preferences_android:compileDebugKotlin', task ':shared_preferences_android:javaPreCompileDebug', task ':shared_preferences_android:compileDebugJavaWithJavac', task ':shared_preferences_android:bundleLibCompileToJarDebug', task ':sqflite_android:javaPreCompileDebug', task ':sqflite_android:compileDebugJavaWithJavac', task ':sqflite_android:bundleLibCompileToJarDebug', task ':app:compileDebugKotlin', task ':app:javaPreCompileDebug', task ':app:compileDebugJavaWithJavac', task ':app:compressDebugAssets', task ':app:processDebugJavaRes', task ':flutter_plugin_android_lifecycle:processDebugJavaRes', task ':flutter_secure_storage:processDebugJavaRes', task ':local_auth_android:processDebugJavaRes', task ':mobile_scanner:processDebugJavaRes', task ':path_provider_android:processDebugJavaRes', task ':share_plus:processDebugJavaRes', task ':shared_preferences_android:processDebugJavaRes', task ':sqflite_android:processDebugJavaRes', task ':app:mergeDebugJavaResource', task ':app:checkDebugDuplicateClasses', task ':app:desugarDebugFileDependencies', task ':app:mergeExtDexDebug', task ':local_auth_android:bundleLibRuntimeToJarDebug', task ':flutter_plugin_android_lifecycle:bundleLibRuntimeToJarDebug', task ':flutter_secure_storage:bundleLibRuntimeToJarDebug', task ':mobile_scanner:bundleLibRuntimeToJarDebug', task ':path_provider_android:bundleLibRuntimeToJarDebug', task ':share_plus:bundleLibRuntimeToJarDebug', task ':shared_preferences_android:bundleLibRuntimeToJarDebug', task ':sqflite_android:bundleLibRuntimeToJarDebug', task ':app:mergeLibDexDebug', task ':app:dexBuilderDebug', task ':app:mergeProjectDexDebug', task ':app:preProfileBuild', task ':app:configureCMakeDebug[arm64-v8a]', task ':app:buildCMakeDebug[arm64-v8a]', task ':app:configureCMakeDebug[armeabi-v7a]', task ':app:buildCMakeDebug[armeabi-v7a]', task ':app:configureCMakeDebug[x86_64]', task ':app:buildCMakeDebug[x86_64]', task ':app:mergeDebugJniLibFolders', task ':flutter_plugin_android_lifecycle:mergeDebugJniLibFolders', task ':flutter_plugin_android_lifecycle:mergeDebugNativeLibs', task ':flutter_plugin_android_lifecycle:copyDebugJniLibsProjectOnly', task ':flutter_secure_storage:mergeDebugJniLibFolders', task ':flutter_secure_storage:mergeDebugNativeLibs', task ':flutter_secure_storage:copyDebugJniLibsProjectOnly', task ':local_auth_android:mergeDebugJniLibFolders', task ':local_auth_android:mergeDebugNativeLibs', task ':local_auth_android:copyDebugJniLibsProjectOnly', task ':mobile_scanner:mergeDebugJniLibFolders', task ':mobile_scanner:mergeDebugNativeLibs', task ':mobile_scanner:copyDebugJniLibsProjectOnly', task ':path_provider_android:mergeDebugJniLibFolders', task ':path_provider_android:mergeDebugNativeLibs', task ':path_provider_android:copyDebugJniLibsProjectOnly', task ':share_plus:mergeDebugJniLibFolders', task ':share_plus:mergeDebugNativeLibs', task ':share_plus:copyDebugJniLibsProjectOnly', task ':shared_preferences_android:mergeDebugJniLibFolders', task ':shared_preferences_android:mergeDebugNativeLibs', task ':shared_preferences_android:copyDebugJniLibsProjectOnly', task ':sqflite_android:mergeDebugJniLibFolders', task ':sqflite_android:mergeDebugNativeLibs', task ':sqflite_android:copyDebugJniLibsProjectOnly', task ':app:mergeDebugNativeLibs', task ':app:stripDebugDebugSymbols', task ':app:validateSigningDebug', task ':app:writeDebugAppMetadata', task ':app:writeDebugSigningConfigVersions', task ':app:packageDebug', task ':app:createDebugApkListingFileRedirect', task ':app:assembleDebug', task ':flutter_plugin_android_lifecycle:stripDebugDebugSymbols', task ':flutter_plugin_android_lifecycle:copyDebugJniLibsProjectAndLocalJars', task ':flutter_plugin_android_lifecycle:extractDebugAnnotations', task ':flutter_plugin_android_lifecycle:extractDeepLinksForAarDebug', task ':flutter_plugin_android_lifecycle:mergeDebugGeneratedProguardFiles', task ':flutter_plugin_android_lifecycle:mergeDebugConsumerProguardFiles', task ':flutter_plugin_android_lifecycle:prepareDebugArtProfile', task ':flutter_plugin_android_lifecycle:prepareLintJarForPublish', task ':flutter_plugin_android_lifecycle:mergeDebugJavaResource', task ':flutter_plugin_android_lifecycle:syncDebugLibJars', task ':flutter_plugin_android_lifecycle:bundleDebugAar', task ':flutter_plugin_android_lifecycle:assembleDebug', task ':flutter_secure_storage:stripDebugDebugSymbols', task ':flutter_secure_storage:copyDebugJniLibsProjectAndLocalJars', task ':flutter_secure_storage:extractDebugAnnotations', task ':flutter_secure_storage:extractDeepLinksForAarDebug', task ':flutter_secure_storage:mergeDebugGeneratedProguardFiles', task ':flutter_secure_storage:mergeDebugConsumerProguardFiles', task ':flutter_secure_storage:prepareDebugArtProfile', task ':flutter_secure_storage:prepareLintJarForPublish', task ':flutter_secure_storage:mergeDebugJavaResource', task ':flutter_secure_storage:syncDebugLibJars', task ':flutter_secure_storage:bundleDebugAar', task ':flutter_secure_storage:assembleDebug', task ':local_auth_android:stripDebugDebugSymbols', task ':local_auth_android:copyDebugJniLibsProjectAndLocalJars', task ':local_auth_android:extractDebugAnnotations', task ':local_auth_android:extractDeepLinksForAarDebug', task ':local_auth_android:mergeDebugGeneratedProguardFiles', task ':local_auth_android:mergeDebugConsumerProguardFiles', task ':local_auth_android:prepareDebugArtProfile', task ':local_auth_android:prepareLintJarForPublish', task ':local_auth_android:mergeDebugJavaResource', task ':local_auth_android:syncDebugLibJars', task ':local_auth_android:bundleDebugAar', task ':local_auth_android:assembleDebug', task ':mobile_scanner:stripDebugDebugSymbols', task ':mobile_scanner:copyDebugJniLibsProjectAndLocalJars', task ':mobile_scanner:extractDebugAnnotations', task ':mobile_scanner:extractDeepLinksForAarDebug', task ':mobile_scanner:mergeDebugGeneratedProguardFiles', task ':mobile_scanner:mergeDebugConsumerProguardFiles', task ':mobile_scanner:prepareDebugArtProfile', task ':mobile_scanner:prepareLintJarForPublish', task ':mobile_scanner:mergeDebugJavaResource', task ':mobile_scanner:syncDebugLibJars', task ':mobile_scanner:bundleDebugAar', task ':mobile_scanner:assembleDebug', task ':path_provider_android:stripDebugDebugSymbols', task ':path_provider_android:copyDebugJniLibsProjectAndLocalJars', task ':path_provider_android:extractDebugAnnotations', task ':path_provider_android:extractDeepLinksForAarDebug', task ':path_provider_android:mergeDebugGeneratedProguardFiles', task ':path_provider_android:mergeDebugConsumerProguardFiles', task ':path_provider_android:prepareDebugArtProfile', task ':path_provider_android:prepareLintJarForPublish', task ':path_provider_android:mergeDebugJavaResource', task ':path_provider_android:syncDebugLibJars', task ':path_provider_android:bundleDebugAar', task ':path_provider_android:assembleDebug', task ':share_plus:stripDebugDebugSymbols', task ':share_plus:copyDebugJniLibsProjectAndLocalJars', task ':share_plus:extractDebugAnnotations', task ':share_plus:extractDeepLinksForAarDebug', task ':share_plus:mergeDebugGeneratedProguardFiles', task ':share_plus:mergeDebugConsumerProguardFiles', task ':share_plus:prepareDebugArtProfile', task ':share_plus:prepareLintJarForPublish', task ':share_plus:mergeDebugJavaResource', task ':share_plus:syncDebugLibJars', task ':share_plus:bundleDebugAar', task ':share_plus:assembleDebug', task ':shared_preferences_android:stripDebugDebugSymbols', task ':shared_preferences_android:copyDebugJniLibsProjectAndLocalJars', task ':shared_preferences_android:extractDebugAnnotations', task ':shared_preferences_android:extractDeepLinksForAarDebug', task ':shared_preferences_android:mergeDebugGeneratedProguardFiles', task ':shared_preferences_android:mergeDebugConsumerProguardFiles', task ':shared_preferences_android:prepareDebugArtProfile', task ':shared_preferences_android:prepareLintJarForPublish', task ':shared_preferences_android:mergeDebugJavaResource', task ':shared_preferences_android:syncDebugLibJars', task ':shared_preferences_android:bundleDebugAar', task ':shared_preferences_android:assembleDebug', task ':sqflite_android:stripDebugDebugSymbols', task ':sqflite_android:copyDebugJniLibsProjectAndLocalJars', task ':sqflite_android:extractDebugAnnotations', task ':sqflite_android:extractDeepLinksForAarDebug', task ':sqflite_android:mergeDebugGeneratedProguardFiles', task ':sqflite_android:mergeDebugConsumerProguardFiles', task ':sqflite_android:prepareDebugArtProfile', task ':sqflite_android:prepareLintJarForPublish', task ':sqflite_android:mergeDebugJavaResource', task ':sqflite_android:syncDebugLibJars', task ':sqflite_android:bundleDebugAar', task ':sqflite_android:assembleDebug']
+[ +370 ms] I/flutter (21297): 🔍 checkConnectionStatus: hasWallet=false, _wallet=null, rustInitialized=true
+[        ] Starting process 'command '/opt/homebrew/share/flutter/bin/flutter''. Working directory: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app Command: /opt/homebrew/share/flutter/bin/flutter --verbose assemble --no-version-check --depfile /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/flutter/debug/flutter_build.d --output /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/flutter/debug -dTargetFile=/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/lib/main.dart -dTargetPlatform=android -dBuildMode=debug -dTrackWidgetCreation=true --DartDefines=RkxVVFRFUl9WRVJTSU9OPTMuMzIuOA==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049ZWRhZGE3YzU2ZQ==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049ZWYwY2QwMDA5MQ==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My44LjE= -dFlavor= -dAndroidArchs=android-arm64 -dMinSdkVersion=21 debug_android_application
+[        ] Successfully started process 'command '/opt/homebrew/share/flutter/bin/flutter''
+[        ] [  +20 ms] "flutter assemble" took 1,863ms.
+[  +99 ms] Resolve mutations for :app:packJniLibsflutterBuildDebug (Thread[#3650,included builds,5,main]) started.
+[        ] :app:packJniLibsflutterBuildDebug (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :app:packJniLibsflutterBuildDebug UP-TO-DATE
+[        ] Caching disabled for task ':app:packJniLibsflutterBuildDebug' because:
+[        ] Skipping task ':app:packJniLibsflutterBuildDebug' as it is up-to-date.
+[ +102 ms] work action Dependencies for project :flutter_plugin_android_lifecycle {artifactType=android-classes-jar, dexing-component-attributes=ComponentSpecificParameters(minSdkVersion=21, debuggable=true, enableCoreLibraryDesugaring=false, enableGlobalSynthetics=false, enableApiModeling=false, dependenciesClassesAreInstrumented=false, asmTransformComponent=null, useJacocoTransformInstrumentation=false, enableDesugaring=true, needsClasspath=true, useFullClasspath=false, componentIfUsingFullClasspath=null)} (Thread[#3650,included builds,5,main]) started.
+[  +96 ms] work action Dependencies for project :flutter_secure_storage {artifactType=android-classes-jar, dexing-component-attributes=ComponentSpecificParameters(minSdkVersion=21, debuggable=true, enableCoreLibraryDesugaring=false, enableGlobalSynthetics=false, enableApiModeling=false, dependenciesClassesAreInstrumented=false, asmTransformComponent=null, useJacocoTransformInstrumentation=false, enableDesugaring=true, needsClasspath=true, useFullClasspath=false, componentIfUsingFullClasspath=null)} (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:preBuild (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:preBuild (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:preBuild UP-TO-DATE
+[        ] Skipping task ':flutter_plugin_android_lifecycle:preBuild' as it has no actions.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:preDebugBuild (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:preDebugBuild (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:preDebugBuild UP-TO-DATE
+[        ] Skipping task ':flutter_plugin_android_lifecycle:preDebugBuild' as it has no actions.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:writeDebugAarMetadata (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:writeDebugAarMetadata (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:writeDebugAarMetadata UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:writeDebugAarMetadata' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:writeDebugAarMetadata' as it is up-to-date.
+[        ] work action resolve aar-metadata.properties (project :flutter_plugin_android_lifecycle) (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:preBuild (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] :flutter_secure_storage:preBuild (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] > Task :flutter_secure_storage:preBuild UP-TO-DATE
+[        ] Skipping task ':flutter_secure_storage:preBuild' as it has no actions.
+[        ] Resolve mutations for :flutter_secure_storage:preDebugBuild (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] :flutter_secure_storage:preDebugBuild (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] > Task :flutter_secure_storage:preDebugBuild UP-TO-DATE
+[        ] Skipping task ':flutter_secure_storage:preDebugBuild' as it has no actions.
+[        ] Resolve mutations for :flutter_secure_storage:writeDebugAarMetadata (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] :flutter_secure_storage:writeDebugAarMetadata (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[   +1 ms] > Task :flutter_secure_storage:writeDebugAarMetadata UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:writeDebugAarMetadata' because:
+[        ] Skipping task ':flutter_secure_storage:writeDebugAarMetadata' as it is up-to-date.
+[        ] work action resolve aar-metadata.properties (project :flutter_secure_storage) (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:mergeDebugShaders (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:mergeDebugShaders (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:mergeDebugShaders UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:mergeDebugShaders' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:mergeDebugShaders' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:compileDebugShaders (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:compileDebugShaders (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:compileDebugShaders NO-SOURCE
+[        ] Skipping task ':flutter_plugin_android_lifecycle:compileDebugShaders' as it has no source files and no previous output files.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:generateDebugAssets (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:generateDebugAssets (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:generateDebugAssets UP-TO-DATE
+[        ] Skipping task ':flutter_plugin_android_lifecycle:generateDebugAssets' as it has no actions.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:packageDebugAssets (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:packageDebugAssets (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:packageDebugAssets UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:packageDebugAssets' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:packageDebugAssets' as it is up-to-date.
+[        ] work action resolve out (project :flutter_plugin_android_lifecycle) (Thread[#3650,included builds,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:mergeDebugShaders (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_secure_storage:mergeDebugShaders (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_secure_storage:mergeDebugShaders UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:mergeDebugShaders' because:
+[        ] Skipping task ':flutter_secure_storage:mergeDebugShaders' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:compileDebugShaders (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_secure_storage:compileDebugShaders (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_secure_storage:compileDebugShaders NO-SOURCE
+[        ] Skipping task ':flutter_secure_storage:compileDebugShaders' as it has no source files and no previous output files.
+[        ] Resolve mutations for :flutter_secure_storage:generateDebugAssets (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_secure_storage:generateDebugAssets (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_secure_storage:generateDebugAssets UP-TO-DATE
+[        ] Skipping task ':flutter_secure_storage:generateDebugAssets' as it has no actions.
+[        ] Resolve mutations for :flutter_secure_storage:packageDebugAssets (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_secure_storage:packageDebugAssets (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_secure_storage:packageDebugAssets UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:packageDebugAssets' because:
+[        ] Skipping task ':flutter_secure_storage:packageDebugAssets' as it is up-to-date.
+[        ] work action resolve out (project :flutter_secure_storage) (Thread[#3650,included builds,5,main]) started.
+[        ]   Output property 'outputDir' file /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/assets/debug/mergeDebugAssets has been removed.
+[        ]   Output property 'outputDir' file /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/assets/debug/mergeDebugAssets/mlkit_barcode_models has been removed.
+[        ]   Output property 'outputDir' file /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/assets/debug/mergeDebugAssets/mlkit_barcode_models/barcode_ssd_mobilenet_v1_dmp25_quant.tflite has been removed.
+[        ]   Output property 'destinationDir' file /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/assets/debug/mergeDebugAssets/flutter_assets has been removed.
+[        ]   Output property 'destinationDir' file /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/assets/debug/mergeDebugAssets/flutter_assets/AssetManifest.bin has been removed.
+[        ]   Output property 'destinationDir' file /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/assets/debug/mergeDebugAssets/flutter_assets/AssetManifest.json has been removed.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:generateDebugResValues (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:generateDebugResValues (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:generateDebugResValues UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:generateDebugResValues' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:generateDebugResValues' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:generateDebugResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:generateDebugResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:generateDebugResources UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:generateDebugResources' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:generateDebugResources' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:packageDebugResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:packageDebugResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:packageDebugResources UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:packageDebugResources' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:packageDebugResources' as it is up-to-date.
+[        ] work action resolve packageDebugResources (project :flutter_plugin_android_lifecycle) (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:generateDebugResValues (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] :flutter_secure_storage:generateDebugResValues (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] > Task :flutter_secure_storage:generateDebugResValues UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:generateDebugResValues' because:
+[        ] Skipping task ':flutter_secure_storage:generateDebugResValues' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:generateDebugResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] :flutter_secure_storage:generateDebugResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] > Task :flutter_secure_storage:generateDebugResources UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:generateDebugResources' because:
+[        ] Skipping task ':flutter_secure_storage:generateDebugResources' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:packageDebugResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] :flutter_secure_storage:packageDebugResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] > Task :flutter_secure_storage:packageDebugResources UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:packageDebugResources' because:
+[        ] Skipping task ':flutter_secure_storage:packageDebugResources' as it is up-to-date.
+[        ] work action resolve packageDebugResources (project :flutter_secure_storage) (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:extractDeepLinksDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:extractDeepLinksDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:extractDeepLinksDebug UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:extractDeepLinksDebug' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:extractDeepLinksDebug' as it is up-to-date.
+[        ] work action resolve navigation.json (project :flutter_plugin_android_lifecycle) (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:processDebugManifest (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:processDebugManifest (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:processDebugManifest UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:processDebugManifest' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:processDebugManifest' as it is up-to-date.
+[        ] work action resolve AndroidManifest.xml (project :flutter_plugin_android_lifecycle) (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:extractDeepLinksDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:extractDeepLinksDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:extractDeepLinksDebug UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:extractDeepLinksDebug' because:
+[        ] Skipping task ':flutter_secure_storage:extractDeepLinksDebug' as it is up-to-date.
+[        ] work action resolve navigation.json (project :flutter_secure_storage) (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:processDebugManifest (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:processDebugManifest (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:processDebugManifest UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:processDebugManifest' because:
+[        ] Skipping task ':flutter_secure_storage:processDebugManifest' as it is up-to-date.
+[        ] work action resolve AndroidManifest.xml (project :flutter_secure_storage) (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:compileDebugLibraryResources (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:compileDebugLibraryResources (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:compileDebugLibraryResources UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:compileDebugLibraryResources' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:compileDebugLibraryResources' as it is up-to-date.
+[        ] work action resolve out (project :flutter_plugin_android_lifecycle) (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:parseDebugLocalResources (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:parseDebugLocalResources (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:parseDebugLocalResources UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:parseDebugLocalResources' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:parseDebugLocalResources' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:generateDebugRFile (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:generateDebugRFile (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:generateDebugRFile UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:generateDebugRFile' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:generateDebugRFile' as it is up-to-date.
+[        ] work action resolve package-aware-r.txt (project :flutter_plugin_android_lifecycle) (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:compileDebugLibraryResources (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:compileDebugLibraryResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] > Task :flutter_secure_storage:compileDebugLibraryResources UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:compileDebugLibraryResources' because:
+[        ] Skipping task ':flutter_secure_storage:compileDebugLibraryResources' as it is up-to-date.
+[        ] work action resolve out (project :flutter_secure_storage) (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:parseDebugLocalResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] :flutter_secure_storage:parseDebugLocalResources (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] > Task :flutter_secure_storage:parseDebugLocalResources UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:parseDebugLocalResources' because:
+[        ] Skipping task ':flutter_secure_storage:parseDebugLocalResources' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:generateDebugRFile (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] :flutter_secure_storage:generateDebugRFile (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[  +84 ms] > Task :flutter_secure_storage:generateDebugRFile UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:generateDebugRFile' because:
+[        ] Skipping task ':flutter_secure_storage:generateDebugRFile' as it is up-to-date.
+[        ] work action resolve package-aware-r.txt (project :flutter_secure_storage) (Thread[#3654,Execution worker Thread 4,5,main]) started.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:javaPreCompileDebug (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:javaPreCompileDebug (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:javaPreCompileDebug UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:javaPreCompileDebug' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:javaPreCompileDebug' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:compileDebugJavaWithJavac (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:compileDebugJavaWithJavac (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[  +94 ms] > Task :flutter_plugin_android_lifecycle:compileDebugJavaWithJavac UP-TO-DATE
+[        ] Custom actions are attached to task ':flutter_plugin_android_lifecycle:compileDebugJavaWithJavac'.
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:compileDebugJavaWithJavac' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:compileDebugJavaWithJavac' as it is up-to-date.
+[        ] No compile result for :flutter_plugin_android_lifecycle:compileDebugJavaWithJavac
+[        ] No compile result for :flutter_plugin_android_lifecycle:compileDebugJavaWithJavac
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:bundleLibCompileToJarDebug (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:bundleLibCompileToJarDebug (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:bundleLibCompileToJarDebug UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:bundleLibCompileToJarDebug' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:bundleLibCompileToJarDebug' as it is up-to-date.
+[        ] work action resolve classes.jar (project :flutter_plugin_android_lifecycle) (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:generateDebugBuildConfig (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] :flutter_secure_storage:generateDebugBuildConfig (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] > Task :flutter_secure_storage:generateDebugBuildConfig UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:generateDebugBuildConfig' because:
+[        ] Skipping task ':flutter_secure_storage:generateDebugBuildConfig' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:javaPreCompileDebug (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] :flutter_secure_storage:javaPreCompileDebug (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] > Task :flutter_secure_storage:javaPreCompileDebug UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:javaPreCompileDebug' because:
+[        ] Skipping task ':flutter_secure_storage:javaPreCompileDebug' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:compileDebugJavaWithJavac (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] :flutter_secure_storage:compileDebugJavaWithJavac (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] > Task :flutter_secure_storage:compileDebugJavaWithJavac UP-TO-DATE
+[        ] Custom actions are attached to task ':flutter_secure_storage:compileDebugJavaWithJavac'.
+[        ] Caching disabled for task ':flutter_secure_storage:compileDebugJavaWithJavac' because:
+[        ] Skipping task ':flutter_secure_storage:compileDebugJavaWithJavac' as it is up-to-date.
+[        ] No compile result for :flutter_secure_storage:compileDebugJavaWithJavac
+[        ] No compile result for :flutter_secure_storage:compileDebugJavaWithJavac
+[        ] Resolve mutations for :flutter_secure_storage:bundleLibCompileToJarDebug (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] :flutter_secure_storage:bundleLibCompileToJarDebug (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] > Task :flutter_secure_storage:bundleLibCompileToJarDebug UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:bundleLibCompileToJarDebug' because:
+[        ] Skipping task ':flutter_secure_storage:bundleLibCompileToJarDebug' as it is up-to-date.
+[        ] work action resolve classes.jar (project :flutter_secure_storage) (Thread[#3656,Execution worker Thread 6,5,main]) started.
+[        ] file or directory '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/app/src/main/resources', not found
+[        ] file or directory '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/app/src/debug/resources', not found
+[        ] file or directory '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/app/src/main/resources', not found
+[        ] file or directory '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android/app/src/debug/resources', not found
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:processDebugJavaRes (Thread[#3651,Execution worker,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:processDebugJavaRes (Thread[#3651,Execution worker,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:processDebugJavaRes NO-SOURCE
+[        ] file or directory '/Users/name/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.28/android/src/main/resources', not found
+[        ] file or directory '/Users/name/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.28/android/src/debug/resources', not found
+[        ] Skipping task ':flutter_plugin_android_lifecycle:processDebugJavaRes' as it has no source files and no previous output files.
+[        ] work action resolve out (project :flutter_plugin_android_lifecycle) (Thread[#3651,Execution worker,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:processDebugJavaRes (Thread[#3651,Execution worker,5,main]) started.
+[        ] :flutter_secure_storage:processDebugJavaRes (Thread[#3651,Execution worker,5,main]) started.
+[        ] > Task :flutter_secure_storage:processDebugJavaRes NO-SOURCE
+[        ] file or directory '/Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/android/src/main/resources', not found
+[        ] file or directory '/Users/name/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/android/src/debug/resources', not found
+[        ] Skipping task ':flutter_secure_storage:processDebugJavaRes' as it has no source files and no previous output files.
+[        ] work action resolve out (project :flutter_secure_storage) (Thread[#3651,Execution worker,5,main]) started.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:bundleLibRuntimeToJarDebug (Thread[#3651,Execution worker,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:bundleLibRuntimeToJarDebug (Thread[#3651,Execution worker,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:bundleLibRuntimeToJarDebug UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:bundleLibRuntimeToJarDebug' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:bundleLibRuntimeToJarDebug' as it is up-to-date.
+[        ] work action resolve classes.jar (project :flutter_plugin_android_lifecycle) (Thread[#3651,Execution worker,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:bundleLibRuntimeToJarDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:bundleLibRuntimeToJarDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:bundleLibRuntimeToJarDebug UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:bundleLibRuntimeToJarDebug' because:
+[        ] Skipping task ':flutter_secure_storage:bundleLibRuntimeToJarDebug' as it is up-to-date.
+[        ] work action resolve classes.jar (project :flutter_secure_storage) (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] Caching disabled for DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/local_auth_android/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar because:
+[        ] Skipping DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/local_auth_android/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar as it is up-to-date.
+[        ] > Transform classes.jar (project :flutter_secure_storage) with DexingWithClasspathTransform
+[        ] Caching disabled for DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/flutter_secure_storage/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar because:
+[        ] Skipping DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/flutter_secure_storage/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar as it is up-to-date.
+[        ] > Transform classes.jar (project :flutter_plugin_android_lifecycle) with DexingWithClasspathTransform
+[        ] Caching disabled for DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/flutter_plugin_android_lifecycle/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar because:
+[        ] Skipping DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/flutter_plugin_android_lifecycle/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar as it is up-to-date.
+[        ] Caching disabled for DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/mobile_scanner/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar because:
+[        ] Skipping DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/mobile_scanner/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar as it is up-to-date.
+[        ] Caching disabled for DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/path_provider_android/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar because:
+[        ] Skipping DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/path_provider_android/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar as it is up-to-date.
+[        ] Caching disabled for DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/share_plus/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar because:
+[        ] Skipping DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/share_plus/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar as it is up-to-date.
+[        ] Caching disabled for DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/shared_preferences_android/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar because:
+[        ] Skipping DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/shared_preferences_android/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar as it is up-to-date.
+[        ] Caching disabled for DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/sqflite_android/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar because:
+[        ] Skipping DexingWithClasspathTransform: /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/sqflite_android/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar as it is up-to-date.
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|arm64-v8a : Start JSON generation. Platform version: 21 min SDK version: arm64-v8a
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|arm64-v8a : JSON '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/.cxx/Debug/71665o6d/arm64-v8a/android_gradle_build.json' was up-to-date
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|arm64-v8a : JSON generation completed without problems
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|arm64-v8a : Writing build model to /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/cxx/Debug/71665o6d/logs/arm64-v8a/build_model.json
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|armeabi-v7a : Start JSON generation. Platform version: 21 min SDK version: armeabi-v7a
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|armeabi-v7a : JSON '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/.cxx/Debug/71665o6d/armeabi-v7a/android_gradle_build.json' was up-to-date
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|armeabi-v7a : JSON generation completed without problems
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|armeabi-v7a : Writing build model to /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/cxx/Debug/71665o6d/logs/armeabi-v7a/build_model.json
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|x86_64 : Start JSON generation. Platform version: 21 min SDK version: x86_64
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|x86_64 : JSON '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/.cxx/Debug/71665o6d/x86_64/android_gradle_build.json' was up-to-date
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|x86_64 : JSON generation completed without problems
+[        ] C/C++: /opt/homebrew/share/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt profile|x86_64 : Writing build model to /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/intermediates/cxx/Debug/71665o6d/logs/x86_64/build_model.json
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:mergeDebugJniLibFolders (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:mergeDebugJniLibFolders (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:mergeDebugJniLibFolders UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:mergeDebugJniLibFolders' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:mergeDebugJniLibFolders' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:mergeDebugNativeLibs (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:mergeDebugNativeLibs (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:mergeDebugNativeLibs NO-SOURCE
+[        ] Skipping task ':flutter_plugin_android_lifecycle:mergeDebugNativeLibs' as it has no source files and no previous output files.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:copyDebugJniLibsProjectOnly (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:copyDebugJniLibsProjectOnly (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:copyDebugJniLibsProjectOnly UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:copyDebugJniLibsProjectOnly' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:copyDebugJniLibsProjectOnly' as it is up-to-date.
+[        ] work action resolve jni (project :flutter_plugin_android_lifecycle) (Thread[#3650,included builds,5,main]) started.
+[        ] Resolve mutations for :flutter_secure_storage:mergeDebugJniLibFolders (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_secure_storage:mergeDebugJniLibFolders (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_secure_storage:mergeDebugJniLibFolders UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:mergeDebugJniLibFolders' because:
+[        ] Skipping task ':flutter_secure_storage:mergeDebugJniLibFolders' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:mergeDebugNativeLibs (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_secure_storage:mergeDebugNativeLibs (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_secure_storage:mergeDebugNativeLibs NO-SOURCE
+[        ] Skipping task ':flutter_secure_storage:mergeDebugNativeLibs' as it has no source files and no previous output files.
+[        ] Resolve mutations for :flutter_secure_storage:copyDebugJniLibsProjectOnly (Thread[#3650,included builds,5,main]) started.
+[        ] :flutter_secure_storage:copyDebugJniLibsProjectOnly (Thread[#3650,included builds,5,main]) started.
+[        ] > Task :flutter_secure_storage:copyDebugJniLibsProjectOnly UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:copyDebugJniLibsProjectOnly' because:
+[        ] Skipping task ':flutter_secure_storage:copyDebugJniLibsProjectOnly' as it is up-to-date.
+[        ] work action resolve jni (project :flutter_secure_storage) (Thread[#3650,included builds,5,main]) started.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:stripDebugDebugSymbols (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:stripDebugDebugSymbols (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:stripDebugDebugSymbols NO-SOURCE
+[        ] Skipping task ':flutter_plugin_android_lifecycle:stripDebugDebugSymbols' as it has no source files and no previous output files.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:copyDebugJniLibsProjectAndLocalJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:copyDebugJniLibsProjectAndLocalJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:copyDebugJniLibsProjectAndLocalJars' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:copyDebugJniLibsProjectAndLocalJars' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:extractDebugAnnotations (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:extractDebugAnnotations (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:extractDebugAnnotations UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:extractDebugAnnotations' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:extractDebugAnnotations' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:extractDeepLinksForAarDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:extractDeepLinksForAarDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:extractDeepLinksForAarDebug UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:extractDeepLinksForAarDebug' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:extractDeepLinksForAarDebug' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:mergeDebugGeneratedProguardFiles (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:mergeDebugGeneratedProguardFiles (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:mergeDebugGeneratedProguardFiles UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:mergeDebugGeneratedProguardFiles' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:mergeDebugGeneratedProguardFiles' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:mergeDebugConsumerProguardFiles (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:mergeDebugConsumerProguardFiles (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:mergeDebugConsumerProguardFiles UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:mergeDebugConsumerProguardFiles' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:mergeDebugConsumerProguardFiles' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:prepareDebugArtProfile (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:prepareDebugArtProfile (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:prepareDebugArtProfile UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:prepareDebugArtProfile' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:prepareDebugArtProfile' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:prepareLintJarForPublish (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:prepareLintJarForPublish (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:prepareLintJarForPublish UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:prepareLintJarForPublish' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:prepareLintJarForPublish' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:mergeDebugJavaResource (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:mergeDebugJavaResource (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:mergeDebugJavaResource UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:mergeDebugJavaResource' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:mergeDebugJavaResource' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:syncDebugLibJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:syncDebugLibJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:syncDebugLibJars UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:syncDebugLibJars' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:syncDebugLibJars' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:bundleDebugAar (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:bundleDebugAar (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:bundleDebugAar UP-TO-DATE
+[        ] Caching disabled for task ':flutter_plugin_android_lifecycle:bundleDebugAar' because:
+[        ] Skipping task ':flutter_plugin_android_lifecycle:bundleDebugAar' as it is up-to-date.
+[        ] Resolve mutations for :flutter_plugin_android_lifecycle:assembleDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_plugin_android_lifecycle:assembleDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_plugin_android_lifecycle:assembleDebug UP-TO-DATE
+[        ] Skipping task ':flutter_plugin_android_lifecycle:assembleDebug' as it has no actions.
+[        ] Resolve mutations for :flutter_secure_storage:stripDebugDebugSymbols (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:stripDebugDebugSymbols (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:stripDebugDebugSymbols NO-SOURCE
+[        ] Skipping task ':flutter_secure_storage:stripDebugDebugSymbols' as it has no source files and no previous output files.
+[        ] Resolve mutations for :flutter_secure_storage:copyDebugJniLibsProjectAndLocalJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:copyDebugJniLibsProjectAndLocalJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:copyDebugJniLibsProjectAndLocalJars' because:
+[        ] Skipping task ':flutter_secure_storage:copyDebugJniLibsProjectAndLocalJars' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:extractDebugAnnotations (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:extractDebugAnnotations (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:extractDebugAnnotations UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:extractDebugAnnotations' because:
+[        ] Skipping task ':flutter_secure_storage:extractDebugAnnotations' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:extractDeepLinksForAarDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:extractDeepLinksForAarDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:extractDeepLinksForAarDebug UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:extractDeepLinksForAarDebug' because:
+[        ] Skipping task ':flutter_secure_storage:extractDeepLinksForAarDebug' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:mergeDebugGeneratedProguardFiles (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:mergeDebugGeneratedProguardFiles (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:mergeDebugGeneratedProguardFiles UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:mergeDebugGeneratedProguardFiles' because:
+[        ] Skipping task ':flutter_secure_storage:mergeDebugGeneratedProguardFiles' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:mergeDebugConsumerProguardFiles (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:mergeDebugConsumerProguardFiles (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:mergeDebugConsumerProguardFiles UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:mergeDebugConsumerProguardFiles' because:
+[        ] Skipping task ':flutter_secure_storage:mergeDebugConsumerProguardFiles' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:prepareDebugArtProfile (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:prepareDebugArtProfile (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:prepareDebugArtProfile UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:prepareDebugArtProfile' because:
+[        ] Skipping task ':flutter_secure_storage:prepareDebugArtProfile' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:prepareLintJarForPublish (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:prepareLintJarForPublish (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:prepareLintJarForPublish UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:prepareLintJarForPublish' because:
+[        ] Skipping task ':flutter_secure_storage:prepareLintJarForPublish' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:mergeDebugJavaResource (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:mergeDebugJavaResource (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:mergeDebugJavaResource UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:mergeDebugJavaResource' because:
+[        ] Skipping task ':flutter_secure_storage:mergeDebugJavaResource' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:syncDebugLibJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:syncDebugLibJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:syncDebugLibJars UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:syncDebugLibJars' because:
+[        ] Skipping task ':flutter_secure_storage:syncDebugLibJars' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:bundleDebugAar (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:bundleDebugAar (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[  +92 ms] > Task :flutter_secure_storage:bundleDebugAar UP-TO-DATE
+[        ] Caching disabled for task ':flutter_secure_storage:bundleDebugAar' because:
+[        ] Skipping task ':flutter_secure_storage:bundleDebugAar' as it is up-to-date.
+[        ] Resolve mutations for :flutter_secure_storage:assembleDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :flutter_secure_storage:assembleDebug (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :flutter_secure_storage:assembleDebug UP-TO-DATE
+[        ] Skipping task ':flutter_secure_storage:assembleDebug' as it has no actions.
+[        ] Resolve mutations for :local_auth_android:syncDebugLibJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :local_auth_android:syncDebugLibJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :local_auth_android:syncDebugLibJars UP-TO-DATE
+[        ] Caching disabled for task ':local_auth_android:syncDebugLibJars' because:
+[        ] Skipping task ':local_auth_android:syncDebugLibJars' as it is up-to-date.
+[        ] Resolve mutations for :mobile_scanner:syncDebugLibJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :mobile_scanner:syncDebugLibJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :mobile_scanner:syncDebugLibJars UP-TO-DATE
+[        ] Caching disabled for task ':mobile_scanner:syncDebugLibJars' because:
+[        ] Skipping task ':mobile_scanner:syncDebugLibJars' as it is up-to-date.
+[        ] Resolve mutations for :path_provider_android:syncDebugLibJars (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] :path_provider_android:syncDebugLibJars (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] > Task :path_provider_android:syncDebugLibJars UP-TO-DATE
+[        ] Caching disabled for task ':path_provider_android:syncDebugLibJars' because:
+[        ] Skipping task ':path_provider_android:syncDebugLibJars' as it is up-to-date.
+[        ] Resolve mutations for :share_plus:syncDebugLibJars (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] :share_plus:syncDebugLibJars (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] > Task :share_plus:syncDebugLibJars UP-TO-DATE
+[        ] Caching disabled for task ':share_plus:syncDebugLibJars' because:
+[        ] Skipping task ':share_plus:syncDebugLibJars' as it is up-to-date.
+[        ] Resolve mutations for :shared_preferences_android:syncDebugLibJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] :shared_preferences_android:syncDebugLibJars (Thread[#3655,Execution worker Thread 5,5,main]) started.
+[        ] > Task :shared_preferences_android:syncDebugLibJars UP-TO-DATE
+[        ] Caching disabled for task ':shared_preferences_android:syncDebugLibJars' because:
+[        ] Skipping task ':shared_preferences_android:syncDebugLibJars' as it is up-to-date.
+[        ] Resolve mutations for :sqflite_android:syncDebugLibJars (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] :sqflite_android:syncDebugLibJars (Thread[#3657,Execution worker Thread 7,5,main]) started.
+[        ] > Task :sqflite_android:syncDebugLibJars UP-TO-DATE
+[        ] Caching disabled for task ':sqflite_android:syncDebugLibJars' because:
+[        ] Skipping task ':sqflite_android:syncDebugLibJars' as it is up-to-date.
+[  +93 ms] I/flutter (21297): 🔍 checkConnectionStatus: hasWallet=false, _wallet=null, rustInitialized=true
+[   +2 ms] [Incubating] Problems report is available at: file:///Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/reports/problems/problems-report.html
+[        ] Watched directory hierarchies: [/opt/homebrew/share/flutter/packages/flutter_tools/gradle, /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/android]
+[  +35 ms] Calculate SHA1: LocalDirectory: '/Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/outputs/flutter-apk'/app-debug.apk
+[+3633 ms] ✓ Built build/app/outputs/flutter-apk/app-debug.apk
+[  +12 ms] executing: /Users/name/Library/Android/sdk/build-tools/36.0.0/aapt dump xmltree /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/outputs/flutter-apk/app-debug.apk AndroidManifest.xml
+[ +265 ms] Exit code 0 from: /Users/name/Library/Android/sdk/build-tools/36.0.0/aapt dump xmltree /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/outputs/flutter-apk/app-debug.apk AndroidManifest.xml
+               A: package="com.bitcoinz.wallet" (Raw: "com.bitcoinz.wallet")
+                 A: android:name(0x01010003)="com.bitcoinz.wallet.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" (Raw: "com.bitcoinz.wallet.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+                 A: android:name(0x01010003)="com.bitcoinz.wallet.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" (Raw: "com.bitcoinz.wallet.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+                 A: android:label(0x01010001)="BitcoinZ Wallet" (Raw: "BitcoinZ Wallet")
+                   A: android:name(0x01010003)="com.example.flutter_app.MainActivity" (Raw: "com.example.flutter_app.MainActivity")
+                     A: android:name(0x01010003)="io.flutter.embedding.android.NormalTheme" (Raw: "io.flutter.embedding.android.NormalTheme")
+                   A: android:name(0x01010003)="flutterEmbedding" (Raw: "flutterEmbedding")
+                   A: android:name(0x01010003)="dev.fluttercommunity.plus.share.ShareFileProvider" (Raw: "dev.fluttercommunity.plus.share.ShareFileProvider")
+                   A: android:authorities(0x01010018)="com.bitcoinz.wallet.flutter.share_provider" (Raw: "com.bitcoinz.wallet.flutter.share_provider")
+                   A: android:name(0x01010003)="dev.fluttercommunity.plus.share.SharePlusPendingIntent" (Raw: "dev.fluttercommunity.plus.share.SharePlusPendingIntent")
+                   A: android:authorities(0x01010018)="com.bitcoinz.wallet.mlkitinitprovider" (Raw: "com.bitcoinz.wallet.mlkitinitprovider")
+                   A: android:authorities(0x01010018)="com.bitcoinz.wallet.androidx-startup" (Raw: "com.bitcoinz.wallet.androidx-startup")
+[        ] executing: /Users/name/Library/Android/sdk/platform-tools/adb -s emulator-5554 shell am force-stop com.bitcoinz.wallet
+[   +1 ms] I/flutter (21297): 🔄 Full refresh via Rust...
+[        ] I/flutter (21297): 🔄 Syncing with network via Rust...
+[+1039 ms] I/flutter (21297): 🔍 checkConnectionStatus: hasWallet=false, _wallet=null, rustInitialized=true
+[   +1 ms] Installing build/app/outputs/flutter-apk/app-debug.apk...
+[        ] executing: /Users/name/Library/Android/sdk/platform-tools/adb -s emulator-5554 install -t -r /Users/name/Documents/code/bitcoinz-mobile-wallet/flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+[   +4 ms] Installing build/app/outputs/flutter-apk/app-debug.apk... (completed in 27.3s)
+[   +5 ms] executing: /Users/name/Library/Android/sdk/platform-tools/adb -s emulator-5554 shell echo -n cb5d39fcc199a5f8fdc00af6252b3b8fd9382f6b > /data/local/tmp/sky.com.bitcoinz.wallet.sha1
+[  +16 ms] executing: /Users/name/Library/Android/sdk/platform-tools/adb -s emulator-5554 shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -f 0x20000000 --ez enable-dart-profiling true --ez enable-checked-mode true --ez verify-entry-points true com.bitcoinz.wallet/com.example.flutter_app.MainActivity
+[+1407 ms] Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x20000000 cmp=com.bitcoinz.wallet/com.example.flutter_app.MainActivity (has extras) }
+[+5119 ms] I/flutter (22457): [IMPORTANT:flutter/shell/platform/android/android_context_gl_impeller.cc(94)] Using the Impeller rendering backend (OpenGLES).
+[ +207 ms] DevFS: Created new filesystem on the device (file:///data/user/0/com.bitcoinz.wallet/code_cache/flutter_appEGTLIK/flutter_app/)
+[ +205 ms] Syncing files to device sdk gphone64 arm64...
+[ +117 ms] I/bitcoinz.wallet(22457): hiddenapi: Accessing hidden method Landroid/view/accessibility/AccessibilityNodeInfo;->getSourceNodeId()J (runtime_flags=0, domain=platform, api=unsupported,test-api) from Lio/flutter/view/AccessibilityViewEmbedder$ReflectionAccessors; (domain=app) using reflection: allowed
+[   +1 ms] I/bitcoinz.wallet(22457): hiddenapi: Accessing hidden method Landroid/view/accessibility/AccessibilityRecord;->getSourceNodeId()J (runtime_flags=0, domain=platform, api=unsupported) from Lio/flutter/view/AccessibilityViewEmbedder$ReflectionAccessors; (domain=app) using reflection: allowed
+[        ] I/bitcoinz.wallet(22457): hiddenapi: Accessing hidden field Landroid/view/accessibility/AccessibilityNodeInfo;->mChildNodeIds:Landroid/util/LongArray; (runtime_flags=0, domain=platform, api=unsupported) from Lio/flutter/view/AccessibilityViewEmbedder$ReflectionAccessors; (domain=app) using reflection: allowed
+[        ] I/bitcoinz.wallet(22457): hiddenapi: Accessing hidden method Landroid/util/LongArray;->get(I)J (runtime_flags=0, domain=platform, api=unsupported) from Lio/flutter/view/AccessibilityViewEmbedder$ReflectionAccessors; (domain=app) using reflection: allowed
+[        ] DevFS: Sync finished
+[   +6 ms] Syncing files to device sdk gphone64 arm64... (completed in 1,147ms)
+[   +3 ms] Synced 0.0MB.
+[ +190 ms] Connected to _flutterView/0xb4000077f37a84d0.
+[        ] d Detach (terminate "flutter run" but leave application running).
+[  +83 ms] W/bitcoinz.wallet(22457): Verification of void androidx.profileinstaller.ProfileInstaller.result(java.util.concurrent.Executor, androidx.profileinstaller.ProfileInstaller$DiagnosticsCallback, int, java.lang.Object) took 128.240ms (70.18 bytecodes/s) (0B arena alloc)
+[  +10 ms] D/ProfileInstaller(22457): Installing profile for com.bitcoinz.wallet
+[  +13 ms] D/WindowLayoutComponentImpl(22457): Register WindowLayoutInfoListener on Context=com.example.flutter_app.MainActivity@b17a278, of which baseContext=android.app.ContextImpl@b72eb42
+[ +277 ms] I/flutter (22457): 💾 StorageService: Using flutter_secure_storage
+[  +54 ms] I/flutter (22457): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+[        ] I/flutter (22457): [38;5;12m│ #0   main (package:bitcoinz_black_amber/main.dart:27:12)[0m
+[        ] I/flutter (22457): [38;5;12m│ #1   <asynchronous suspension>[0m
+[        ] I/flutter (22457): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+[        ] I/flutter (22457): [38;5;12m│ 💡 Storage service initialized: flutter_secure_storage[0m
+[        ] I/flutter (22457): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+[  +88 ms] I/flutter (22457): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+[   +1 ms] I/flutter (22457): [38;5;12m│ #0   main (package:bitcoinz_black_amber/main.dart:44:14)[0m
+[        ] I/flutter (22457): [38;5;12m│ #1   <asynchronous suspension>[0m
+[        ] I/flutter (22457): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+[        ] I/flutter (22457): [38;5;12m│ 💡 🦀 Rust bridge initialized for mempool monitoring[0m
+[        ] I/flutter (22457): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+[  +43 ms] I/flutter (22457): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+[   +2 ms] I/flutter (22457): [38;5;12m│ #0   BitcoinZService.initialize (package:bitcoinz_black_amber/services/bitcoinz_service.dart:139:15)[0m
+[        ] I/flutter (22457): [38;5;12m│ #1   main (package:bitcoinz_black_amber/main.dart:54:36)[0m
+[   +2 ms] I/flutter (22457): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+[        ] I/flutter (22457): [38;5;12m│ 💡 BitcoinZ service initialized successfully[0m
+[        ] I/flutter (22457): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+[   +9 ms] I/flutter (22457): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+[   +6 ms] I/flutter (22457): [38;5;12m│ #0   main (package:bitcoinz_black_amber/main.dart:55:12)[0m
+[        ] I/flutter (22457): [38;5;12m│ #1   <asynchronous suspension>[0m
+[        ] I/flutter (22457): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+[        ] I/flutter (22457): [38;5;12m│ 💡 BitcoinZ service initialized successfully[0m
+[        ] I/flutter (22457): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+[+1625 ms] I/flutter (22457): 🔨 Creating new BitcoinzRustService singleton instance
+[  +12 ms] I/flutter (22457): 🔍 AuthProvider._loadStoredData() - Starting storage reads...
+[        ] I/flutter (22457):   Keys to read: has_wallet, wallet_id, biometrics_enabled, cli_wallet_imported
+[+1129 ms] I/flutter (22457): 📊 Unread memo count: 0 (from 0 total memos)
+[  +10 ms] I/flutter (22457): 📱 SharedPreferences initialized with 0 memo statuses
+[ +304 ms] I/HWUI    (22457): Davey! duration=3030ms; Flags=1, FrameTimelineVsyncId=1920819, IntendedVsync=8055512626522, Vsync=8058262626412, InputEventId=0, HandleInputStart=8058278549592, AnimationStart=8058278553675, PerformTraversalsStart=8058278554425, DrawStart=8058368331383, FrameDeadline=8055529293188, FrameStartTime=8058276279717, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=8058406139342, SyncStart=8058408408383, IssueDrawCommandsStart=8058412691383, SwapBuffers=8058488508425, FrameCompleted=8058545383883, DequeueBufferDuration=15372875, QueueBufferDuration=1210083, GpuCompleted=8058529919842, SwapBuffersCompleted=8058545383883, DisplayPresentTime=0, CommandSubmissionCompleted=8058488508425, 
+[+1206 ms] I/flutter (22457): 🔍 StorageService.read(secure): has_wallet = "true"
+[   +1 ms] I/flutter (22457):   Read has_wallet: "true"
+[  +54 ms] I/flutter (22457): 🔍 StorageService.read(secure): wallet_id = "wallet_1755621149390"
+[        ] I/flutter (22457):   Read wallet_id: "wallet_1755621149390"
+[        ] I/ImeTracker(22457): com.bitcoinz.wallet:cb8f1abd: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+[        ] I/flutter (22457): 🔍 StorageService.read(secure): biometrics_enabled = "null"
+[        ] I/flutter (22457):   Read biometrics_enabled: "null"
+[   +3 ms] I/flutter (22457): 🔍 StorageService.read(secure): cli_wallet_imported = "null"
+[        ] I/flutter (22457):   Read cli_wallet_imported: "null"
+[   +2 ms] I/flutter (22457): ✅ AuthProvider._loadStoredData() completed:
+[        ] I/flutter (22457):   _hasWallet: true (from "true")
+[        ] I/flutter (22457):   _walletId: wallet_1755621149390
+[        ] I/flutter (22457):   needsSetup: false
+[   +1 ms] I/flutter (22457):   needsAuthentication: true
+[  +78 ms] I/flutter (22457): 🔌 Pre-connecting to server while on splash screen...
+[        ] I/flutter (22457): 🔌 Checking server connectivity...
+[ +210 ms] I/flutter (22457): ✅ Server appears to be reachable
+[        ] I/flutter (22457): ✅ Early connection established
+[ +232 ms] I/bitcoinz.wallet(22457): Compiler allocated 5111KB to compile void android.view.ViewRootImpl.performTraversals()
+[+1579 ms] I/flutter (22457): 🚀 SplashScreen._navigateToNextScreen():
+[  +11 ms] I/flutter (22457):   hasWallet: true
+[        ] I/flutter (22457):   isAuthenticated: false
+[        ] I/flutter (22457):   needsSetup: false
+[        ] I/flutter (22457):   needsAuthentication: true
+[  +15 ms] I/flutter (22457): 🔍 StorageService.read(secure): pin_hash = "09d7d8153a8178a958ecaa130aad71becfb73f2c5d30f5f3f33066ec7624b355"
+[        ] I/flutter (22457): → Navigating to AuthScreen (needsAuthentication)
+[+12873 ms] I/bitcoinz.wallet(22457): Background concurrent mark compact GC freed 2828KB AllocSpace bytes, 10(280KB) LOS objects, 49% free, 2490KB/4981KB, paused 390us,5.336ms total 242.043ms
+[  +12 ms] DevFS: Deleting filesystem on the device (file:///data/user/0/com.bitcoinz.wallet/code_cache/flutter_appEGTLIK/flutter_app/)
+[   +5 ms] DevFS: Deleted filesystem on the device (file:///data/user/0/com.bitcoinz.wallet/code_cache/flutter_appEGTLIK/flutter_app/)
+[  +22 ms] "flutter run" took 265,926ms.

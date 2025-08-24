@@ -122,13 +122,9 @@ class BitcoinZCLI {
       // Load the native library (using absolute path to ensure we get the latest version)
       if (Platform.isMacOS) {
         try {
-          // First try the absolute path to ensure we get the latest version
-          _lib = DynamicLibrary.open('/Users/name/Documents/code/bitcoinz-mobile-wallet/rust_core/target/release/libbitcoinz_mobile.dylib');
+          _lib = DynamicLibrary.open('libbitcoinz_mobile.dylib');
         } catch (e) {
           try {
-            _lib = DynamicLibrary.open('libbitcoinz_mobile.dylib');
-          } catch (e2) {
-            try {
               _lib = DynamicLibrary.open('@executable_path/../Frameworks/libbitcoinz_mobile.dylib');
             } catch (e3) {
               try {
