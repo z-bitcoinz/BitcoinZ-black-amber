@@ -880,33 +880,62 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
     }
 
     pub async fn tbalance(&self, addr: Option<String>) -> u64 {
-        self.get_utxos()
-            .await
+        let utxos = self.get_utxos().await;
+        println!("💰 TBALANCE DEBUG: Total UTXOs = {}", utxos.len());
+        
+        let filtered_utxos: Vec<_> = utxos
             .iter()
             .filter(|utxo| match addr.as_ref() {
                 Some(a) => utxo.address == *a,
                 None => true,
             })
-            .map(|utxo| utxo.value)
-            .sum::<u64>()
+            .collect();
+            
+        for utxo in &filtered_utxos {
+            println!("💰 TBALANCE UTXO: height={}, value={}, txid={:?}", utxo.height, utxo.value, utxo.txid);
+        }
+        
+        let total = filtered_utxos.iter().map(|utxo| utxo.value).sum::<u64>();
+        println!("💰 TBALANCE RESULT: {} zatoshis", total);
+        total
     }
 
     pub async fn spendable_tbalance(&self, addr: Option<String>) -> u64 {
         let anchor_height = self.get_anchor_height().await;
+        println!("🎯 SPENDABLE_TBALANCE DEBUG: anchor_height = {}", anchor_height);
         
-        self.get_utxos()
-            .await
+        let utxos = self.get_utxos().await;
+        println!("🎯 SPENDABLE_TBALANCE: Total UTXOs = {}", utxos.len());
+        
+        let filtered_utxos: Vec<_> = utxos
             .iter()
             .filter(|utxo| match addr.as_ref() {
                 Some(a) => utxo.address == *a,
                 None => true,
             })
-            // Filter out spent UTXOs
+            .collect();
+        println!("🎯 After address filter: {} UTXOs", filtered_utxos.len());
+        
+        let not_spent: Vec<_> = filtered_utxos
+            .iter()
             .filter(|utxo| utxo.spent.is_none() && utxo.unconfirmed_spent.is_none())
-            // For transparent funds, require 1 confirmation (height <= anchor_height)
-            .filter(|utxo| utxo.height <= anchor_height as i32)
-            .map(|utxo| utxo.value)
-            .sum::<u64>()
+            .collect();
+        println!("🎯 After spent filter: {} UTXOs", not_spent.len());
+        
+        let height_filtered: Vec<_> = not_spent
+            .iter()
+            .filter(|utxo| {
+                let passes_height = utxo.height > 0 && utxo.height <= anchor_height as i32;
+                println!("🎯 UTXO height={}, anchor={}, passes_height={}, value={}, txid={:?}", 
+                    utxo.height, anchor_height, passes_height, utxo.value, utxo.txid);
+                passes_height
+            })
+            .collect();
+        println!("🎯 After height filter: {} UTXOs", height_filtered.len());
+        
+        let total = height_filtered.iter().map(|utxo| utxo.value).sum::<u64>();
+        println!("🎯 SPENDABLE_TBALANCE RESULT: {} zatoshis", total);
+        total
     }
 
     pub async fn unverified_zbalance(&self, addr: Option<String>) -> u64 {
@@ -1711,7 +1740,8 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
             FetchFullTxns::<P>::scan_full_tx(
                 self.config.clone(),
                 tx,
-                target_height.into(),
+                // For unconfirmed sent transactions, use height 0 to ensure they're excluded from spendable balance
+                BlockHeight::from_u32(0),
                 true,
                 now() as u32,
                 self.keys.clone(),

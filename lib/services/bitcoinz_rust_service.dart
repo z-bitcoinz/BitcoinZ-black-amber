@@ -566,6 +566,15 @@ class BitcoinzRustService {
       double rustSpendableTransparent = (data['spendable_tbalance'] ?? 0) / 100000000.0;
       double rustSpendableShielded = (data['spendable_zbalance'] ?? 0) / 100000000.0;
       
+      if (kDebugMode) {
+        print('🔍 RAW RUST VALUES:');
+        print('   tbalance: ${data['tbalance']} zatoshis = ${(data['tbalance'] ?? 0) / 100000000.0} BTCZ');
+        print('   spendable_tbalance: ${data['spendable_tbalance']} zatoshis = $rustSpendableTransparent BTCZ');
+        print('   zbalance: ${data['zbalance']} zatoshis = ${(data['zbalance'] ?? 0) / 100000000.0} BTCZ');
+        print('   spendable_zbalance: ${data['spendable_zbalance']} zatoshis = $rustSpendableShielded BTCZ');
+        print('   🚨 ISSUE: If spendable_tbalance equals tbalance but transaction shows "Confirming", then Rust is incorrectly including unconfirmed funds!');
+      }
+      
       // Get total balances for display
       double totalTransparent = (data['tbalance'] ?? 0) / 100000000.0;
       double totalShielded = (data['zbalance'] ?? 0) / 100000000.0;
@@ -574,6 +583,7 @@ class BitcoinzRustService {
         print('📊 RUST BACKEND BALANCES:');
         print('   Total: ${totalTransparent} T + ${totalShielded} Z = ${totalTransparent + totalShielded} BTCZ');
         print('   🎯 Backend says spendable: ${rustSpendableTransparent} T + ${rustSpendableShielded} Z = ${rustSpendableTransparent + rustSpendableShielded} BTCZ');
+        print('   ⚠️  PROBLEM CHECK: If receiving unconfirmed T transaction, spendable_tbalance should be 0, not include the unconfirmed amount!');
       }
       
       // Calculate unconfirmed amounts - separate incoming vs change

@@ -216,9 +216,9 @@ class ResponsiveUtils {
 
   // Balance-specific responsive sizing
   static double getBalanceTextSize(BuildContext context) {
-    if (isSmallMobile(context)) return 24.0;  // Smaller for tight screens
-    if (isMobile(context)) return 28.0;       // Reduced from 32px for mobile
-    return 32.0;                              // Keep desktop size
+    if (isSmallMobile(context)) return 34.0;  // Increased for better mobile readability
+    if (isMobile(context)) return 38.0;       // Increased for better mobile readability
+    return 36.0;                              // Match send page spendable balance size
   }
 
   static double getBalanceTextHeight(BuildContext context) {

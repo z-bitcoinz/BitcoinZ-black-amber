@@ -451,6 +451,8 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightClient<P> {
     }
 
     pub async fn do_balance(&self) -> JsonValue {
+        println!("🚨 DO_BALANCE: Starting balance calculation...");
+        
         // Collect UA addresses
         let mut ua_addresses = vec![];
         for uaddress in self.wallet.keys().read().await.get_all_uaddresses() {
@@ -484,14 +486,22 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightClient<P> {
             });
         }
 
+        println!("🚨 DO_BALANCE: About to call tbalance(None)...");
+        let tbalance_result = self.wallet.tbalance(None).await;
+        println!("🚨 DO_BALANCE: tbalance result: {}", tbalance_result);
+        
+        println!("🚨 DO_BALANCE: About to call spendable_tbalance(None)...");
+        let spendable_tbalance_result = self.wallet.spendable_tbalance(None).await;
+        println!("🚨 DO_BALANCE: spendable_tbalance result: {}", spendable_tbalance_result);
+
         object! {
             "uabalance" => self.wallet.uabalance(None).await,
             "zbalance"           => self.wallet.zbalance(None).await,
             "verified_zbalance"  => self.wallet.verified_zbalance(None).await,
             "spendable_zbalance" => self.wallet.spendable_zbalance(None).await,
             "unverified_zbalance"   => self.wallet.unverified_zbalance(None).await,
-            "tbalance"           => self.wallet.tbalance(None).await,
-            "spendable_tbalance" => self.wallet.spendable_tbalance(None).await,
+            "tbalance"           => tbalance_result,
+            "spendable_tbalance" => spendable_tbalance_result,
             "ua_addresses" => ua_addresses,
             "z_addresses"        => z_addresses,
             "t_addresses"        => t_addresses,
@@ -1272,7 +1282,8 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightClient<P> {
                             FetchFullTxns::<P>::scan_full_tx(
                                 config.clone(),
                                 tx,
-                                BlockHeight::from_u32(rtx.height as u32),
+                                // For unconfirmed mempool transactions, use height 0 to ensure they're excluded from spendable balance
+                                BlockHeight::from_u32(0),
                                 true,
                                 now() as u32,
                                 keys.clone(),

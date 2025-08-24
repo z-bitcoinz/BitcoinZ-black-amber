@@ -280,6 +280,7 @@ pub fn initialize_from_phrase(
 
 /// Execute a command (main wallet interface)
 pub fn execute(command: String, args: String) -> String {
+    println!("🚨 API.RS EXECUTE: command='{}', args='{}'", command, args);
     let lightclient = LIGHTCLIENT.lock().unwrap().borrow().clone();
     
     let lightclient = match lightclient {
@@ -299,7 +300,10 @@ pub fn execute(command: String, args: String) -> String {
         args.split_whitespace().collect()
     };
     
-    commands::do_user_command(&command, &args_vec, lightclient.as_ref())
+    println!("🚨 API.RS: About to call do_user_command with command='{}' and {} args", command, args_vec.len());
+    let result = commands::do_user_command(&command, &args_vec, lightclient.as_ref());
+    println!("🚨 API.RS: do_user_command completed");
+    result
 }
 
 /// Deinitialize the wallet

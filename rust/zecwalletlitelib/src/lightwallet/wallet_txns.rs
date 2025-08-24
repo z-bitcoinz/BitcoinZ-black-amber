@@ -566,7 +566,10 @@ impl WalletTxns {
             .find(|utxo| utxo.txid == txid && utxo.output_index == output_num as u64)
         {
             // If it already exists, it is likely an mempool tx, so update the height
-            utxo.height = height as i32
+            // For unconfirmed transactions, use height 0 to ensure they're excluded from spendable balance
+            let new_height = if unconfirmed { 0 } else { height as i32 };
+            println!("🔧 UTXO UPDATE: unconfirmed={}, height={} -> new_height={}", unconfirmed, height, new_height);
+            utxo.height = new_height
         } else {
             wtx.utxos.push(Utxo {
                 address: taddr,
@@ -574,7 +577,12 @@ impl WalletTxns {
                 output_index: output_num as u64,
                 script: vout.script_pubkey.0.clone(),
                 value: vout.value.into(),
-                height: height as i32,
+                // For unconfirmed transactions, use height 0 to ensure they're excluded from spendable balance
+                height: {
+                    let new_height = if unconfirmed { 0 } else { height as i32 };
+                    println!("🔧 NEW UTXO: unconfirmed={}, height={} -> new_height={}", unconfirmed, height, new_height);
+                    new_height
+                },
                 spent_at_height: None,
                 spent: None,
                 unconfirmed_spent: None,

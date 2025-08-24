@@ -316,7 +316,13 @@ impl<P: consensus::Parameters + Send + Sync + 'static> Command<P> for BalanceCom
         "Show the current ZEC balance in the wallet".to_string()
     }
     fn exec(&self, _args: &[&str], lightclient: &LightClient<P>) -> String {
-        RT.block_on(async move { format!("{}", lightclient.do_balance().await.pretty(2)) })
+        println!("🚨 BALANCE COMMAND: Starting exec() function...");
+        RT.block_on(async move { 
+            println!("🚨 BALANCE COMMAND: About to call do_balance()...");
+            let result = lightclient.do_balance().await;
+            println!("🚨 BALANCE COMMAND: do_balance() completed");
+            format!("{}", result.pretty(2)) 
+        })
     }
 }
 
@@ -1338,9 +1344,20 @@ pub fn do_user_command<P: consensus::Parameters + Send + Sync + 'static>(
     args: &Vec<&str>,
     lightclient: &LightClient<P>,
 ) -> String {
-    match get_commands().get(&cmd.to_ascii_lowercase()) {
-        Some(cmd) => cmd.exec(args, lightclient),
-        None => format!("Unknown command : {}. Type 'help' for a list of commands", cmd),
+    println!("🚨 DO_USER_COMMAND: cmd='{}', args={:?}", cmd, args);
+    let cmd_key = cmd.to_ascii_lowercase();
+    println!("🚨 DO_USER_COMMAND: Looking up command '{}'", cmd_key);
+    match get_commands().get(&cmd_key) {
+        Some(cmd_obj) => {
+            println!("🚨 DO_USER_COMMAND: Found command, calling exec()...");
+            let result = cmd_obj.exec(args, lightclient);
+            println!("🚨 DO_USER_COMMAND: exec() completed");
+            result
+        }
+        None => {
+            println!("🚨 DO_USER_COMMAND: Command not found: {}", cmd);
+            format!("Unknown command : {}. Type 'help' for a list of commands", cmd)
+        }
     }
 }
 

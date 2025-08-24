@@ -5,6 +5,7 @@ import 'dart:io';
 import '../providers/wallet_provider.dart';
 import '../providers/currency_provider.dart';
 import '../utils/responsive.dart';
+import 'animated_progress_dots.dart';
 
 class BalanceCard extends StatefulWidget {
   const BalanceCard({super.key});
@@ -149,7 +150,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                         currencyProvider.formatFiatAmount(walletProvider.balance.total),
                         style: TextStyle(
                           color: const Color(0xFFFF6B00).withOpacity(0.9),
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.w600,
                           letterSpacing: -0.5,
                         ),
@@ -248,7 +249,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                 label,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.7),
-                  fontSize: 12,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -259,11 +260,16 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
             amount,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 18,
+              fontSize: 24,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.5,
             ),
           ),
+          // Show progress dots when this balance type has unconfirmed transactions
+          if (hasUnconfirmed || walletProvider.isLoading || walletProvider.isSyncing) ...[
+            const SizedBox(height: 4),
+            const AnimatedProgressDots(),
+          ],
           // Removed redundant "Confirming:" display from balance columns
           // This is already shown on the main dashboard
         ],

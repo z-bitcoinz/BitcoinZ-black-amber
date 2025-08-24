@@ -7,6 +7,7 @@ import '../../providers/currency_provider.dart';
 import '../../widgets/transaction_success_dialog.dart';
 import '../../widgets/transaction_confirmation_dialog.dart';
 import '../../widgets/sending_progress_overlay.dart';
+import '../../widgets/animated_progress_dots.dart';
 import 'qr_scanner_screen.dart';
 
 class SendScreenModern extends StatefulWidget {
@@ -422,7 +423,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                   walletProvider.balance.formattedSpendable,
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 28,
+                                    fontSize: 36,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -462,7 +463,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                   walletProvider.balance.formattedTotal,
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.9),
-                                    fontSize: 14,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -486,7 +487,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                           ),
                           child: Column(
                             children: [
-                              // Header
+                              // Header with loading animation
                               Row(
                                 children: [
                                   Icon(
@@ -499,10 +500,15 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                     'Balance Breakdown',
                                     style: TextStyle(
                                       color: Colors.white.withOpacity(0.6),
-                                      fontSize: 12,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
+                                  // Show animated dots when balance has unconfirmed activity
+                                  if (walletProvider.balance.unconfirmed > 0 || walletProvider.balance.unverified > 0 || walletProvider.isLoading || walletProvider.isSyncing) ...[
+                                    const SizedBox(width: 8),
+                                    const AnimatedProgressDots(),
+                                  ],
                                 ],
                               ),
                               const SizedBox(height: 8),
@@ -526,7 +532,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                         'Spendable',
                                         style: TextStyle(
                                           color: Colors.white.withOpacity(0.8),
-                                          fontSize: 12,
+                                          fontSize: 15,
                                         ),
                                       ),
                                     ],
@@ -535,7 +541,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                     walletProvider.balance.formattedSpendable,
                                     style: const TextStyle(
                                       color: Color(0xFF4CAF50),
-                                      fontSize: 12,
+                                      fontSize: 15,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -563,7 +569,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                           'Incoming (Confirming)',
                                           style: TextStyle(
                                             color: Colors.white.withOpacity(0.8),
-                                            fontSize: 12,
+                                            fontSize: 15,
                                           ),
                                         ),
                                       ],
@@ -572,7 +578,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                       walletProvider.balance.formattedPureIncoming,
                                       style: const TextStyle(
                                         color: Colors.blue,
-                                        fontSize: 12,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -601,7 +607,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                           'Change Returning',
                                           style: TextStyle(
                                             color: Colors.white.withOpacity(0.8),
-                                            fontSize: 12,
+                                            fontSize: 15,
                                           ),
                                         ),
                                       ],
@@ -610,7 +616,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                       walletProvider.balance.formattedUnverified,
                                       style: TextStyle(
                                         color: Colors.green.withOpacity(0.7),
-                                        fontSize: 12,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -632,7 +638,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                     'Total',
                                     style: TextStyle(
                                       color: Colors.white.withOpacity(0.9),
-                                      fontSize: 12,
+                                      fontSize: 15,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -640,7 +646,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                     walletProvider.balance.formattedTotal,
                                     style: TextStyle(
                                       color: Colors.white.withOpacity(0.9),
-                                      fontSize: 12,
+                                      fontSize: 15,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -651,63 +657,6 @@ class _SendScreenModernState extends State<SendScreenModern> {
                         ),
                       ],
                       
-                      // Confirmation Requirements Explanation - Show when there are any confirming funds (incoming OR change)
-                      if (walletProvider.balance.unconfirmed > 0 || walletProvider.balance.unverified > 0) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.blue.withOpacity(0.2),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.info_outline,
-                                size: 16,
-                                color: Colors.blue,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: RichText(
-                                  text: TextSpan(
-                                    style: TextStyle(
-                                      color: Colors.blue.withOpacity(0.9),
-                                      fontSize: 11,
-                                    ),
-                                    children: [
-                                      const TextSpan(
-                                        text: 'Security requirement: ',
-                                        style: TextStyle(fontWeight: FontWeight.w600),
-                                      ),
-                                      const TextSpan(
-                                        text: 'Transparent funds need ',
-                                      ),
-                                      const TextSpan(
-                                        text: '1 confirmation',
-                                        style: TextStyle(fontWeight: FontWeight.w600),
-                                      ),
-                                      const TextSpan(
-                                        text: ', shielded funds need ',
-                                      ),
-                                      const TextSpan(
-                                        text: '2 confirmations',
-                                        style: TextStyle(fontWeight: FontWeight.w600),
-                                      ),
-                                      const TextSpan(
-                                        text: ' before spending (typically 2-6 minutes)',
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -1236,3 +1185,4 @@ class _SendScreenModernState extends State<SendScreenModern> {
 );
   }
 }
+
