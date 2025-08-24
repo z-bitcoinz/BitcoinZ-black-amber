@@ -472,8 +472,8 @@ class _SendScreenModernState extends State<SendScreenModern> {
                         ],
                       ),
                       
-                      // Balance Breakdown - Only show when there are funds needing confirmations
-                      if (walletProvider.balance.unconfirmed > 0) ...[
+                      // Balance Breakdown - Show when there are any confirming funds (incoming OR change)
+                      if (walletProvider.balance.unconfirmed > 0 || walletProvider.balance.unverified > 0) ...[
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -651,8 +651,8 @@ class _SendScreenModernState extends State<SendScreenModern> {
                         ),
                       ],
                       
-                      // Confirmation Requirements Explanation - Only show when there are confirming funds
-                      if (walletProvider.balance.unconfirmed > 0) ...[
+                      // Confirmation Requirements Explanation - Show when there are any confirming funds (incoming OR change)
+                      if (walletProvider.balance.unconfirmed > 0 || walletProvider.balance.unverified > 0) ...[
                         const SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
