@@ -23,6 +23,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
   final _memoController = TextEditingController();
   
   bool _isSending = false;
+  String _sendingStatus = '';
   String? _errorMessage;
   bool _isShieldedTransaction = false;
   final double _estimatedFee = 0.00001; // Standard BitcoinZ fee (much lower)
@@ -261,14 +262,31 @@ class _SendScreenModernState extends State<SendScreenModern> {
   }
   
   Future<void> _processSendTransaction(double amount, String address, [double? fiatAmount, String? currencyCode]) async {
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    
+    // Determine if auto-shielding might occur
+    final hasTransparentFunds = walletProvider.balance.transparent > 0.001;
+    final needsAutoShielding = hasTransparentFunds && _isShieldedTransaction;
+    
     setState(() {
       _isSending = true;
+      _sendingStatus = needsAutoShielding 
+          ? 'Preparing transaction...\nAuto-shielding transparent funds'
+          : hasTransparentFunds
+              ? 'Broadcasting transaction...\nUsing transparent funds'
+              : 'Broadcasting transaction...';
       _errorMessage = null;
     });
 
     try {
-      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
       final memo = _isShieldedTransaction ? _memoController.text : null;
+      
+      // Update status during the actual send
+      if (needsAutoShielding) {
+        setState(() {
+          _sendingStatus = 'Auto-shielding in progress...\nConverting transparent to shielded funds';
+        });
+      }
       
       final txid = await walletProvider.sendTransaction(
         toAddress: address,
@@ -277,6 +295,14 @@ class _SendScreenModernState extends State<SendScreenModern> {
       );
       
       if (txid != null && mounted) {
+        // Update status to show success
+        setState(() {
+          _sendingStatus = 'Transaction sent successfully!';
+        });
+        
+        // Brief delay to show success message
+        await Future.delayed(const Duration(milliseconds: 800));
+        
         // Show success dialog
         await showDialog(
           context: context,
@@ -305,16 +331,19 @@ class _SendScreenModernState extends State<SendScreenModern> {
       } else {
         setState(() {
           _errorMessage = 'Transaction failed. Please try again.';
+          _sendingStatus = '';
         });
       }
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
+        _sendingStatus = '';
       });
     } finally {
       if (mounted) {
         setState(() {
           _isSending = false;
+          _sendingStatus = '';
         });
       }
     }
@@ -1199,7 +1228,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
     ),
     // Sending Progress Overlay
     SendingProgressOverlay(
-      status: _isSending ? 'Broadcasting transaction...' : '',
+      status: _isSending ? _sendingStatus : '',
       progress: _isSending ? 0.5 : 0,
       isVisible: _isSending,
     ),

@@ -491,6 +491,7 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightClient<P> {
             "spendable_zbalance" => self.wallet.spendable_zbalance(None).await,
             "unverified_zbalance"   => self.wallet.unverified_zbalance(None).await,
             "tbalance"           => self.wallet.tbalance(None).await,
+            "spendable_tbalance" => self.wallet.spendable_tbalance(None).await,
             "ua_addresses" => ua_addresses,
             "z_addresses"        => z_addresses,
             "t_addresses"        => t_addresses,

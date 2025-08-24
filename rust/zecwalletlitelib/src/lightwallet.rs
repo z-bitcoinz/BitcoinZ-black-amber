@@ -891,6 +891,24 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
             .sum::<u64>()
     }
 
+    pub async fn spendable_tbalance(&self, addr: Option<String>) -> u64 {
+        let anchor_height = self.get_anchor_height().await;
+        
+        self.get_utxos()
+            .await
+            .iter()
+            .filter(|utxo| match addr.as_ref() {
+                Some(a) => utxo.address == *a,
+                None => true,
+            })
+            // Filter out spent UTXOs
+            .filter(|utxo| utxo.spent.is_none() && utxo.unconfirmed_spent.is_none())
+            // For transparent funds, require 1 confirmation (height <= anchor_height)
+            .filter(|utxo| utxo.height <= anchor_height as i32)
+            .map(|utxo| utxo.value)
+            .sum::<u64>()
+    }
+
     pub async fn unverified_zbalance(&self, addr: Option<String>) -> u64 {
         let anchor_height = self.get_anchor_height().await;
 
