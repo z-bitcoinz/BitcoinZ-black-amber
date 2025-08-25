@@ -296,7 +296,12 @@ pub fn execute(command: String, args: String) -> String {
 
     let args_vec: Vec<&str> = if args.is_empty() {
         vec![]
+    } else if command == "send" && args.starts_with('[') {
+        // For send command with JSON format, pass as single argument
+        println!("🚨 API.RS: Detected JSON send command, passing as single argument");
+        vec![&args]
     } else {
+        // For other commands, use normal whitespace splitting
         args.split_whitespace().collect()
     };
     
@@ -338,14 +343,43 @@ pub fn get_transactions() -> String {
 }
 
 /// Send transaction
-pub async fn send_transaction(address: String, amount: u64, memo: Option<String>) -> String {
-    let args = if let Some(m) = memo {
-        format!("{} {} \"{}\"", address, amount, m)
-    } else {
-        format!("{} {}", address, amount)
+pub async fn send_transaction(address: String, amount: i64, memo: Option<String>) -> String {
+    println!("🚨 RUST send_transaction called: address={}, amount={}, memo={:?}", address, amount, memo);
+    
+    // Get lightclient instance
+    let lightclient = LIGHTCLIENT.lock().unwrap().borrow().clone();
+    let lightclient = match lightclient {
+        Some(l) => l,
+        None => {
+            return r#"{"error": "Wallet not initialized"}"#.to_string();
+        }
     };
     
-    execute("send".to_string(), args)
+    // Convert amount to u64 (do_send expects u64)
+    let amount_u64 = if amount < 0 {
+        return r#"{"error": "Invalid amount: cannot be negative"}"#.to_string();
+    } else {
+        amount as u64
+    };
+    
+    // Prepare the address, amount, memo tuple for do_send
+    let addrs = vec![(&*address, amount_u64, memo)];
+    
+    println!("🚨 RUST calling lightclient.do_send directly: address={}, amount={}, memo={:?}", address, amount_u64, addrs[0].2);
+    
+    // Call lightclient.do_send() directly (already in async context)
+    match lightclient.do_send(addrs).await {
+        Ok(txid) => {
+            println!("🚨 RUST do_send success: txid={}", txid);
+            format!(r#"{{"txid": "{}"}}"#, txid)
+        }
+        Err(e) => {
+            println!("🚨 RUST do_send error: {}", e);
+            // Escape quotes in error message to prevent JSON issues
+            let escaped_error = e.replace("\"", "\\\"");
+            format!(r#"{{"error": "{}"}}"#, escaped_error)
+        }
+    }
 }
 
 /// Get addresses

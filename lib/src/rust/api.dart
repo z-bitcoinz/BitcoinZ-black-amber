@@ -79,7 +79,9 @@ String getTransactions() => RustLib.instance.api.crateApiGetTransactions();
 
 /// Send transaction
 Future<String> sendTransaction(
-        {required String address, required BigInt amount, String? memo}) =>
+        {required String address,
+        required PlatformInt64 amount,
+        String? memo}) =>
     RustLib.instance.api
         .crateApiSendTransaction(address: address, amount: amount, memo: memo);
 

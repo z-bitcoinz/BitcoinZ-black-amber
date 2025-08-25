@@ -1078,10 +1078,42 @@ class BitcoinzRustService {
       // Convert BTCZ to zatoshis (1 BTCZ = 100,000,000 zatoshis)
       final zatoshis = (amount * 100000000).toInt();
       
-      // Build send command arguments  
-      final args = '$address $zatoshis ${memo ?? ""}';
+      // Safely handle memo encoding for Android compatibility
+      String safeMemo = '';
+      if (memo != null && memo.trim().isNotEmpty) {
+        // Trim and validate memo length (max 512 bytes for shielded)
+        safeMemo = memo.trim();
+        if (safeMemo.length > 512) {
+          safeMemo = safeMemo.substring(0, 512);
+          if (kDebugMode) print('⚠️ Memo truncated to 512 characters for Android compatibility');
+        }
+        
+        // Escape special characters that could break command parsing
+        safeMemo = safeMemo
+            .replaceAll('"', '\\"')      // Escape quotes
+            .replaceAll('\\', '\\\\')    // Escape backslashes
+            .replaceAll('\n', '\\n')     // Escape newlines
+            .replaceAll('\r', '\\r')     // Escape carriage returns
+            .replaceAll('\t', '\\t');    // Escape tabs
+        
+        if (kDebugMode) {
+          print('📝 Android memo processing:');
+          print('   Original: ${memo.substring(0, math.min(memo.length, 50))}${memo.length > 50 ? "..." : ""}');
+          print('   Safe: ${safeMemo.substring(0, math.min(safeMemo.length, 50))}${safeMemo.length > 50 ? "..." : ""}');
+          print('   Length: ${safeMemo.length} chars');
+        }
+      }
       
-      final result = await rust_api.execute(command: 'send', args: args);
+      if (kDebugMode) print('🔧 Using dedicated sendTransaction API: address=$address, amount=$zatoshis, memo=${safeMemo.isEmpty ? "null" : "\"$safeMemo\""}');
+      
+      final result = await rust_api.sendTransaction(
+        address: address,
+        amount: zatoshis,
+        memo: safeMemo.isEmpty ? null : safeMemo,
+      );
+      
+      if (kDebugMode) print('🔍 Raw send result: ${result.length > 200 ? result.substring(0, 200) + "..." : result}');
+      
       final data = jsonDecode(result);
       
       if (data['txid'] != null) {
@@ -1146,8 +1178,31 @@ class BitcoinzRustService {
       
       return null;
     } catch (e) {
-      if (kDebugMode) print('❌ Send transaction failed: $e');
-      throw e;
+      if (kDebugMode) {
+        print('❌ Send transaction failed: $e');
+        if (Platform.isAndroid) {
+          print('🤖 Android-specific troubleshooting:');
+          print('   - Check memo encoding and special characters');
+          print('   - Verify wallet sync status');
+          print('   - Ensure sufficient balance for fees');
+          print('   - Check if memo is within 512 character limit');
+        }
+      }
+      
+      // Provide more user-friendly error messages for common Android issues
+      String errorMessage = e.toString();
+      if (errorMessage.contains('insufficient') || errorMessage.contains('balance')) {
+        throw Exception('Insufficient balance. Please check your available funds and try again.');
+      } else if (errorMessage.contains('memo') || errorMessage.contains('invalid')) {
+        throw Exception('Invalid memo format. Please check for special characters and try again.');
+      } else if (errorMessage.contains('address') || errorMessage.contains('invalid')) {
+        throw Exception('Invalid recipient address. Please verify the address and try again.');
+      } else if (errorMessage.contains('sync') || errorMessage.contains('chain')) {
+        throw Exception('Wallet not fully synced. Please wait for sync to complete and try again.');
+      } else {
+        // Generic error handling
+        throw Exception('Transaction failed: ${errorMessage.replaceAll('Exception: ', '')}');
+      }
     }
   }
   
