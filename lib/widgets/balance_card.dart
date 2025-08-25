@@ -225,9 +225,10 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
   Widget _buildBalanceColumn(BuildContext context, String label, String amount, IconData icon) {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     final isTransparent = label == 'Transparent';
+    // Only show dots for incoming unconfirmed transactions (not outgoing)
     final hasUnconfirmed = isTransparent 
-        ? walletProvider.balance.hasUnconfirmedTransparentBalance
-        : walletProvider.balance.hasUnconfirmedShieldedBalance;
+        ? walletProvider.balance.hasIncomingUnconfirmedTransparentBalance
+        : walletProvider.balance.hasIncomingUnconfirmedShieldedBalance;
     final unconfirmedAmount = isTransparent
         ? walletProvider.balance.formattedUnconfirmedTransparent
         : walletProvider.balance.formattedUnconfirmedShielded;

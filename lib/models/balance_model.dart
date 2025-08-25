@@ -105,6 +105,20 @@ class BalanceModel {
   /// Check if wallet has unconfirmed shielded balance
   bool get hasUnconfirmedShieldedBalance => unconfirmedShielded > 0;
 
+  /// Check if wallet has incoming unconfirmed transparent balance (excludes outgoing change)
+  bool get hasIncomingUnconfirmedTransparentBalance {
+    // Calculate pure incoming transparent: unconfirmed minus any unverified (change) amounts
+    final incomingTransparent = unconfirmedTransparent - unverifiedTransparent;
+    return incomingTransparent > 0;
+  }
+  
+  /// Check if wallet has incoming unconfirmed shielded balance (excludes outgoing change)
+  bool get hasIncomingUnconfirmedShieldedBalance {
+    // Calculate pure incoming shielded: unconfirmed minus any unverified (change) amounts
+    final incomingShielded = unconfirmedShielded - unverifiedShielded;
+    return incomingShielded > 0;
+  }
+
   /// Get balance in zatoshis
   int get totalZatoshis => (total * AppConstants.zatoshisPerBtcz).round();
   int get transparentZatoshis => (transparent * AppConstants.zatoshisPerBtcz).round();
