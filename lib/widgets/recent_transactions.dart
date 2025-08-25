@@ -6,6 +6,7 @@ import '../providers/wallet_provider.dart';
 import '../providers/currency_provider.dart';
 // import '../services/btcz_cli_service.dart'; // Removed - CLI no longer used
 import '../utils/responsive.dart';
+import 'animated_confirming_text.dart';
 
 class RecentTransactions extends StatefulWidget {
   final int limit;
@@ -233,15 +234,13 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Show circular progress for confirming transactions
+                            // Show animated confirming text for unconfirmed transactions
                             if (isConfirming) ...[
                               Container(
-                                width: 12,
-                                height: 12,
-                                margin: const EdgeInsets.only(right: 6),
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                                margin: const EdgeInsets.only(right: 8),
+                                child: const AnimatedConfirmingText(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
@@ -264,16 +263,6 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                             style: TextStyle(
                               fontSize: 11,
                               color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ] else if (isConfirming) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'Confirming',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.orange,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
