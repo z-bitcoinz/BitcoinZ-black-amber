@@ -13,6 +13,7 @@ import '../models/address_model.dart';
 // import '../services/bitcoinz_service.dart'; // Not used - using Rust service instead
 import '../services/database_service.dart';
 import '../services/bitcoinz_rust_service.dart';
+import '../services/network_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/network_provider.dart';
 import '../screens/wallet/paginated_transaction_history_screen.dart';
@@ -30,10 +31,17 @@ class WalletProvider with ChangeNotifier {
   bool _isConnected = false;
   String _connectionStatus = 'Disconnected';
   DateTime? _lastConnectionCheck;
+  DateTime? _lastSuccessfulRustOperation;
+  int? _lastKnownBlockHeight;
   Timer? _syncTimer;
+  Timer? _connectionValidationTimer;
   
   // Network provider reference
   NetworkProvider? _networkProvider;
+  
+  // Network service for connectivity monitoring
+  final NetworkService _networkService = NetworkService();
+  StreamSubscription<bool>? _internetStatusSubscription;
   
   // Sync progress tracking (like BitcoinZ Blue)
   int _syncedBlocks = 0;
@@ -87,11 +95,16 @@ class WalletProvider with ChangeNotifier {
     // Initialize SharedPreferences early
     _initializePreferences();
     
+    // Initialize network service
+    _initializeNetworkService();
+    
     // Initialize Native Rust service with mempool monitoring
     _rustService = BitcoinzRustService.instance;
     _rustService.fnSetTotalBalance = (balance) async {
       if (kDebugMode) print('🦀 Rust Bridge updated balance: ${balance.formattedTotal} BTCZ (unconfirmed: ${balance.unconfirmed})');
       _balance = balance;
+      
+      // NOTE: Balance updates can come from cached data, so we don't override connection status here
       
       // Save balance to cache for faster startup
       if (_wallet != null) {
@@ -118,6 +131,8 @@ class WalletProvider with ChangeNotifier {
     _rustService.fnSetTransactionsList = (transactions) async {
       final unconfirmedCount = transactions.where((tx) => tx.confirmations == 0).length;
       if (kDebugMode) print('🦀 Rust Bridge updated transactions: ${transactions.length} txs ($unconfirmedCount unconfirmed)');
+      
+      // NOTE: Transaction updates can come from cached data, so we don't override connection status here
       
       // Preserve memo read status from existing transactions and cache
       final Map<String, bool> memoReadStatus = {};
@@ -194,6 +209,41 @@ class WalletProvider with ChangeNotifier {
     _rustService.fnSetInfo = (info) {
       if (kDebugMode) print('🦀 Rust Bridge info: Block ${info['latestBlock']}');
     };
+  }
+
+  /// Initialize network connectivity monitoring
+  void _initializeNetworkService() async {
+    try {
+      await _networkService.initialize();
+      
+      // Listen for internet connectivity changes
+      _internetStatusSubscription = _networkService.internetStatusStream.listen((hasInternet) {
+        if (kDebugMode) {
+          print('🌐 WalletProvider: Internet connectivity changed - $hasInternet');
+        }
+        
+        if (!hasInternet) {
+          // Lost internet connection
+          _setConnectionStatus(false, 'No internet connection');
+        } else {
+          // Regained internet connection - INSTANT aggressive validation
+          if (kDebugMode) print('🔗 Internet restored, starting IMMEDIATE aggressive reconnection');
+          
+          // Priority 1: Fastest possible Rust connectivity check
+          _fastRustConnectivityCheck().then((success) {
+            if (!success) {
+              // Priority 2: If fast check fails, try rapid validation
+              _rapidConnectionValidation();
+              
+              // Priority 3: Traditional check as backup
+              checkConnectionStatus();
+            }
+          });
+        }
+      });
+    } catch (e) {
+      if (kDebugMode) print('❌ WalletProvider: Failed to initialize network service - $e');
+    }
   }
 
   // Getters
@@ -1344,6 +1394,32 @@ class WalletProvider with ChangeNotifier {
       print('🔍 checkConnectionStatus: hasWallet=$hasWallet, _wallet=$_wallet, rustInitialized=${_rustService.initialized}');
     }
     
+    // FALLBACK: If we have very recent successful operations, trust them over slow checks
+    if (_lastSuccessfulRustOperation != null) {
+      final timeSinceSuccess = DateTime.now().difference(_lastSuccessfulRustOperation!);
+      if (timeSinceSuccess.inSeconds < 30) {
+        if (!_isConnected) {
+          if (kDebugMode) print('🚀 FALLBACK: Recent Rust success (${timeSinceSuccess.inSeconds}s ago), marking as connected');
+          _setConnectionStatus(true, 'Connected');
+        }
+        return; // Skip slow checks if we have recent success
+      }
+    }
+    
+    // Check internet connectivity (but don't let it block if we have recent success)
+    if (!_networkService.hasInternetAccess) {
+      // Double-check with fallback logic before marking as disconnected
+      if (_lastSuccessfulRustOperation != null) {
+        final timeSinceSuccess = DateTime.now().difference(_lastSuccessfulRustOperation!);
+        if (timeSinceSuccess.inSeconds < 120) { // 2 minutes grace period
+          if (kDebugMode) print('🚀 FALLBACK: NetworkService says no internet, but recent Rust success (${timeSinceSuccess.inSeconds}s ago)');
+          return; // Don't mark as disconnected if we had recent success
+        }
+      }
+      _setConnectionStatus(false, 'No internet connection');
+      return;
+    }
+    
     // Check if we actually have a wallet
     if (!hasWallet) {
       // Don't show "No wallet" if we're in the process of loading
@@ -1364,15 +1440,21 @@ class WalletProvider with ChangeNotifier {
     }
     
     try {
-      // Check if Rust service is initialized
+      // Check if Rust service is initialized and can get sync status
+      // No server HTTP pinging - trust Rust service communication only
       if (_rustService.initialized) {
-        // Try to get sync status as a connection check
-        final status = await _rustService.getSyncStatus();
+        // Try to get sync status as a connection check with timeout
+        final status = await _rustService.getSyncStatus()
+            .timeout(const Duration(seconds: 10));
+        
         if (status != null) {
           _setConnectionStatus(true, 'Connected');
           _lastConnectionCheck = DateTime.now();
+          // NOTE: Just getting sync status doesn't guarantee server connection (could be cached)
+          // Real connection detection happens when sync is in_progress or we get new data
         } else {
-          _setConnectionStatus(false, 'Disconnected');
+          // Internet available but Rust can't get status
+          _setConnectionStatus(false, 'Connection error');
         }
       } else {
         _setConnectionStatus(false, 'Not initialized');
@@ -1380,7 +1462,11 @@ class WalletProvider with ChangeNotifier {
         _scheduleReconnectionAttempt();
       }
     } catch (e) {
-      _setConnectionStatus(false, 'Connection error');
+      if (e is TimeoutException) {
+        _setConnectionStatus(false, 'Connection timeout');
+      } else {
+        _setConnectionStatus(false, 'Connection error');
+      }
       if (kDebugMode) print('❌ Connection check failed: $e');
     }
   }
@@ -1399,6 +1485,8 @@ class WalletProvider with ChangeNotifier {
         return;
       }
       
+      // NOTE: Basic sync status can be cached, so we check for REAL activity below
+      
       if (kDebugMode) {
         print('📊 Sync status update: $status');
       }
@@ -1406,6 +1494,10 @@ class WalletProvider with ChangeNotifier {
       final inProgress = status['in_progress'] ?? false;
       
       if (inProgress) {
+        // REAL SERVER CONNECTION: Active sync requires server communication
+        if (kDebugMode) print('🔗 REAL CONNECTION: Sync in progress, forcing Connected status');
+        _overrideConnectionStatus(operation: 'active_sync');
+        
         _setSyncing(true);  // Ensure syncing flag is set
         
         // Track sync start time
@@ -1473,6 +1565,10 @@ class WalletProvider with ChangeNotifier {
         
         // Stop polling immediately when sync is complete
         _stopSyncStatusPolling();
+        
+        // REAL SERVER CONNECTION: Successful sync completion means server communication worked
+        if (kDebugMode) print('🔗 REAL CONNECTION: Sync completed successfully, forcing Connected status');
+        _overrideConnectionStatus(operation: 'sync_completed');
         
         // Clear sync progress to prevent stuck "100%" display
         if (_syncProgress >= 100.0 || !inProgress) {
@@ -1569,6 +1665,8 @@ class WalletProvider with ChangeNotifier {
           final blockHeight = await _rustService.getCurrentBlockHeight();
           if (blockHeight != null && blockHeight > 0) {
             if (kDebugMode) print('✅ Connected: Block height $blockHeight');
+            // Smart block height detection - only override if it's NEW data
+            _handleNewBlockHeight(blockHeight);
           }
         } catch (e) {
           // Don't change connection status if block height check fails
@@ -1586,10 +1684,149 @@ class WalletProvider with ChangeNotifier {
   
   /// Set connection status
   void _setConnectionStatus(bool connected, String status) {
+    final wasConnected = _isConnected;
     _isConnected = connected;
     _connectionStatus = status;
     _lastConnectionCheck = DateTime.now();
+    
+    // Start validation timer when disconnected
+    if (!connected && wasConnected) {
+      _startConnectionValidation();
+    } else if (connected && !wasConnected) {
+      // Stop validation when connected
+      _connectionValidationTimer?.cancel();
+      _connectionValidationTimer = null;
+    }
+    
     notifyListeners();
+  }
+  
+  /// Override connection status when Rust operations succeed
+  void _overrideConnectionStatus({String? operation}) {
+    // AGGRESSIVE: If Rust operations work, we have connectivity - ignore NetworkService
+    if (!_isConnected) {
+      final operationMsg = operation != null ? ' ($operation)' : '';
+      if (kDebugMode) print('🔗 Rust operation successful$operationMsg, FORCING connection status to Connected');
+      _setConnectionStatus(true, 'Connected');
+      // Stop frequent validation when connected
+      _connectionValidationTimer?.cancel();
+      _connectionValidationTimer = null;
+      
+      // Update last successful operation timestamp
+      _lastSuccessfulRustOperation = DateTime.now();
+    }
+  }
+  
+  /// Start aggressive connection validation when disconnected
+  void _startConnectionValidation() {
+    // Don't start if already running or if connected
+    if (_connectionValidationTimer?.isActive == true || _isConnected) return;
+    
+    if (kDebugMode) print('🔍 Starting AGGRESSIVE connection validation timer (3s intervals)');
+    _connectionValidationTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (!_isConnected) {
+        if (kDebugMode) print('🔗 Rapid reconnection attempt...');
+        
+        // Try multiple quick validation approaches
+        await _rapidConnectionValidation();
+      } else {
+        // Stop validation when connected
+        if (kDebugMode) print('✅ Connection restored, stopping validation timer');
+        timer.cancel();
+        _connectionValidationTimer = null;
+      }
+    });
+  }
+  
+  /// Rapid connection validation with multiple approaches
+  Future<void> _rapidConnectionValidation() async {
+    if (_isConnected) return; // Already connected, skip
+    
+    try {
+      // Approach 1: Quick sync status check (fastest) - but only if it shows real activity
+      if (_rustService.initialized) {
+        final status = await _rustService.getSyncStatus()
+            .timeout(const Duration(seconds: 2));
+        if (status != null) {
+          final inProgress = status['in_progress'] ?? false;
+          if (inProgress) {
+            // Only override if sync is actively in progress (real server communication)
+            if (kDebugMode) print('🚀 RAPID: Sync in progress, forcing reconnection');
+            _overrideConnectionStatus(operation: 'rapid_sync_active');
+            return;
+          }
+        }
+      }
+      
+      // Approach 2: Quick block height check - only override if it's NEW data
+      if (_rustService.initialized) {
+        final height = await _rustService.getCurrentBlockHeight()
+            .timeout(const Duration(seconds: 2));
+        if (height != null && height > 0) {
+          // Use smart handler that only triggers on new block heights
+          _handleNewBlockHeight(height);
+          // Don't return here - let other approaches run too
+        }
+      }
+      
+      // Approach 3: If we have recent successful operations, trust them
+      if (_lastSuccessfulRustOperation != null) {
+        final timeSinceLastSuccess = DateTime.now().difference(_lastSuccessfulRustOperation!);
+        if (timeSinceLastSuccess.inSeconds < 60) {
+          if (kDebugMode) print('🚀 RAPID: Recent successful operation (${timeSinceLastSuccess.inSeconds}s ago), forcing reconnection');
+          _overrideConnectionStatus(operation: 'recent_success_override');
+          return;
+        }
+      }
+      
+    } catch (e) {
+      // Quick operations failed, but don't spam logs
+      if (kDebugMode && DateTime.now().second % 10 == 0) {
+        print('⚡ Rapid validation failed: $e');
+      }
+    }
+  }
+  
+  /// Handle new block height - only trigger connection override for NEW data
+  void _handleNewBlockHeight(int blockHeight) {
+    if (_lastKnownBlockHeight == null || _lastKnownBlockHeight != blockHeight) {
+      if (kDebugMode) print('🔗 NEW BLOCK HEIGHT: $blockHeight (was: $_lastKnownBlockHeight) - REAL server data!');
+      _lastKnownBlockHeight = blockHeight;
+      // This is fresh server data, safe to override connection status
+      _overrideConnectionStatus(operation: 'new_block_height');
+    } else {
+      if (kDebugMode) print('📊 Same block height: $blockHeight (cached data, not overriding connection)');
+    }
+  }
+  
+  /// Fast Rust-based internet connectivity check (alternative to NetworkService)
+  Future<bool> _fastRustConnectivityCheck() async {
+    if (!_rustService.initialized) return false;
+    
+    try {
+      // Try the fastest possible Rust operation with very short timeout
+      final status = await _rustService.getSyncStatus()
+          .timeout(const Duration(milliseconds: 1500)); // Very fast timeout
+      
+      if (status != null) {
+        // Check if this is REAL server communication or cached data
+        final inProgress = status['in_progress'] ?? false;
+        final syncedBlocks = status['synced_blocks'] ?? 0;
+        
+        if (inProgress || syncedBlocks > 0) {
+          // Only override if we have signs of real server activity
+          if (kDebugMode) print('🚀 Fast Rust connectivity: SUCCESS with real activity (inProgress: $inProgress, blocks: $syncedBlocks)');
+          _overrideConnectionStatus(operation: 'fast_rust_check_with_activity');
+          return true;
+        } else {
+          if (kDebugMode) print('📊 Fast Rust connectivity: Got status but no signs of server activity (cached data?)');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('⚡ Fast Rust connectivity: FAILED - $e');
+    }
+    
+    return false;
   }
   
   /// Start automatic syncing using BitcoinZ Blue's exact approach
@@ -1863,6 +2100,12 @@ class WalletProvider with ChangeNotifier {
         await _rustService.fetchAddresses();
         
         if (kDebugMode) print('✅ Wallet data refresh complete');
+        
+        // If Rust operations succeeded, we have connectivity - override any negative status
+        if (!_isConnected && _networkService.hasInternetAccess) {
+          if (kDebugMode) print('🔗 Rust operations successful, overriding connection status');
+          _setConnectionStatus(true, 'Connected');
+        }
       } catch (e) {
         if (kDebugMode) print('⚠️ Error refreshing wallet data: $e');
       }
@@ -2795,6 +3038,12 @@ class WalletProvider with ChangeNotifier {
   void dispose() {
     _rustService.dispose(); // Clean up the Rust service (async but we can't await here)
     stopAutoSync();
+    
+    // Clean up network service
+    _internetStatusSubscription?.cancel();
+    _connectionValidationTimer?.cancel();
+    _networkService.dispose();
+    
     super.dispose();
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/wallet_provider.dart';
+import '../providers/network_provider.dart';
 
 /// Detailed sync information dialog
 class SyncDetailsDialog extends StatelessWidget {
@@ -9,53 +10,55 @@ class SyncDetailsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<WalletProvider>(
-      builder: (context, provider, child) {
+    return Consumer2<WalletProvider, NetworkProvider>(
+      builder: (context, walletProvider, networkProvider, child) {
         final theme = Theme.of(context);
         
         return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+          backgroundColor: Colors.transparent,
           child: Container(
-            padding: const EdgeInsets.all(20),
-            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.grey.shade800,
+                width: 1,
+              ),
+            ),
+            padding: const EdgeInsets.all(24),
+            constraints: const BoxConstraints(maxWidth: 380),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.sync_alt,
-                      color: theme.colorScheme.primary,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Sync Details',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        'Sync Details',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                    const Spacer(),
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close, color: Colors.white70),
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 
                 // Connection Status
                 _buildDetailRow(
                   context,
                   icon: Icons.wifi,
                   label: 'Connection',
-                  value: provider.isConnected ? 'Connected' : 'Disconnected',
-                  valueColor: provider.isConnected ? Colors.green : Colors.red,
+                  value: walletProvider.isConnected ? 'Connected' : 'Disconnected',
+                  valueColor: walletProvider.isConnected ? Colors.green : Colors.red,
                 ),
                 const SizedBox(height: 12),
                 
@@ -64,7 +67,7 @@ class SyncDetailsDialog extends StatelessWidget {
                   context,
                   icon: Icons.dns,
                   label: 'Server',
-                  value: 'lightd.btcz.rocks:9067',
+                  value: networkProvider.currentServerInfo?.displayName ?? 'Unknown Server',
                 ),
                 const SizedBox(height: 12),
                 
@@ -73,31 +76,32 @@ class SyncDetailsDialog extends StatelessWidget {
                   context,
                   icon: Icons.sync,
                   label: 'Status',
-                  value: provider.isSyncing 
-                    ? 'Syncing (${provider.syncProgress.toStringAsFixed(1)}%)'
+                  value: walletProvider.isSyncing 
+                    ? 'Syncing (${walletProvider.syncProgress.toStringAsFixed(1)}%)'
                     : 'Idle',
-                  valueColor: provider.isSyncing ? Colors.blue : null,
+                  valueColor: walletProvider.isSyncing ? Colors.blue : null,
                 ),
                 
-                if (provider.isSyncing || provider.syncedBlocks > 0) ...[
+                if (walletProvider.isSyncing || walletProvider.syncedBlocks > 0) ...[
                   const SizedBox(height: 20),
-                  const Divider(),
+                  Divider(color: Colors.grey.shade800),
                   const SizedBox(height: 20),
                   
                   Text(
                     'Sync Progress',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 12),
                   
                   // Progress Bar
-                  if (provider.syncProgress > 0) ...[
+                  if (walletProvider.syncProgress > 0) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: LinearProgressIndicator(
-                        value: provider.syncProgress / 100,
+                        value: walletProvider.syncProgress / 100,
                         minHeight: 8,
                         backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                         valueColor: AlwaysStoppedAnimation<Color>(
@@ -108,7 +112,7 @@ class SyncDetailsDialog extends StatelessWidget {
                     const SizedBox(height: 8),
                     Center(
                       child: Text(
-                        '${provider.syncProgress.toStringAsFixed(1)}%',
+                        '${walletProvider.syncProgress.toStringAsFixed(1)}%',
                         style: theme.textTheme.bodyLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.primary,
@@ -119,40 +123,40 @@ class SyncDetailsDialog extends StatelessWidget {
                   ],
                   
                   // Batch Info
-                  if (provider.batchTotal > 0) ...[
+                  if (walletProvider.batchTotal > 0) ...[
                     _buildDetailRow(
                       context,
                       icon: Icons.layers,
                       label: 'Batch',
-                      value: '${provider.batchNum} of ${provider.batchTotal}',
+                      value: '${walletProvider.batchNum} of ${walletProvider.batchTotal}',
                     ),
                     const SizedBox(height: 12),
                   ],
                   
                   // Blocks Info
-                  if (provider.totalBlocks > 0) ...[
+                  if (walletProvider.totalBlocks > 0) ...[
                     _buildDetailRow(
                       context,
                       icon: Icons.grid_view,
                       label: 'Blocks Synced',
-                      value: '${NumberFormat('#,###').format(provider.syncedBlocks)} / ${NumberFormat('#,###').format(provider.totalBlocks)}',
+                      value: '${NumberFormat('#,###').format(walletProvider.syncedBlocks)} / ${NumberFormat('#,###').format(walletProvider.totalBlocks)}',
                     ),
                     const SizedBox(height: 12),
                   ],
                   
                   // Sync Message
-                  if (provider.syncMessage.isNotEmpty) ...[
+                  if (walletProvider.syncMessage.isNotEmpty) ...[
                     _buildDetailRow(
                       context,
                       icon: Icons.info_outline,
                       label: 'Message',
-                      value: provider.syncMessage,
+                      value: walletProvider.syncMessage,
                     ),
                   ],
                 ],
                 
                 const SizedBox(height: 20),
-                const Divider(),
+                Divider(color: Colors.grey.shade800),
                 const SizedBox(height: 20),
                 
                 // Wallet Info
@@ -160,6 +164,7 @@ class SyncDetailsDialog extends StatelessWidget {
                   'Wallet Information',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -169,9 +174,9 @@ class SyncDetailsDialog extends StatelessWidget {
                   context,
                   icon: Icons.access_time,
                   label: 'Last Sync',
-                  value: provider.lastSyncTime != null
-                    ? _formatLastSync(provider.lastSyncTime!)
-                    : 'Never',
+                  value: walletProvider.lastSyncTime != null
+                    ? _formatLastSync(walletProvider.lastSyncTime!)
+                    : 'Just now',
                 ),
                 
                 const SizedBox(height: 24),
@@ -180,30 +185,38 @@ class SyncDetailsDialog extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    if (!provider.isSyncing) ...[
-                      TextButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          provider.syncWallet();
-                        },
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Force Sync'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: theme.colorScheme.primary,
+                    if (!walletProvider.isSyncing) ...[
+                      Container(
+                        height: 36,
+                        child: TextButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            walletProvider.syncWallet();
+                          },
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Force Sync'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFFD2691E),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
                     ],
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: theme.colorScheme.onPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    Container(
+                      height: 36,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD2691E),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
                         ),
+                        child: const Text('Close'),
                       ),
-                      child: const Text('Close'),
                     ),
                   ],
                 ),
@@ -222,28 +235,28 @@ class SyncDetailsDialog extends StatelessWidget {
     required String value,
     Color? valueColor,
   }) {
-    final theme = Theme.of(context);
-    
     return Row(
       children: [
         Icon(
           icon,
           size: 20,
-          color: theme.colorScheme.onSurface.withOpacity(0.6),
+          color: Colors.white.withOpacity(0.6),
         ),
         const SizedBox(width: 12),
         Text(
           label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.white70,
           ),
         ),
         const Spacer(),
         Text(
           value,
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: TextStyle(
+            fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: valueColor ?? theme.colorScheme.onSurface,
+            color: valueColor ?? Colors.white,
           ),
         ),
       ],
