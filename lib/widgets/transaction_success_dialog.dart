@@ -265,30 +265,31 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                            // Animated checkmark with pulse
+                            // Clean Animated Checkmark
                             AnimatedBuilder(
-                              animation: _pulseAnimation,
+                              animation: _scaleAnimation,
                               builder: (context, child) {
                                 return Transform.scale(
-                                  scale: _pulseAnimation.value,
+                                  scale: _scaleAnimation.value,
                                   child: Container(
-                                    width: 72,
-                                    height: 72,
+                                    width: 80,
+                                    height: 80,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Colors.green.shade400,
-                                          Colors.green.shade600,
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
+                                      border: Border.all(
+                                        color: Colors.green.shade400,
+                                        width: 3,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.green.withOpacity(0.5),
+                                          color: Colors.green.withOpacity(0.3),
                                           blurRadius: 20,
-                                          spreadRadius: 2,
+                                          spreadRadius: 5,
+                                        ),
+                                        BoxShadow(
+                                          color: Colors.green.withOpacity(0.1),
+                                          blurRadius: 40,
+                                          spreadRadius: 15,
                                         ),
                                       ],
                                     ),
@@ -296,7 +297,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                                       animation: _checkAnimation,
                                       builder: (context, child) {
                                         return CustomPaint(
-                                          painter: CheckmarkPainter(
+                                          painter: ElegantCheckmarkPainter(
                                             progress: _checkAnimation.value,
                                           ),
                                         );
@@ -654,6 +655,79 @@ class ConfettiParticle {
     required this.color,
     required this.size,
   });
+}
+
+// Elegant checkmark painter with smooth drawing animation
+class ElegantCheckmarkPainter extends CustomPainter {
+  final double progress;
+  
+  ElegantCheckmarkPainter({required this.progress});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.green.shade500
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    
+    final path = Path();
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    
+    // Only draw if we have progress
+    if (progress > 0) {
+      // First line of checkmark (down-left to center)
+      final firstLineProgress = math.min(progress * 1.8, 1.0);
+      if (firstLineProgress > 0) {
+        final startX = centerX - 14;
+        final startY = centerY - 2;
+        final midX = centerX - 6;
+        final midY = centerY + 8;
+        
+        path.moveTo(startX, startY);
+        path.lineTo(
+          startX + ((midX - startX) * firstLineProgress),
+          startY + ((midY - startY) * firstLineProgress),
+        );
+      }
+      
+      // Second line of checkmark (center to up-right)
+      if (progress > 0.4) {
+        final secondLineProgress = math.min((progress - 0.4) * 1.8, 1.0);
+        final midX = centerX - 6;
+        final midY = centerY + 8;
+        final endX = centerX + 16;
+        final endY = centerY - 10;
+        
+        // Continue from where first line ended
+        if (firstLineProgress >= 1.0) {
+          path.lineTo(
+            midX + ((endX - midX) * secondLineProgress),
+            midY + ((endY - midY) * secondLineProgress),
+          );
+        }
+      }
+    }
+    
+    canvas.drawPath(path, paint);
+    
+    // Add subtle glow effect when complete
+    if (progress > 0.8) {
+      final glowPaint = Paint()
+        ..color = Colors.green.withOpacity(0.3)
+        ..strokeWidth = 8
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+      
+      canvas.drawPath(path, glowPaint);
+    }
+  }
+  
+  @override
+  bool shouldRepaint(ElegantCheckmarkPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
 }
 
 class CheckmarkPainter extends CustomPainter {
