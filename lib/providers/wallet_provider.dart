@@ -13,11 +13,11 @@ import '../models/address_model.dart';
 // import '../services/bitcoinz_service.dart'; // Not used - using Rust service instead
 import '../services/database_service.dart';
 import '../services/bitcoinz_rust_service.dart';
-import '../services/network_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/network_provider.dart';
 import '../screens/wallet/paginated_transaction_history_screen.dart';
 import '../utils/constants.dart';
+import '../src/rust/api.dart' as rust_api;
 
 class WalletProvider with ChangeNotifier {
   WalletModel? _wallet;
@@ -34,14 +34,12 @@ class WalletProvider with ChangeNotifier {
   DateTime? _lastSuccessfulRustOperation;
   int? _lastKnownBlockHeight;
   Timer? _syncTimer;
-  Timer? _connectionValidationTimer;
   
   // Network provider reference
   NetworkProvider? _networkProvider;
   
-  // Network service for connectivity monitoring
-  final NetworkService _networkService = NetworkService();
-  StreamSubscription<bool>? _internetStatusSubscription;
+  // Simple connection monitoring (single Rust anchor)
+  Timer? _simpleConnectionTimer;
   
   // Sync progress tracking (like BitcoinZ Blue)
   int _syncedBlocks = 0;
@@ -95,8 +93,8 @@ class WalletProvider with ChangeNotifier {
     // Initialize SharedPreferences early
     _initializePreferences();
     
-    // Initialize network service
-    _initializeNetworkService();
+    // Start simple connection monitoring
+    _startSimpleConnectionMonitoring();
     
     // Initialize Native Rust service with mempool monitoring
     _rustService = BitcoinzRustService.instance;
@@ -211,39 +209,51 @@ class WalletProvider with ChangeNotifier {
     };
   }
 
-  /// Initialize network connectivity monitoring
-  void _initializeNetworkService() async {
+  /// Start simple connection monitoring using only Rust
+  void _startSimpleConnectionMonitoring() {
+    if (kDebugMode) print('🔗 Starting simple Rust-only connection monitoring');
+    
+    // Single timer that checks connection every 3 seconds - ONLY source of connection status
+    _simpleConnectionTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (_rustService.initialized) {
+        await _simpleRustConnectionCheck();
+      }
+    });
+  }
+  
+  /// Real gRPC connection test - tests actual server connectivity
+  /// This is the ONLY method that should set Connected status
+  Future<bool> _testRealServerConnection({String? context}) async {
     try {
-      await _networkService.initialize();
+      final contextMsg = context != null ? ' ($context)' : '';
+      if (kDebugMode) print('🔍 REAL gRPC test$contextMsg...');
       
-      // Listen for internet connectivity changes
-      _internetStatusSubscription = _networkService.internetStatusStream.listen((hasInternet) {
-        if (kDebugMode) {
-          print('🌐 WalletProvider: Internet connectivity changed - $hasInternet');
-        }
-        
-        if (!hasInternet) {
-          // Lost internet connection
-          _setConnectionStatus(false, 'No internet connection');
-        } else {
-          // Regained internet connection - INSTANT aggressive validation
-          if (kDebugMode) print('🔗 Internet restored, starting IMMEDIATE aggressive reconnection');
-          
-          // Priority 1: Fastest possible Rust connectivity check
-          _fastRustConnectivityCheck().then((success) {
-            if (!success) {
-              // Priority 2: If fast check fails, try rapid validation
-              _rapidConnectionValidation();
-              
-              // Priority 3: Traditional check as backup
-              checkConnectionStatus();
-            }
-          });
-        }
-      });
+      // Use rust_api.getServerInfo() to make actual gRPC call to server
+      final result = await rust_api.getServerInfo(serverUri: currentServerUrl)
+          .timeout(const Duration(seconds: 3));
+      final responseData = jsonDecode(result) as Map<String, dynamic>;
+      
+      if (responseData.containsKey('success') && responseData['success'] == true) {
+        if (kDebugMode) print('✅ REAL server connection SUCCESS$contextMsg');
+        _setConnectionStatus(true, 'Connected');
+        return true;
+      } else {
+        final errorMsg = responseData['error'] ?? 'Unknown server error';
+        if (kDebugMode) print('❌ REAL server connection FAILED$contextMsg: $errorMsg');
+        _setConnectionStatus(false, 'Server error');
+        return false;
+      }
     } catch (e) {
-      if (kDebugMode) print('❌ WalletProvider: Failed to initialize network service - $e');
+      final contextMsg = context != null ? ' ($context)' : '';
+      if (kDebugMode) print('❌ REAL server connection FAILED$contextMsg: $e');
+      _setConnectionStatus(false, 'Connection failed');
+      return false;
     }
+  }
+
+  /// Legacy method - now uses real connection test
+  Future<void> _simpleRustConnectionCheck() async {
+    await _testRealServerConnection(context: 'periodic_check');
   }
 
   // Getters
@@ -1014,10 +1024,10 @@ class WalletProvider with ChangeNotifier {
           }
         }
         
-        // Set connection status immediately after Rust initialization
+        // Test real connection status after Rust initialization
         if (_rustService.initialized) {
-          _setConnectionStatus(true, 'Connected to server');
-          if (kDebugMode) print('✅ Rust service initialized, marking as connected');
+          if (kDebugMode) print('🔧 Rust service initialized, testing real server connection...');
+          await _testRealServerConnection(context: 'after_rust_init');
         } else {
           _setConnectionStatus(false, 'Initializing...');
           if (kDebugMode) print('⏳ Rust service not yet initialized');
@@ -1137,10 +1147,10 @@ class WalletProvider with ChangeNotifier {
           'createdAt': DateTime.now().toIso8601String(),
         });
         
-        // Set connection status immediately after Rust initialization
+        // Test real connection status after Rust initialization
         if (_rustService.initialized) {
-          _setConnectionStatus(true, 'Connected to server');
-          if (kDebugMode) print('✅ Rust service initialized, marking as connected');
+          if (kDebugMode) print('🔧 Rust service initialized, testing real server connection...');
+          await _testRealServerConnection(context: 'after_rust_init');
         } else {
           _setConnectionStatus(false, 'Initializing...');
           if (kDebugMode) print('⏳ Rust service not yet initialized');
@@ -1242,6 +1252,12 @@ class WalletProvider with ChangeNotifier {
       if (kDebugMode) print('🔄 Silent background refresh (no UI)...');
     }
     
+    // Don't sync if we're disconnected - prevents background operations when offline
+    if (!_isConnected) {
+      if (kDebugMode) print('📵 Skipping background sync - currently disconnected');
+      return;
+    }
+    
     try {
       // Check if this is a CLI wallet
       if (_wallet?.walletId?.startsWith('cli_imported_') == true) {
@@ -1286,7 +1302,8 @@ class WalletProvider with ChangeNotifier {
         if (kDebugMode) print('⏰ Sync polling timeout - stopping after 5 minutes');
         _stopSyncStatusPolling();
         _setSyncing(false);
-        _setConnectionStatus(true, 'Connected');
+        // Test real connection instead of assuming connected on timeout
+        await _testRealServerConnection(context: 'sync_timeout');
         return;
       }
       
@@ -1326,11 +1343,13 @@ class WalletProvider with ChangeNotifier {
             );
             
             if (connected) {
-              if (kDebugMode) print('✅ Reconnected successfully!');
-              _setConnectionStatus(true, 'Connected to server');
+              if (kDebugMode) print('🔧 Rust reconnected, testing real server connection...');
+              final reallyConnected = await _testRealServerConnection(context: 'reconnect');
               
-              // Now sync the wallet
-              syncWalletInBackground();
+              if (reallyConnected) {
+                // Now sync the wallet
+                syncWalletInBackground();
+              }
             } else {
               // Schedule another attempt
               _scheduleReconnectionAttempt();
@@ -1354,8 +1373,8 @@ class WalletProvider with ChangeNotifier {
     try {
       // Check if we already have a connection
       if (_rustService.initialized) {
-        if (kDebugMode) print('✅ Already connected to server');
-        _setConnectionStatus(true, 'Connected');
+        if (kDebugMode) print('🔧 Rust initialized, testing real server connection...');
+        await _testRealServerConnection(context: 'early_connection_check');
         return;
       }
       
@@ -1368,10 +1387,9 @@ class WalletProvider with ChangeNotifier {
         // Quick check with timeout
         await Future.delayed(const Duration(milliseconds: 200));
         
-        // If we got here without error, server seems reachable
-        if (kDebugMode) print('✅ Server appears to be reachable');
-        // Don't set any status - follow Black Amber philosophy of minimal UI
-        _setConnectionStatus(true, '');  // Empty status = no message shown
+        // Test real server connection instead of assuming reachable
+        if (kDebugMode) print('🔧 Server check passed, testing real connection...');
+        await _testRealServerConnection(context: 'early_server_check');
         
       } catch (e) {
         // Only show offline if we actually can't reach the server
@@ -1399,26 +1417,14 @@ class WalletProvider with ChangeNotifier {
       final timeSinceSuccess = DateTime.now().difference(_lastSuccessfulRustOperation!);
       if (timeSinceSuccess.inSeconds < 30) {
         if (!_isConnected) {
-          if (kDebugMode) print('🚀 FALLBACK: Recent Rust success (${timeSinceSuccess.inSeconds}s ago), marking as connected');
-          _setConnectionStatus(true, 'Connected');
+          if (kDebugMode) print('🔧 Recent Rust success (${timeSinceSuccess.inSeconds}s ago), testing real connection...');
+          await _testRealServerConnection(context: 'recent_success_fallback');
         }
         return; // Skip slow checks if we have recent success
       }
     }
     
-    // Check internet connectivity (but don't let it block if we have recent success)
-    if (!_networkService.hasInternetAccess) {
-      // Double-check with fallback logic before marking as disconnected
-      if (_lastSuccessfulRustOperation != null) {
-        final timeSinceSuccess = DateTime.now().difference(_lastSuccessfulRustOperation!);
-        if (timeSinceSuccess.inSeconds < 120) { // 2 minutes grace period
-          if (kDebugMode) print('🚀 FALLBACK: NetworkService says no internet, but recent Rust success (${timeSinceSuccess.inSeconds}s ago)');
-          return; // Don't mark as disconnected if we had recent success
-        }
-      }
-      _setConnectionStatus(false, 'No internet connection');
-      return;
-    }
+    // NOTE: No internet checking - we rely solely on Rust service communication
     
     // Check if we actually have a wallet
     if (!hasWallet) {
@@ -1448,10 +1454,9 @@ class WalletProvider with ChangeNotifier {
             .timeout(const Duration(seconds: 10));
         
         if (status != null) {
-          _setConnectionStatus(true, 'Connected');
+          // getSyncStatus can return cached data - don't set connection status here
+          if (kDebugMode) print('📊 getSyncStatus returned data (may be cached)');
           _lastConnectionCheck = DateTime.now();
-          // NOTE: Just getting sync status doesn't guarantee server connection (could be cached)
-          // Real connection detection happens when sync is in_progress or we get new data
         } else {
           // Internet available but Rust can't get status
           _setConnectionStatus(false, 'Connection error');
@@ -1494,9 +1499,8 @@ class WalletProvider with ChangeNotifier {
       final inProgress = status['in_progress'] ?? false;
       
       if (inProgress) {
-        // REAL SERVER CONNECTION: Active sync requires server communication
-        if (kDebugMode) print('🔗 REAL CONNECTION: Sync in progress, forcing Connected status');
-        _overrideConnectionStatus(operation: 'active_sync');
+        // Active sync detected - let periodic check handle connection status
+        if (kDebugMode) print('📊 Sync in progress detected');
         
         _setSyncing(true);  // Ensure syncing flag is set
         
@@ -1566,9 +1570,8 @@ class WalletProvider with ChangeNotifier {
         // Stop polling immediately when sync is complete
         _stopSyncStatusPolling();
         
-        // REAL SERVER CONNECTION: Successful sync completion means server communication worked
-        if (kDebugMode) print('🔗 REAL CONNECTION: Sync completed successfully, forcing Connected status');
-        _overrideConnectionStatus(operation: 'sync_completed');
+        // Sync completed - let periodic check handle connection status
+        if (kDebugMode) print('📊 Sync completed');
         
         // Clear sync progress to prevent stuck "100%" display
         if (_syncProgress >= 100.0 || !inProgress) {
@@ -1596,8 +1599,8 @@ class WalletProvider with ChangeNotifier {
         _batchNum = 0;
         _batchTotal = 0;
         
-        // Set connection status to green (ready) like macOS
-        _setConnectionStatus(true, 'Connected');
+        // Data load completed - let periodic check handle connection status
+        if (kDebugMode) print('📊 Data load completed');
         
         // Immediately clear syncing flag - don't delay
         _setSyncing(false);
@@ -1654,11 +1657,10 @@ class WalletProvider with ChangeNotifier {
         print('🔍 _checkConnection: walletId=${_wallet?.walletId}, isCliWallet=${_wallet?.walletId?.startsWith('cli_imported_')}');
       }
       
-      // If Rust service is initialized, we consider it connected
-      // The Rust service handles its own connection internally
+      // If Rust service is initialized, test real connection
       if (_rustService.initialized) {
-        _setConnectionStatus(true, 'Connected to server');
-        if (kDebugMode) print('✅ Rust service is initialized, marking as connected');
+        if (kDebugMode) print('🔧 Rust service initialized, testing real server connection...');
+        await _testRealServerConnection(context: 'connection_check');
         
         // Try to get block height for additional verification (non-blocking)
         try {
@@ -1684,150 +1686,30 @@ class WalletProvider with ChangeNotifier {
   
   /// Set connection status
   void _setConnectionStatus(bool connected, String status) {
-    final wasConnected = _isConnected;
     _isConnected = connected;
     _connectionStatus = status;
     _lastConnectionCheck = DateTime.now();
-    
-    // Start validation timer when disconnected
-    if (!connected && wasConnected) {
-      _startConnectionValidation();
-    } else if (connected && !wasConnected) {
-      // Stop validation when connected
-      _connectionValidationTimer?.cancel();
-      _connectionValidationTimer = null;
-    }
-    
     notifyListeners();
   }
   
-  /// Override connection status when Rust operations succeed
-  void _overrideConnectionStatus({String? operation}) {
-    // AGGRESSIVE: If Rust operations work, we have connectivity - ignore NetworkService
-    if (!_isConnected) {
-      final operationMsg = operation != null ? ' ($operation)' : '';
-      if (kDebugMode) print('🔗 Rust operation successful$operationMsg, FORCING connection status to Connected');
-      _setConnectionStatus(true, 'Connected');
-      // Stop frequent validation when connected
-      _connectionValidationTimer?.cancel();
-      _connectionValidationTimer = null;
-      
-      // Update last successful operation timestamp
-      _lastSuccessfulRustOperation = DateTime.now();
-    }
+  /// Update last successful operation timestamp only
+  void _updateLastSuccessfulOperation() {
+    _lastSuccessfulRustOperation = DateTime.now();
   }
   
-  /// Start aggressive connection validation when disconnected
-  void _startConnectionValidation() {
-    // Don't start if already running or if connected
-    if (_connectionValidationTimer?.isActive == true || _isConnected) return;
-    
-    if (kDebugMode) print('🔍 Starting AGGRESSIVE connection validation timer (3s intervals)');
-    _connectionValidationTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
-      if (!_isConnected) {
-        if (kDebugMode) print('🔗 Rapid reconnection attempt...');
-        
-        // Try multiple quick validation approaches
-        await _rapidConnectionValidation();
-      } else {
-        // Stop validation when connected
-        if (kDebugMode) print('✅ Connection restored, stopping validation timer');
-        timer.cancel();
-        _connectionValidationTimer = null;
-      }
-    });
-  }
   
-  /// Rapid connection validation with multiple approaches
-  Future<void> _rapidConnectionValidation() async {
-    if (_isConnected) return; // Already connected, skip
-    
-    try {
-      // Approach 1: Quick sync status check (fastest) - but only if it shows real activity
-      if (_rustService.initialized) {
-        final status = await _rustService.getSyncStatus()
-            .timeout(const Duration(seconds: 2));
-        if (status != null) {
-          final inProgress = status['in_progress'] ?? false;
-          if (inProgress) {
-            // Only override if sync is actively in progress (real server communication)
-            if (kDebugMode) print('🚀 RAPID: Sync in progress, forcing reconnection');
-            _overrideConnectionStatus(operation: 'rapid_sync_active');
-            return;
-          }
-        }
-      }
-      
-      // Approach 2: Quick block height check - only override if it's NEW data
-      if (_rustService.initialized) {
-        final height = await _rustService.getCurrentBlockHeight()
-            .timeout(const Duration(seconds: 2));
-        if (height != null && height > 0) {
-          // Use smart handler that only triggers on new block heights
-          _handleNewBlockHeight(height);
-          // Don't return here - let other approaches run too
-        }
-      }
-      
-      // Approach 3: If we have recent successful operations, trust them
-      if (_lastSuccessfulRustOperation != null) {
-        final timeSinceLastSuccess = DateTime.now().difference(_lastSuccessfulRustOperation!);
-        if (timeSinceLastSuccess.inSeconds < 60) {
-          if (kDebugMode) print('🚀 RAPID: Recent successful operation (${timeSinceLastSuccess.inSeconds}s ago), forcing reconnection');
-          _overrideConnectionStatus(operation: 'recent_success_override');
-          return;
-        }
-      }
-      
-    } catch (e) {
-      // Quick operations failed, but don't spam logs
-      if (kDebugMode && DateTime.now().second % 10 == 0) {
-        print('⚡ Rapid validation failed: $e');
-      }
-    }
-  }
-  
-  /// Handle new block height - only trigger connection override for NEW data
+  /// Handle new block height - test real connection when we get NEW data
   void _handleNewBlockHeight(int blockHeight) {
     if (_lastKnownBlockHeight == null || _lastKnownBlockHeight != blockHeight) {
-      if (kDebugMode) print('🔗 NEW BLOCK HEIGHT: $blockHeight (was: $_lastKnownBlockHeight) - REAL server data!');
+      if (kDebugMode) print('🔗 NEW BLOCK HEIGHT: $blockHeight (was: $_lastKnownBlockHeight) - testing connection');
       _lastKnownBlockHeight = blockHeight;
-      // This is fresh server data, safe to override connection status
-      _overrideConnectionStatus(operation: 'new_block_height');
+      // This suggests real server data - test connection to confirm
+      _testRealServerConnection(context: 'new_block_height');
     } else {
-      if (kDebugMode) print('📊 Same block height: $blockHeight (cached data, not overriding connection)');
+      if (kDebugMode) print('📊 Same block height: $blockHeight (cached data, no connection test)');
     }
   }
   
-  /// Fast Rust-based internet connectivity check (alternative to NetworkService)
-  Future<bool> _fastRustConnectivityCheck() async {
-    if (!_rustService.initialized) return false;
-    
-    try {
-      // Try the fastest possible Rust operation with very short timeout
-      final status = await _rustService.getSyncStatus()
-          .timeout(const Duration(milliseconds: 1500)); // Very fast timeout
-      
-      if (status != null) {
-        // Check if this is REAL server communication or cached data
-        final inProgress = status['in_progress'] ?? false;
-        final syncedBlocks = status['synced_blocks'] ?? 0;
-        
-        if (inProgress || syncedBlocks > 0) {
-          // Only override if we have signs of real server activity
-          if (kDebugMode) print('🚀 Fast Rust connectivity: SUCCESS with real activity (inProgress: $inProgress, blocks: $syncedBlocks)');
-          _overrideConnectionStatus(operation: 'fast_rust_check_with_activity');
-          return true;
-        } else {
-          if (kDebugMode) print('📊 Fast Rust connectivity: Got status but no signs of server activity (cached data?)');
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) print('⚡ Fast Rust connectivity: FAILED - $e');
-    }
-    
-    return false;
-  }
   
   /// Start automatic syncing using BitcoinZ Blue's exact approach
   void startAutoSync() {
@@ -1844,7 +1726,7 @@ class WalletProvider with ChangeNotifier {
     
     // Keep a backup timer for connection checks (less frequent)
     _syncTimer = Timer.periodic(const Duration(minutes: 10), (timer) async {
-      if (hasWallet && _autoSyncEnabled) {
+      if (hasWallet && _autoSyncEnabled && _isConnected) {
         try {
           if (kDebugMode) print('🔍 Running connection health check...');
           await _checkConnection(); // Ensure we're still connected
@@ -2101,11 +1983,9 @@ class WalletProvider with ChangeNotifier {
         
         if (kDebugMode) print('✅ Wallet data refresh complete');
         
-        // If Rust operations succeeded, we have connectivity - override any negative status
-        if (!_isConnected && _networkService.hasInternetAccess) {
-          if (kDebugMode) print('🔗 Rust operations successful, overriding connection status');
-          _setConnectionStatus(true, 'Connected');
-        }
+        // Rust operations succeeded - let the periodic connection check handle status
+        if (kDebugMode) print('✅ Wallet data refresh successful');
+        _updateLastSuccessfulOperation();
       } catch (e) {
         if (kDebugMode) print('⚠️ Error refreshing wallet data: $e');
       }
@@ -3039,10 +2919,8 @@ class WalletProvider with ChangeNotifier {
     _rustService.dispose(); // Clean up the Rust service (async but we can't await here)
     stopAutoSync();
     
-    // Clean up network service
-    _internetStatusSubscription?.cancel();
-    _connectionValidationTimer?.cancel();
-    _networkService.dispose();
+    // Clean up simple connection monitoring
+    _simpleConnectionTimer?.cancel();
     
     super.dispose();
   }

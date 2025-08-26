@@ -88,6 +88,11 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
   Future<void> _silentSync() async {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     
+    // Don't sync if disconnected - prevents auto-sync when offline
+    if (!walletProvider.isConnected) {
+      return;
+    }
+    
     // Start pulse animation during sync
     if (!_connectionPulseController.isAnimating) {
       _connectionPulseController.repeat(reverse: true);
@@ -132,48 +137,23 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
               constraints: const BoxConstraints(maxWidth: 400),
               child: Stack(
                 children: [
-                  // Glassmorphism background
+                  // Simple black background
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withOpacity(0.1),
-                          Colors.white.withOpacity(0.05),
-                        ],
-                      ),
+                      color: Colors.black,
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.grey.shade800,
                         width: 1,
                       ),
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                        child: Container(
-                          padding: const EdgeInsets.all(28),
-                          child: Column(
+                    padding: const EdgeInsets.all(28),
+                    child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               // Header with title and close button
                               Row(
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.orange.withOpacity(0.2),
-                                    ),
-                                    child: const Icon(
-                                      Icons.settings_ethernet,
-                                      color: Colors.orange,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
                                       'Connection Details',
@@ -195,21 +175,21 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                               const SizedBox(height: 24),
                               
                               // Status Card
-                              _buildStatusCard(context, isConnected),
+                              _buildStatusCard(context, isConnected, walletProvider.connectionStatus),
                               
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 12),
                               
                               // Server Information
                               _buildInfoCard(
                                 context,
                                 'Server Information',
                                 [
-                                  _InfoItem(
-                                    icon: Icons.dns,
-                                    label: 'Server',
-                                    value: serverInfo?.displayName ?? networkProvider.currentServerUrl,
-                                    copyable: false,
-                                  ),
+                                  if (serverInfo?.name != null)
+                                    _InfoItem(
+                                      icon: Icons.dns,
+                                      label: 'Server',
+                                      value: serverInfo!.displayName,
+                                    ),
                                   _InfoItem(
                                     icon: Icons.public,
                                     label: 'Network',
@@ -224,7 +204,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                                 ],
                               ),
                               
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 8),
                               
                               // Blockchain Information
                               _buildInfoCard(
@@ -236,7 +216,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                                       icon: Icons.layers,
                                       label: 'Block Height',
                                       value: '#${serverInfo!.latestBlockHeight!.toString()}',
-                                      valueColor: Colors.orange,
+                                      valueColor: const Color(0xFFFFB800),
                                     ),
                                   if (walletProvider.lastConnectionCheck != null)
                                     _InfoItem(
@@ -261,7 +241,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                                   Expanded(
                                     child: _buildActionButton(
                                       context,
-                                      'Network Settings',
+                                      'Settings',
                                       Icons.settings,
                                       Colors.grey.withOpacity(0.2),
                                       () {
@@ -280,7 +260,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                                       context,
                                       'Sync Now',
                                       Icons.sync,
-                                      Colors.orange.withOpacity(0.2),
+                                      Colors.grey.withOpacity(0.2),
                                       () {
                                         Navigator.of(context).pop();
                                         _silentSync();
@@ -291,9 +271,6 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -350,27 +327,17 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
     }
   }
 
-  Widget _buildStatusCard(BuildContext context, bool isConnected) {
+  Widget _buildStatusCard(BuildContext context, bool isConnected, String connectionStatus) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isConnected
-              ? [
-                  Colors.green.withOpacity(0.2),
-                  Colors.green.withOpacity(0.1),
-                ]
-              : [
-                  Colors.red.withOpacity(0.2),
-                  Colors.red.withOpacity(0.1),
-                ],
-        ),
+        color: isConnected 
+            ? const Color(0xFF1C1C1C) 
+            : const Color(0xFF1C1C1C),
         border: Border.all(
-          color: isConnected ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+          color: Colors.grey.shade800,
           width: 1,
         ),
       ),
@@ -404,7 +371,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
                 ),
               ),
               Text(
-                isConnected ? 'Wallet is synced' : 'Connection failed',
+                _getConnectionStatusMessage(isConnected, connectionStatus),
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.white.withOpacity(0.7),
@@ -420,12 +387,12 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
   Widget _buildInfoCard(BuildContext context, String title, List<_InfoItem> items) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: Colors.white.withOpacity(0.05),
+        color: const Color(0xFF1C1C1C),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.grey.shade800,
           width: 1,
         ),
       ),
@@ -435,19 +402,19 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
           Text(
             title,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withOpacity(0.9),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           ...items.asMap().entries.map((entry) {
             final index = entry.key;
             final item = entry.value;
             return Column(
               children: [
                 _buildInfoItem(context, item),
-                if (index < items.length - 1) const SizedBox(height: 12),
+                if (index < items.length - 1) const SizedBox(height: 6),
               ],
             );
           }),
@@ -463,7 +430,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
         children: [
           Icon(
             item.icon,
-            size: 16,
+            size: 14,
             color: Colors.white.withOpacity(0.6),
           ),
           const SizedBox(width: 12),
@@ -471,7 +438,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
             child: Text(
               item.label,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 11,
                 color: Colors.white.withOpacity(0.7),
               ),
             ),
@@ -482,7 +449,7 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
               Text(
                 item.value,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: item.valueColor ?? Colors.white,
                 ),
@@ -500,6 +467,192 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildCompactInfoCard(BuildContext context, String title, List<_InfoItem> items) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF1C1C1C),
+        border: Border.all(
+          color: Colors.grey.shade800,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withOpacity(0.9),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Group items into rows of 2
+          for (int i = 0; i < items.length; i += 2) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCompactInfoItem(context, items[i]),
+                ),
+                if (i + 1 < items.length) ...[
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildCompactInfoItem(context, items[i + 1]),
+                  ),
+                ],
+              ],
+            ),
+            if (i + 2 < items.length) const SizedBox(height: 6),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactInfoItem(BuildContext context, _InfoItem item) {
+    return GestureDetector(
+      onTap: item.copyable ? () => _copyToClipboard(item.copyValue ?? item.value) : null,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            item.icon,
+            size: 12,
+            color: Colors.white.withOpacity(0.6),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              '${item.label}: ${item.value}',
+              style: TextStyle(
+                fontSize: 10,
+                color: item.valueColor ?? Colors.white.withOpacity(0.8),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (item.copyable) ...[
+            const SizedBox(width: 2),
+            Icon(
+              Icons.copy,
+              size: 10,
+              color: Colors.white.withOpacity(0.5),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMixedInfoCard(BuildContext context, String title, List<_InfoItem> items, {List<int> singleLineItems = const []}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF1C1C1C),
+        border: Border.all(
+          color: Colors.grey.shade800,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withOpacity(0.9),
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...items.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            
+            // Check if this item should be on its own line
+            if (singleLineItems.contains(index)) {
+              return Column(
+                children: [
+                  _buildInfoItem(context, item),
+                  if (index < items.length - 1) const SizedBox(height: 6),
+                ],
+              );
+            }
+            
+            // Skip if this item will be paired with the previous one
+            if (index > 0 && !singleLineItems.contains(index - 1) && !singleLineItems.contains(index) && index % 2 == 1) {
+              return const SizedBox.shrink();
+            }
+            
+            // Check if next item exists and should be paired
+            final nextIndex = index + 1;
+            if (nextIndex < items.length && 
+                !singleLineItems.contains(index) && 
+                !singleLineItems.contains(nextIndex)) {
+              // Pair this item with the next one
+              return Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildCompactInfoItem(context, item),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildCompactInfoItem(context, items[nextIndex]),
+                      ),
+                    ],
+                  ),
+                  if (nextIndex < items.length - 1) const SizedBox(height: 6),
+                ],
+              );
+            }
+            
+            // Single item that doesn't get paired
+            return Column(
+              children: [
+                _buildCompactInfoItem(context, item),
+                if (index < items.length - 1) const SizedBox(height: 6),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  /// Get user-friendly connection status message
+  String _getConnectionStatusMessage(bool isConnected, String connectionStatus) {
+    if (isConnected) {
+      return 'Wallet is synced';
+    }
+    
+    // Provide user-friendly messages for different disconnection reasons
+    switch (connectionStatus) {
+      case 'No internet connection':
+        return 'Check your internet connection';
+      case 'Connection timeout':
+        return 'Connection timed out';
+      case 'Connection error':
+        return 'Unable to connect to network';
+      case 'Loading...':
+        return 'Initializing wallet...';
+      case 'Not initialized':
+        return 'Connecting to network...';
+      case 'No wallet':
+        return 'No wallet found';
+      default:
+        return 'Connection failed';
+    }
   }
 
   Widget _buildActionButton(
