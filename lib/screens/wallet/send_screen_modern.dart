@@ -4,14 +4,24 @@ import 'package:provider/provider.dart';
 import 'dart:async';
 import '../../providers/wallet_provider.dart';
 import '../../providers/currency_provider.dart';
+import '../../providers/contact_provider.dart';
+import '../../models/contact_model.dart';
 import '../../widgets/transaction_success_dialog.dart';
 import '../../widgets/transaction_confirmation_dialog.dart';
 import '../../widgets/sending_progress_overlay.dart';
 import '../../widgets/animated_progress_dots.dart';
 import 'qr_scanner_screen.dart';
+import '../../services/send_prefill_bus.dart';
 
 class SendScreenModern extends StatefulWidget {
-  const SendScreenModern({super.key});
+  final String? prefilledAddress;
+  final String? contactName;
+
+  const SendScreenModern({
+    super.key,
+    this.prefilledAddress,
+    this.contactName,
+  });
 
   @override
   State<SendScreenModern> createState() => _SendScreenModernState();
@@ -22,16 +32,140 @@ class _SendScreenModernState extends State<SendScreenModern> {
   final _addressController = TextEditingController();
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
-  
+
+  // Selected contact name (if coming from contacts or prefill bus)
+  String? _selectedContactName;
+
   bool _isSending = false;
   String _sendingStatus = '';
   String? _errorMessage;
   bool _isShieldedTransaction = false;
   final double _estimatedFee = 0.00001; // Standard BitcoinZ fee (much lower)
   bool _isFiatInput = false;
-  
+
+  @override
+  void initState() {
+    super.initState();
+    print('🎯 SendScreenModern.initState() called');
+    print('🎯 SendScreenModern.initState: prefilledAddress = ${widget.prefilledAddress}');
+    print('🎯 SendScreenModern.initState: contactName = ${widget.contactName}');
+
+    // Listen for prefill events so we can update even when the widget is reused by PageView
+    SendPrefillBus.current.addListener(_onPrefillChanged);
+
+    // Save incoming contact name (if any) for use across the flow
+    _selectedContactName = widget.contactName;
+
+    _handlePrefilledData();
+  }
+
+  @override
+  void didUpdateWidget(SendScreenModern oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    print('🎯 SendScreenModern.didUpdateWidget() called');
+    print('🎯 SendScreenModern.didUpdateWidget: old prefilledAddress = ${oldWidget.prefilledAddress}');
+    print('🎯 SendScreenModern.didUpdateWidget: new prefilledAddress = ${widget.prefilledAddress}');
+    print('🎯 SendScreenModern.didUpdateWidget: old contactName = ${oldWidget.contactName}');
+    print('🎯 SendScreenModern.didUpdateWidget: new contactName = ${widget.contactName}');
+
+    // Handle updates to prefilled data
+    if (oldWidget.prefilledAddress != widget.prefilledAddress ||
+        oldWidget.contactName != widget.contactName) {
+      print('🎯 SendScreenModern.didUpdateWidget: Prefilled data changed, calling _handlePrefilledData()');
+      _handlePrefilledData();
+    } else {
+      print('🎯 SendScreenModern.didUpdateWidget: No change in prefilled data');
+    }
+  }
+
+  void _onPrefillChanged() {
+    final prefill = SendPrefillBus.current.value;
+    print('🎯 SendScreenModern._onPrefillChanged: $prefill');
+    if (prefill != null) {
+      if (prefill.address.isNotEmpty) {
+        print('🎯 SendScreenModern: Applying bus prefill address: ${prefill.address}');
+        _addressController.text = prefill.address;
+        _isValidBitcoinZAddress(prefill.address);
+      }
+      if (prefill.name != null && prefill.name!.isNotEmpty) {
+        _selectedContactName = prefill.name;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Sending to ${prefill.name!}'),
+                backgroundColor: Colors.blue,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+            setState(() {}); // refresh UI banner/title
+          }
+        });
+      }
+    }
+  }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // If there is a prefill waiting on the bus when we become active, apply it.
+    final prefill = SendPrefillBus.current.value;
+    if (prefill != null) {
+      if (prefill.address.isNotEmpty) {
+        print('🎯 SendScreenModern.didChangeDependencies: applying pending prefill address');
+        _addressController.text = prefill.address;
+        _isValidBitcoinZAddress(prefill.address);
+      }
+      if (prefill.name != null && prefill.name!.isNotEmpty) {
+        print('🎯 SendScreenModern.didChangeDependencies: applying pending prefill name: ${prefill.name}');
+        _selectedContactName = prefill.name;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {}); // refresh UI banner/title
+        });
+      }
+    }
+  }
+
+
+  void _handlePrefilledData() {
+    print('🎯 SendScreenModern._handlePrefilledData() called');
+    print('🎯 SendScreenModern: prefilledAddress = ${widget.prefilledAddress}');
+    print('🎯 SendScreenModern: contactName = ${widget.contactName}');
+
+    // Initialize with prefilled address if provided
+    if (widget.prefilledAddress != null) {
+      print('🎯 SendScreenModern: Setting address controller text to: ${widget.prefilledAddress!}');
+      _addressController.text = widget.prefilledAddress!;
+      print('🎯 SendScreenModern: Address controller text is now: ${_addressController.text}');
+
+      // Validate the address to set transaction type
+      _isValidBitcoinZAddress(widget.prefilledAddress!);
+    } else {
+      print('🎯 SendScreenModern: No prefilled address provided');
+    }
+
+    // Apply contact name (independent of whether address came via widget or bus)
+    if (widget.contactName != null && widget.contactName!.isNotEmpty) {
+      _selectedContactName = widget.contactName;
+      print('🎯 SendScreenModern: Applying contact name for UI: ${widget.contactName!}');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sending to ${widget.contactName!}'),
+              backgroundColor: Colors.blue,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          setState(() {}); // refresh UI banner/title
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
+    SendPrefillBus.current.removeListener(_onPrefillChanged);
     _addressController.dispose();
     _amountController.dispose();
     _memoController.dispose();
@@ -40,19 +174,19 @@ class _SendScreenModernState extends State<SendScreenModern> {
 
   bool _isValidBitcoinZAddress(String address) {
     if (address.isEmpty) return false;
-    
+
     // Transparent addresses
     if (address.startsWith('t1') && address.length >= 34) {
       setState(() => _isShieldedTransaction = false);
       return true;
     }
-    
+
     // Shielded addresses
     if ((address.startsWith('zc') || address.startsWith('zs')) && address.length >= 60) {
       setState(() => _isShieldedTransaction = true);
       return true;
     }
-    
+
     return false;
   }
 
@@ -61,7 +195,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
     if (text.isEmpty) return null;
     final parsed = double.tryParse(text);
     if (parsed == null) return null;
-    
+
     if (_isFiatInput) {
       final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
       return currencyProvider.convertFiatToBtcz(parsed);
@@ -72,7 +206,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
   bool _canSend(WalletProvider walletProvider) {
     final amount = _getAmountValue();
     if (amount == null || amount <= 0) return false;
-    
+
     final totalNeeded = amount + _estimatedFee;
     return walletProvider.balance.spendable >= totalNeeded;
   }
@@ -85,7 +219,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
           fullscreenDialog: true,
         ),
       );
-      
+
       if (result != null && result.isNotEmpty && result != 'manual_entry') {
         _processQRCodeData(result);
       }
@@ -101,26 +235,26 @@ class _SendScreenModernState extends State<SendScreenModern> {
       }
     }
   }
-  
+
   void _processQRCodeData(String qrData) {
     try {
       final parsedData = _parseQRCode(qrData);
-      
+
       if (parsedData['address'] != null) {
         _addressController.text = parsedData['address']!;
-        
+
         // Validate the address to set transaction type
         _isValidBitcoinZAddress(parsedData['address']!);
       }
-      
+
       if (parsedData['amount'] != null && parsedData['amount']!.isNotEmpty) {
         _amountController.text = parsedData['amount']!;
       }
-      
+
       if (parsedData['memo'] != null && parsedData['memo']!.isNotEmpty && _isShieldedTransaction) {
         _memoController.text = parsedData['memo']!;
       }
-      
+
       // Show success feedback
       HapticFeedback.lightImpact();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -135,10 +269,10 @@ class _SendScreenModernState extends State<SendScreenModern> {
           margin: const EdgeInsets.all(16),
         ),
       );
-      
+
       // Rebuild to update UI
       setState(() {});
-      
+
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -154,17 +288,17 @@ class _SendScreenModernState extends State<SendScreenModern> {
       );
     }
   }
-  
+
   Map<String, String?> _parseQRCode(String qrData) {
     final result = <String, String?>{
       'address': null,
       'amount': null,
       'memo': null,
     };
-    
+
     // Clean the QR data
     final cleanData = qrData.trim();
-    
+
     // Check if it's a BitcoinZ URI (bitcoinz:address?params)
     if (cleanData.toLowerCase().startsWith('bitcoinz:')) {
       final uri = Uri.tryParse(cleanData);
@@ -174,15 +308,15 @@ class _SendScreenModernState extends State<SendScreenModern> {
         if (address.isEmpty && uri.host.isNotEmpty) {
           address = uri.host; // Handle bitcoinz://address format
         }
-        
+
         result['address'] = address;
         result['amount'] = uri.queryParameters['amount'];
         result['memo'] = uri.queryParameters['memo'] ?? uri.queryParameters['message'];
-        
+
         return result;
       }
     }
-    
+
     // Check if it's a generic crypto URI (bitcoin:, zcash:, etc.)
     if (cleanData.contains(':')) {
       final uri = Uri.tryParse(cleanData);
@@ -191,53 +325,102 @@ class _SendScreenModernState extends State<SendScreenModern> {
         if (address.isEmpty && uri.host.isNotEmpty) {
           address = uri.host;
         }
-        
+
         result['address'] = address;
         result['amount'] = uri.queryParameters['amount'];
         result['memo'] = uri.queryParameters['memo'] ?? uri.queryParameters['message'];
-        
+
         return result;
       }
     }
-    
+
     // Assume it's a plain address
     if (_isValidAddressFormat(cleanData)) {
       result['address'] = cleanData;
       return result;
     }
-    
+
     throw Exception('Unsupported QR code format');
   }
-  
+
   bool _isValidAddressFormat(String address) {
     // BitcoinZ transparent addresses start with 't1' and are ~34 chars
     if (address.startsWith('t1') && address.length >= 32 && address.length <= 40) {
       return true;
     }
-    
+
     // BitcoinZ shielded addresses start with 'zs' and are longer
     if (address.startsWith('zs') && address.length >= 60 && address.length <= 80) {
       return true;
     }
-    
+
     // Legacy shielded addresses start with 'zc'
     if (address.startsWith('zc') && address.length >= 60 && address.length <= 80) {
       return true;
     }
-    
+
     return false;
+  }
+
+  Future<void> _showContactPicker() async {
+    final contactProvider = Provider.of<ContactProvider>(context, listen: false);
+
+    // Ensure contacts are loaded
+    if (contactProvider.contacts.isEmpty) {
+      await contactProvider.loadContacts();
+    }
+
+    if (!mounted) return;
+
+    if (contactProvider.contacts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No contacts found. Add contacts first.'),
+          backgroundColor: Colors.orange,
+          action: SnackBarAction(
+            label: 'Add Contact',
+            onPressed: () {
+              // Navigate to contacts tab - would require parent MainScreen access
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    final selectedContact = await showDialog<ContactModel>(
+      context: context,
+      builder: (context) => _ContactPickerDialog(contacts: contactProvider.contacts),
+    );
+
+    if (selectedContact != null && mounted) {
+      _addressController.text = selectedContact.address;
+      _isValidBitcoinZAddress(selectedContact.address);
+      _selectedContactName = selectedContact.name; // wire name for banner, dialogs, title
+
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Selected ${selectedContact.name}'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      setState(() {});
+    }
   }
 
   Future<void> _sendTransaction() async {
     if (!_formKey.currentState!.validate() || _isSending) return;
-    
+
     final amount = _getAmountValue()!;
     final address = _addressController.text.trim();
-    
+
     final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
     double? fiatAmount;
     String? currencyCode;
-    
+
     if (currencyProvider.currentPrice != null) {
       if (_isFiatInput) {
         fiatAmount = double.tryParse(_amountController.text.trim());
@@ -246,7 +429,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
       }
       currencyCode = currencyProvider.selectedCurrency.code;
     }
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -256,22 +439,23 @@ class _SendScreenModernState extends State<SendScreenModern> {
         fee: _estimatedFee,
         fiatAmount: fiatAmount,
         currencyCode: currencyCode,
+        contactName: _selectedContactName,
         onConfirm: () => _processSendTransaction(amount, address, fiatAmount, currencyCode),
         onCancel: () {},
       ),
     );
   }
-  
+
   Future<void> _processSendTransaction(double amount, String address, [double? fiatAmount, String? currencyCode]) async {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    
+
     // Determine if auto-shielding might occur
     final hasTransparentFunds = walletProvider.balance.transparent > 0.001;
     final needsAutoShielding = hasTransparentFunds && _isShieldedTransaction;
-    
+
     setState(() {
       _isSending = true;
-      _sendingStatus = needsAutoShielding 
+      _sendingStatus = needsAutoShielding
           ? 'Preparing transaction...\nAuto-shielding transparent funds'
           : hasTransparentFunds
               ? 'Broadcasting transaction...\nUsing transparent funds'
@@ -281,29 +465,29 @@ class _SendScreenModernState extends State<SendScreenModern> {
 
     try {
       final memo = _isShieldedTransaction ? _memoController.text : null;
-      
+
       // Update status during the actual send
       if (needsAutoShielding) {
         setState(() {
           _sendingStatus = 'Auto-shielding in progress...\nConverting transparent to shielded funds';
         });
       }
-      
+
       final txid = await walletProvider.sendTransaction(
         toAddress: address,
         amount: amount,
         memo: memo,
       );
-      
+
       if (txid != null && mounted) {
         // Update status to show success
         setState(() {
           _sendingStatus = 'Transaction sent successfully!';
         });
-        
+
         // Brief delay to show success message
         await Future.delayed(const Duration(milliseconds: 800));
-        
+
         // Show success dialog
         await showDialog(
           context: context,
@@ -314,6 +498,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
             toAddress: address,
             fiatAmount: fiatAmount,
             currencyCode: currencyCode,
+            contactName: _selectedContactName,
             onClose: () {
               // Pop the dialog safely
               if (mounted && Navigator.of(context).canPop()) {
@@ -322,7 +507,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
             },
           ),
         );
-        
+
         // Clear fields after successful send
         if (mounted) {
           _addressController.clear();
@@ -356,7 +541,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
     final currencyProvider = Provider.of<CurrencyProvider>(context);
     final screenHeight = MediaQuery.of(context).size.height;
     final isSmallScreen = screenHeight < 700;
-    
+
     return Stack(
       children: [
         Scaffold(
@@ -364,9 +549,11 @@ class _SendScreenModernState extends State<SendScreenModern> {
           appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          'Send',
-          style: TextStyle(
+        title: Text(
+          _selectedContactName != null && _selectedContactName!.isNotEmpty
+              ? 'Send to ${_selectedContactName!}'
+              : 'Send',
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
@@ -381,6 +568,74 @@ class _SendScreenModernState extends State<SendScreenModern> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Contact Info Card (if sending to contact)
+                if (_selectedContactName != null && _selectedContactName!.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                          Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.person,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Sending to Contact',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _selectedContactName!,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.check_circle,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 // Complete Balance Card with Clear Breakdown
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -472,7 +727,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                           ),
                         ],
                       ),
-                      
+
                       // Balance Breakdown - Show when there are any confirming funds (incoming OR change)
                       if (walletProvider.balance.unconfirmed > 0 || walletProvider.balance.unverified > 0) ...[
                         const SizedBox(height: 16),
@@ -512,7 +767,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              
+
                               // Spendable
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -547,7 +802,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                   ),
                                 ],
                               ),
-                              
+
                               // Pure Incoming funds (not change) - show only if > 0.001
                               if (walletProvider.balance.pureIncoming >= 0.001) ...[
                                 const SizedBox(height: 6),
@@ -585,7 +840,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                   ],
                                 ),
                               ],
-                              
+
                               // Change Returning (unverified balance) - show only if meaningful amount
                               if (walletProvider.balance.unverified >= 0.001) ...[
                                 const SizedBox(height: 6),
@@ -623,7 +878,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                   ],
                                 ),
                               ],
-                              
+
                               // Divider and Total
                               const SizedBox(height: 8),
                               Container(
@@ -656,13 +911,13 @@ class _SendScreenModernState extends State<SendScreenModern> {
                           ),
                         ),
                       ],
-                      
+
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Recipient Address Field
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -703,13 +958,28 @@ class _SendScreenModernState extends State<SendScreenModern> {
                             color: Colors.white.withOpacity(0.5),
                             size: 18,
                           ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              Icons.qr_code_scanner,
-                              color: const Color(0xFFFF6B00),
-                              size: 20,
-                            ),
-                            onPressed: _scanQRCode,
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.contacts,
+                                  color: const Color(0xFFFF6B00),
+                                  size: 20,
+                                ),
+                                onPressed: _showContactPicker,
+                                tooltip: 'Select from contacts',
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.qr_code_scanner,
+                                  color: const Color(0xFFFF6B00),
+                                  size: 20,
+                                ),
+                                onPressed: _scanQRCode,
+                                tooltip: 'Scan QR code',
+                              ),
+                            ],
                           ),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -730,9 +1000,9 @@ class _SendScreenModernState extends State<SendScreenModern> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Amount Field
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -776,8 +1046,8 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  _isFiatInput 
-                                      ? '${currencyProvider.selectedCurrency.code} → BTCZ' 
+                                  _isFiatInput
+                                      ? '${currencyProvider.selectedCurrency.code} → BTCZ'
                                       : 'BTCZ → ${currencyProvider.selectedCurrency.code}',
                                   style: const TextStyle(
                                     color: Color(0xFFFF6B00),
@@ -819,7 +1089,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                           ),
                           prefixIcon: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: _isFiatInput 
+                            child: _isFiatInput
                                 ? Icon(
                                     Icons.attach_money,
                                     color: Colors.white.withOpacity(0.5),
@@ -864,7 +1134,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                     ),
                                   ),
                           ),
-                          suffixText: _isFiatInput 
+                          suffixText: _isFiatInput
                               ? currencyProvider.selectedCurrency.code
                               : 'BTCZ',
                           suffixStyle: TextStyle(
@@ -906,12 +1176,12 @@ class _SendScreenModernState extends State<SendScreenModern> {
                               if (inputAmount <= 0) {
                                 return const SizedBox();
                               }
-                              
+
                               String conversionText = '';
-                              
+
                               // Use hardcoded price as fallback if API fails
                               const double fallbackPrice = 0.00005; // Example: 1 BTCZ = $0.00005
-                              
+
                               if (_isFiatInput) {
                                 // Converting from fiat to BTCZ
                                 double? btczAmount = currencyProvider.convertFiatToBtcz(inputAmount);
@@ -933,17 +1203,17 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                   conversionText = '≈ \$${fiatAmount.toStringAsFixed(2)}';
                                 }
                               }
-                              
+
                               if (conversionText.isEmpty) {
                                 // Fallback if prices aren't loaded
                                 conversionText = 'Conversion unavailable';
                               }
-                              
+
                               return Text(
                                 conversionText,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: conversionText.contains('unavailable') 
+                                  color: conversionText.contains('unavailable')
                                       ? Colors.white.withOpacity(0.4)
                                       : const Color(0xFFFF6B00),
                                   fontWeight: FontWeight.w600,
@@ -1027,7 +1297,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                     ],
                   ],
                 ),
-                
+
                 // Memo Field (for shielded transactions)
                 if (_isShieldedTransaction) ...[
                   const SizedBox(height: 20),
@@ -1078,7 +1348,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                     ],
                   ),
                 ],
-                
+
                 // Error Message
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 16),
@@ -1112,9 +1382,9 @@ class _SendScreenModernState extends State<SendScreenModern> {
                     ),
                   ),
                 ],
-                
+
                 const SizedBox(height: 32),
-                
+
                 // Send Button
                 Container(
                   height: 54,
@@ -1122,11 +1392,17 @@ class _SendScreenModernState extends State<SendScreenModern> {
                     gradient: LinearGradient(
                       colors: _canSend(walletProvider) && !_isSending
                           ? [const Color(0xFFFF6B00), const Color(0xFFFFAA00)]
-                          : [Colors.grey.shade700, Colors.grey.shade600],
+                          : [const Color(0xFF1A1A1A), const Color(0xFF0F0F0F)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(27),
+                    borderRadius: BorderRadius.circular(8), // Sharp corners
+                    border: Border.all(
+                      color: _canSend(walletProvider) && !_isSending
+                          ? const Color(0xFFFF6B00).withOpacity(0.6)
+                          : Colors.white.withOpacity(0.2),
+                      width: 1.5,
+                    ),
                     boxShadow: _canSend(walletProvider) && !_isSending
                         ? [
                             BoxShadow(
@@ -1134,8 +1410,19 @@ class _SendScreenModernState extends State<SendScreenModern> {
                               blurRadius: 20,
                               offset: const Offset(0, 8),
                             ),
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
                           ]
-                        : [],
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                   ),
                   child: ElevatedButton(
                     onPressed: _canSend(walletProvider) && !_isSending
@@ -1145,7 +1432,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(27),
+                        borderRadius: BorderRadius.circular(8), // Sharp corners
                       ),
                     ),
                     child: _isSending
@@ -1161,13 +1448,14 @@ class _SendScreenModernState extends State<SendScreenModern> {
                             'Send Transaction',
                             style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700, // Sharper font weight
+                              letterSpacing: 1.0, // More spacing
                               color: Colors.white,
                             ),
                           ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
               ],
             ),
@@ -1183,6 +1471,269 @@ class _SendScreenModernState extends State<SendScreenModern> {
     ),
   ],
 );
+  }
+}
+
+class _ContactPickerDialog extends StatefulWidget {
+  final List<ContactModel> contacts;
+
+  const _ContactPickerDialog({
+    required this.contacts,
+  });
+
+  @override
+  State<_ContactPickerDialog> createState() => _ContactPickerDialogState();
+}
+
+class _ContactPickerDialogState extends State<_ContactPickerDialog> {
+  final _searchController = TextEditingController();
+  List<ContactModel> _filteredContacts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredContacts = widget.contacts;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterContacts(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredContacts = widget.contacts;
+      } else {
+        final lowerQuery = query.toLowerCase();
+        _filteredContacts = widget.contacts.where((contact) {
+          return contact.name.toLowerCase().contains(lowerQuery) ||
+                 contact.address.toLowerCase().contains(lowerQuery) ||
+                 (contact.description?.toLowerCase().contains(lowerQuery) ?? false);
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxHeight: 600, maxWidth: 400),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.contacts,
+                    color: Color(0xFFFF6B00),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Select Contact',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+
+            // Search field
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _filterContacts,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search contacts...',
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFF2A2A2A),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+            ),
+
+            // Contact list
+            Expanded(
+              child: _filteredContacts.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 48,
+                            color: Colors.white.withOpacity(0.3),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No contacts found',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _filteredContacts.length,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      itemBuilder: (context, index) {
+                        final contact = _filteredContacts[index];
+                        return ListTile(
+                          onTap: () => Navigator.pop(context, contact),
+                          leading: CircleAvatar(
+                            radius: 20,
+                            backgroundColor: const Color(0xFFFF6B00).withOpacity(0.2),
+                            child: Text(
+                              contact.name.isNotEmpty
+                                  ? contact.name[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                color: Color(0xFFFF6B00),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  contact.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              if (contact.isFavorite)
+                                const Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                  size: 16,
+                                ),
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: contact.isTransparent
+                                      ? Colors.blue.withOpacity(0.2)
+                                      : Colors.purple.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  contact.isTransparent ? 'T' : 'S',
+                                  style: TextStyle(
+                                    color: contact.isTransparent
+                                        ? Colors.blue
+                                        : Colors.purple,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                contact.address.length > 24
+                                    ? '${contact.address.substring(0, 12)}...${contact.address.substring(contact.address.length - 12)}'
+                                    : contact.address,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.6),
+                                  fontSize: 12,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                              if (contact.description?.isNotEmpty == true)
+                                Text(
+                                  contact.description!,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.4),
+                                    fontSize: 11,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+
+            // Footer
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+              ),
+              child: Text(
+                '${_filteredContacts.length} contact${_filteredContacts.length == 1 ? '' : 's'}',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

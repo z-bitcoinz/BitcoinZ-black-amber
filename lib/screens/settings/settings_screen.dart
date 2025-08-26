@@ -5,9 +5,11 @@ import 'change_pin_screen.dart';
 import 'backup_wallet_screen.dart';
 import 'help_screen.dart';
 import 'network_settings_screen.dart';
+import 'contacts_backup_screen.dart';
 import '../../providers/currency_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/network_provider.dart';
+import '../../providers/contact_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -177,6 +179,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     },
                   ),
                 ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Contacts section
+              Consumer<ContactProvider>(
+                builder: (context, contactProvider, child) {
+                  return _buildSettingsSection(
+                    title: 'Contacts',
+                    children: [
+                      _buildSettingsTile(
+                        context: context,
+                        icon: Icons.backup,
+                        title: 'Backup & Restore Contacts',
+                        subtitle: contactProvider.hasContacts 
+                            ? '${contactProvider.contactsCount} contact${contactProvider.contactsCount == 1 ? '' : 's'}' 
+                            : 'No contacts to backup',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ContactsBackupScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
               ),
               
               const SizedBox(height: 24),

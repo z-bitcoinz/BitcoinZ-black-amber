@@ -8,6 +8,7 @@ class TransactionConfirmationDialog extends StatefulWidget {
   final double fee;
   final double? fiatAmount;
   final String? currencyCode;
+  final String? contactName; // Optional friendly recipient name
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
 
@@ -18,6 +19,7 @@ class TransactionConfirmationDialog extends StatefulWidget {
     required this.fee,
     this.fiatAmount,
     this.currencyCode,
+    this.contactName,
     required this.onConfirm,
     required this.onCancel,
   });
@@ -157,10 +159,21 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                             ),
                             child: Column(
                               children: [
-                                // To Address
+                                // Recipient (name if available, else address)
+                                if (widget.contactName != null && widget.contactName!.isNotEmpty) ...[
+                                  _buildDetailRow(
+                                    context,
+                                    'RECIPIENT',
+                                    widget.contactName!,
+                                    Icons.person_outline,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildDivider(),
+                                  const SizedBox(height: 12),
+                                ],
                                 _buildDetailRow(
                                   context,
-                                  'SEND TO',
+                                  widget.contactName != null && widget.contactName!.isNotEmpty ? 'ADDRESS' : 'SEND TO',
                                   _formatAddress(widget.toAddress),
                                   Icons.account_balance_wallet_outlined,
                                   isAddress: true,
@@ -249,26 +262,43 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                             children: [
                               // Cancel Button
                               Expanded(
-                                child: TextButton(
-                                  onPressed: () {
-                                    widget.onCancel();
-                                    Navigator.of(context).pop();
-                                  },
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      side: BorderSide(
-                                        color: Colors.white.withOpacity(0.2),
-                                      ),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8), // Sharp corners
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        const Color(0xFF1A1A1A), // Deeper dark color
+                                        const Color(0xFF0F0F0F), // Even deeper
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.2),
+                                      width: 1.5,
                                     ),
                                   ),
-                                  child: Text(
-                                    'Cancel',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.8),
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(8), // Sharp corners
+                                      onTap: () {
+                                        widget.onCancel();
+                                        Navigator.of(context).pop();
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        child: const Text(
+                                          'Cancel',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700, // Sharper font weight
+                                            letterSpacing: 1.0, // More spacing
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -281,19 +311,28 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                                 flex: 2,
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(8), // Sharp corners
                                     gradient: LinearGradient(
                                       colors: [
-                                        Theme.of(context).colorScheme.primary,
-                                        Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                        const Color(0xFFFF6B00), // Same orange as Send Transaction
+                                        const Color(0xFFFFAA00), // Same orange gradient
                                       ],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
+                                    border: Border.all(
+                                      color: const Color(0xFFFF6B00).withOpacity(0.6),
+                                      width: 1.5,
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
-                                        blurRadius: 12,
+                                        color: const Color(0xFFFF6B00).withOpacity(0.3),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 10,
                                         offset: const Offset(0, 4),
                                       ),
                                     ],
@@ -301,13 +340,13 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                                   child: Material(
                                     color: Colors.transparent,
                                     child: InkWell(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(8), // Sharp corners
                                       onTap: () {
                                         Navigator.of(context).pop();
                                         widget.onConfirm();
                                       },
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
                                         child: Row(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
@@ -322,7 +361,8 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                                               style: TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 15,
-                                                fontWeight: FontWeight.w600,
+                                                fontWeight: FontWeight.w700, // Sharper font weight
+                                                letterSpacing: 1.0, // More spacing
                                               ),
                                             ),
                                           ],
@@ -413,58 +453,82 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                 ),
               ),
               const SizedBox(height: 2),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          value,
-                          style: TextStyle(
-                            color: isSubtle 
-                                ? Colors.white.withOpacity(0.6)
-                                : Colors.white,
-                            fontSize: isAmount ? 16 : 14,
-                            fontWeight: isAmount ? FontWeight.bold : FontWeight.w500,
-                            fontFamily: isAddress || isAmount ? 'monospace' : null,
-                          ),
-                        ),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1,
                   ),
-                  if (isAddress) 
-                    IconButton(
-                      icon: Icon(
-                        Icons.copy,
-                        size: 14,
-                        color: Colors.white.withOpacity(0.4),
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: fullAddress ?? value));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Address copied to clipboard'),
-                            duration: const Duration(seconds: 2),
-                            backgroundColor: Colors.green.shade600,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            value,
+                            style: TextStyle(
+                              color: isSubtle 
+                                  ? Colors.white.withOpacity(0.6)
+                                  : Colors.white,
+                              fontSize: isAmount ? 16 : 14,
+                              fontWeight: isAmount ? FontWeight.bold : FontWeight.w500,
+                              fontFamily: isAddress || isAmount ? 'monospace' : null,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        );
-                      },
+                          if (subtitle != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                ],
+                    if (isAddress) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.copy,
+                            size: 16,
+                            color: Colors.white.withOpacity(0.7),
+                          ),
+                          padding: const EdgeInsets.all(8),
+                          constraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: fullAddress ?? value));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Address copied to clipboard'),
+                                duration: const Duration(seconds: 2),
+                                backgroundColor: Colors.green.shade600,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),

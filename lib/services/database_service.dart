@@ -6,6 +6,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/transaction_model.dart';
 import '../models/address_model.dart';
+import '../models/contact_model.dart';
 import './wallet_storage_service.dart';
 
 class DatabaseService {
@@ -74,7 +75,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 2,
+      version: 3,
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
       singleInstance: true,
@@ -119,6 +120,21 @@ class DatabaseService {
       )
     ''');
 
+    // Create contacts table
+    await db.execute('''
+      CREATE TABLE contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        address TEXT UNIQUE NOT NULL,
+        type TEXT NOT NULL,
+        description TEXT,
+        picture_base64 TEXT,
+        is_favorite INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+
     // Create indexes for better performance
     await db.execute('CREATE INDEX idx_transactions_txid ON transactions(txid)');
     await db.execute('CREATE INDEX idx_transactions_timestamp ON transactions(timestamp DESC)');
@@ -126,6 +142,9 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_transactions_pending ON transactions(is_pending)');
     await db.execute('CREATE INDEX idx_addresses_address ON addresses(address)');
     await db.execute('CREATE INDEX idx_addresses_type ON addresses(type)');
+    await db.execute('CREATE INDEX idx_contacts_address ON contacts(address)');
+    await db.execute('CREATE INDEX idx_contacts_name ON contacts(name)');
+    await db.execute('CREATE INDEX idx_contacts_favorite ON contacts(is_favorite)');
   }
 
   Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
@@ -133,6 +152,28 @@ class DatabaseService {
     if (oldVersion < 2) {
       // Add memo_read column to existing transactions table
       await db.execute('ALTER TABLE transactions ADD COLUMN memo_read INTEGER NOT NULL DEFAULT 0');
+    }
+    
+    if (oldVersion < 3) {
+      // Create contacts table
+      await db.execute('''
+        CREATE TABLE contacts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          address TEXT UNIQUE NOT NULL,
+          type TEXT NOT NULL,
+          description TEXT,
+          picture_base64 TEXT,
+          is_favorite INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+      
+      // Create indexes for contacts
+      await db.execute('CREATE INDEX idx_contacts_address ON contacts(address)');
+      await db.execute('CREATE INDEX idx_contacts_name ON contacts(name)');
+      await db.execute('CREATE INDEX idx_contacts_favorite ON contacts(is_favorite)');
     }
   }
 
@@ -498,11 +539,101 @@ class DatabaseService {
     );
   }
 
+  // Contact CRUD operations
+  Future<void> insertContact(ContactModel contact) async {
+    final db = await database;
+    await db.insert(
+      'contacts',
+      _contactToMap(contact),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<ContactModel>> getContacts({
+    bool? isFavorite,
+    String? searchQuery,
+  }) async {
+    final db = await database;
+    
+    String whereClause = '';
+    List<Object?> whereArgs = [];
+    
+    List<String> conditions = [];
+    
+    if (isFavorite != null) {
+      conditions.add('is_favorite = ?');
+      whereArgs.add(isFavorite ? 1 : 0);
+    }
+    
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      conditions.add('''
+        (name LIKE ? OR 
+         address LIKE ? OR 
+         description LIKE ?)
+      ''');
+      final query = '%$searchQuery%';
+      whereArgs.addAll([query, query, query]);
+    }
+    
+    if (conditions.isNotEmpty) {
+      whereClause = 'WHERE ${conditions.join(' AND ')}';
+    }
+    
+    final results = await db.rawQuery('''
+      SELECT * FROM contacts 
+      $whereClause 
+      ORDER BY is_favorite DESC, name ASC
+    ''', whereArgs);
+
+    return results.map((map) => _mapToContact(map)).toList();
+  }
+
+  Future<ContactModel?> getContactByAddress(String address) async {
+    final db = await database;
+    final results = await db.query(
+      'contacts',
+      where: 'address = ?',
+      whereArgs: [address],
+      limit: 1,
+    );
+    
+    if (results.isNotEmpty) {
+      return _mapToContact(results.first);
+    }
+    return null;
+  }
+
+  Future<void> updateContact(ContactModel contact) async {
+    final db = await database;
+    await db.update(
+      'contacts',
+      _contactToMap(contact),
+      where: 'id = ?',
+      whereArgs: [contact.id],
+    );
+  }
+
+  Future<void> deleteContact(int contactId) async {
+    final db = await database;
+    await db.delete(
+      'contacts',
+      where: 'id = ?',
+      whereArgs: [contactId],
+    );
+  }
+
+  Future<int> getContactsCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM contacts');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
   // Utility methods
   Future<void> clearAllData() async {
     final db = await database;
     await db.delete('transactions');
     await db.delete('addresses');
+    await db.delete('contacts');
   }
 
   Future<void> close() async {
@@ -662,6 +793,35 @@ class DatabaseService {
       label: map['label'] as String?,
       balance: map['balance'] as double? ?? 0.0,
       isActive: (map['is_active'] as int? ?? 1) == 1,
+    );
+  }
+
+  Map<String, dynamic> _contactToMap(ContactModel contact) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return {
+      'id': contact.id,
+      'name': contact.name,
+      'address': contact.address,
+      'type': contact.type,
+      'description': contact.description,
+      'picture_base64': contact.pictureBase64,
+      'is_favorite': contact.isFavorite ? 1 : 0,
+      'created_at': contact.createdAt.millisecondsSinceEpoch,
+      'updated_at': contact.updatedAt.millisecondsSinceEpoch,
+    };
+  }
+
+  ContactModel _mapToContact(Map<String, dynamic> map) {
+    return ContactModel(
+      id: map['id'] as int?,
+      name: map['name'] as String,
+      address: map['address'] as String,
+      type: map['type'] as String,
+      description: map['description'] as String?,
+      pictureBase64: map['picture_base64'] as String?,
+      isFavorite: (map['is_favorite'] as int? ?? 0) == 1,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
     );
   }
 }

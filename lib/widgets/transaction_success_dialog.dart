@@ -11,6 +11,7 @@ class TransactionSuccessDialog extends StatefulWidget {
   final double? fiatAmount;
   final String? currencyCode;
   final double? fee;
+  final String? contactName; // Optional friendly recipient name
   final VoidCallback onClose;
 
   const TransactionSuccessDialog({
@@ -21,6 +22,7 @@ class TransactionSuccessDialog extends StatefulWidget {
     this.fiatAmount,
     this.currencyCode,
     this.fee,
+    this.contactName,
     required this.onClose,
   });
 
@@ -233,7 +235,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                       child: Container(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(18), // Reduced from 24
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -272,24 +274,24 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                                 return Transform.scale(
                                   scale: _scaleAnimation.value,
                                   child: Container(
-                                    width: 80,
-                                    height: 80,
+                                    width: 60, // Reduced from 80
+                                    height: 60, // Reduced from 80
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                         color: Colors.green.shade400,
-                                        width: 3,
+                                        width: 2.5, // Reduced from 3
                                       ),
                                       boxShadow: [
                                         BoxShadow(
                                           color: Colors.green.withOpacity(0.3),
-                                          blurRadius: 20,
-                                          spreadRadius: 5,
+                                          blurRadius: 15, // Reduced from 20
+                                          spreadRadius: 3, // Reduced from 5
                                         ),
                                         BoxShadow(
                                           color: Colors.green.withOpacity(0.1),
-                                          blurRadius: 40,
-                                          spreadRadius: 15,
+                                          blurRadius: 25, // Reduced from 40
+                                          spreadRadius: 8, // Reduced from 15
                                         ),
                                       ],
                                     ),
@@ -308,20 +310,22 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                               },
                             ),
                             
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12), // Reduced from 16
                             
                             // Success title
-                            const Text(
-                              'Transaction Sent!',
-                              style: TextStyle(
+                            Text(
+                              widget.contactName != null && widget.contactName!.isNotEmpty
+                                  ? 'Sent to ${widget.contactName!}!'
+                                  : 'Transaction Sent!',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            
-                            const SizedBox(height: 16),
+
+                            const SizedBox(height: 12), // Reduced from 16
                             
                             // Amount Card
                             Container(
@@ -402,17 +406,28 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                               ),
                               child: Column(
                                 children: [
-                                  // To address
+                                  // Recipient (show name if available)
+                                  if (widget.contactName != null && widget.contactName!.isNotEmpty) ...[
+                                    _buildDetailRow(
+                                      icon: Icons.person_outline,
+                                      label: 'RECIPIENT',
+                                      value: widget.contactName!,
+                                      onCopy: null,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    _buildDivider(),
+                                    const SizedBox(height: 6),
+                                  ],
                                   _buildDetailRow(
                                     icon: Icons.account_balance_wallet_outlined,
-                                    label: 'TO',
+                                    label: widget.contactName != null && widget.contactName!.isNotEmpty ? 'ADDRESS' : 'TO',
                                     value: _formatAddress(widget.toAddress),
                                     onCopy: () => _copyToClipboard(widget.toAddress, 'Address'),
                                   ),
-                                  
-                                  const SizedBox(height: 8),
+
+                                  const SizedBox(height: 6), // Reduced from 8
                                   _buildDivider(),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 6), // Reduced from 8
                                   
                                   // Transaction ID
                                   _buildDetailRow(
@@ -436,9 +451,9 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                                     ),
                                   ],
                                   
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 6), // Reduced from 8
                                   _buildDivider(),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 6), // Reduced from 8
                                   
                                   // Status
                                   Row(
@@ -497,25 +512,29 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                               ),
                             ),
                             
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12), // Reduced from 16
                             
-                            // Done button
+                            // Close button
                             Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(8), // Sharp corners
                                 gradient: LinearGradient(
                                   colors: [
-                                    Theme.of(context).colorScheme.primary,
-                                    Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                    const Color(0xFF1A1A1A), // Deeper dark color
+                                    const Color(0xFF0F0F0F), // Even deeper
                                   ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.2),
+                                  width: 1.5,
+                                ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
-                                    blurRadius: 12,
+                                    color: Colors.black.withOpacity(0.4),
+                                    blurRadius: 8,
                                     offset: const Offset(0, 4),
                                   ),
                                 ],
@@ -523,21 +542,21 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                               child: Material(
                                 color: Colors.transparent,
                                 child: InkWell(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(8), // Sharp corners
                                   onTap: () {
                                     // Only call onClose, let parent handle navigation
                                     widget.onClose();
                                   },
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
                                     child: const Text(
-                                      'Done',
+                                      'Close',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0.5,
+                                        fontWeight: FontWeight.w700, // Sharper font weight
+                                        letterSpacing: 1.0, // More spacing
                                       ),
                                     ),
                                   ),
@@ -545,7 +564,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                               ),
                             ),
                             
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6), // Reduced from 8
                             
                             // Auto-close countdown
                             Text(
@@ -576,50 +595,71 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
     required String value,
     VoidCallback? onCopy,
   }) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 18,
-          color: Colors.white.withOpacity(0.5),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), // Reduced vertical padding
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 1,
         ),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: TextStyle(
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 16, // Reduced from 18
             color: Colors.white.withOpacity(0.5),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
           ),
-        ),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontFamily: 'monospace',
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        if (onCopy != null) ...[
-          const SizedBox(width: 4),
-          IconButton(
-            icon: Icon(
-              Icons.copy,
-              size: 14,
+          const SizedBox(width: 8), // Reduced from 10
+          Text(
+            label,
+            style: TextStyle(
               color: Colors.white.withOpacity(0.5),
+              fontSize: 10, // Reduced from 11
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(
-              minWidth: 24,
-              minHeight: 24,
-            ),
-            onPressed: onCopy,
           ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12, // Reduced from 13
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (onCopy != null) ...[
+            const SizedBox(width: 6), // Reduced from 8
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4), // Reduced from 6
+              ),
+              child: IconButton(
+                icon: Icon(
+                  Icons.copy,
+                  size: 14, // Reduced from 16
+                  color: Colors.white.withOpacity(0.7),
+                ),
+                padding: const EdgeInsets.all(6), // Reduced from 8
+                constraints: const BoxConstraints(
+                  minWidth: 28, // Reduced from 32
+                  minHeight: 28, // Reduced from 32
+                ),
+                onPressed: onCopy,
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
   

@@ -903,32 +903,53 @@ class _SendScreenState extends State<SendScreen>
                                 width: double.infinity,
                                 height: 60,
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(30),
+                                  borderRadius: BorderRadius.circular(8), // Sharp corners
                                   gradient: _canSend(walletProvider) && !_isSending
                                       ? LinearGradient(
                                           colors: [
                                             Theme.of(context).colorScheme.primary,
-                                            Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                            Theme.of(context).colorScheme.primary.withOpacity(0.8),
                                           ],
                                           begin: Alignment.topLeft,
                                           end: Alignment.bottomRight,
                                         )
-                                      : null,
-                                  color: !_canSend(walletProvider) || _isSending
-                                      ? Colors.white.withOpacity(0.1)
-                                      : null,
+                                      : LinearGradient(
+                                          colors: [
+                                            const Color(0xFF1A1A1A), // Deeper dark color for disabled
+                                            const Color(0xFF0F0F0F), // Even deeper
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                  border: Border.all(
+                                    color: _canSend(walletProvider) && !_isSending
+                                        ? Theme.of(context).colorScheme.primary.withOpacity(0.6)
+                                        : Colors.white.withOpacity(0.2),
+                                    width: 1.5,
+                                  ),
                                   boxShadow: _canSend(walletProvider) && !_isSending ? [
                                     BoxShadow(
                                       color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
                                       blurRadius: 20,
                                       offset: const Offset(0, 8),
                                     ),
-                                  ] : [],
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ] : [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
                                 ),
                                 child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
-                                    borderRadius: BorderRadius.circular(30),
+                                    borderRadius: BorderRadius.circular(8), // Sharp corners
                                     onTap: (_isSending || !_canSend(walletProvider)) ? null : _sendTransaction,
                                     child: Center(
                                       child: _isSending
@@ -982,8 +1003,8 @@ class _SendScreenState extends State<SendScreen>
                                                   'Send Transaction',
                                                   style: TextStyle(
                                                     fontSize: 16,
-                                                    fontWeight: FontWeight.w600,
-                                                    letterSpacing: 0.5,
+                                                    fontWeight: FontWeight.w700, // Sharper font weight
+                                                    letterSpacing: 1.0, // More spacing
                                                     color: _canSend(walletProvider) 
                                                         ? Colors.white 
                                                         : Colors.white.withOpacity(0.3),

@@ -9,7 +9,9 @@ import 'providers/wallet_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/currency_provider.dart';
 import 'providers/network_provider.dart';
+import 'providers/contact_provider.dart';
 import 'screens/splash_screen.dart';
+import 'screens/main_screen.dart';
 import 'utils/constants.dart';
 import 'services/bitcoinz_service.dart';
 import 'services/storage_service.dart';
@@ -121,6 +123,7 @@ class BitcoinZWalletApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider(create: (_) => CurrencyProvider()),
+        ChangeNotifierProvider(create: (_) => ContactProvider()),
       ],
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
@@ -130,6 +133,7 @@ class BitcoinZWalletApp extends StatelessWidget {
             theme: _buildLightTheme(),
             darkTheme: _buildDarkTheme(),
             themeMode: ThemeMode.dark, // Default to dark theme
+            navigatorKey: MainScreen.navigatorKey,
             home: const SplashScreen(),
             builder: (context, child) {
               // Handle global error boundary

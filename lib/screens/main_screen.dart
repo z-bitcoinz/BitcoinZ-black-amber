@@ -8,6 +8,9 @@ import 'wallet/send_screen_modern.dart';
 import 'wallet/receive_screen_modern.dart';
 import 'wallet/paginated_transaction_history_screen.dart';
 import 'settings/settings_screen.dart';
+import 'contacts/contacts_screen.dart';
+import '../providers/contact_provider.dart';
+import '../services/send_prefill_bus.dart';
 // import '../demo/cli_demo_page.dart'; // Removed - CLI demo no longer used
 
 class MainScreen extends StatefulWidget {
@@ -20,6 +23,23 @@ class MainScreen extends StatefulWidget {
   static _MainScreenState? of(BuildContext context) {
     return context.findAncestorStateOfType<_MainScreenState>();
   }
+
+  // Static navigation key for global access
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  // Static reference to the current MainScreen state
+  static _MainScreenState? _currentInstance;
+
+  // Global method to navigate to send with contact
+  static void navigateToSendWithContact(String address, String contactName) {
+    print('🎯 MainScreen.navigateToSendWithContact called with: $address, $contactName');
+    if (_currentInstance != null) {
+      print('🎯 MainScreen: Found current instance, calling method');
+      _currentInstance!.navigateToSendWithContact(address, contactName);
+    } else {
+      print('🎯 MainScreen: No current instance found!');
+    }
+  }
 }
 
 class _MainScreenState extends State<MainScreen>
@@ -27,14 +47,27 @@ class _MainScreenState extends State<MainScreen>
   int _currentIndex = 0;
   late PageController _pageController;
   late AnimationController _animationController;
+  
+  // Contact data for sending
+  String? _prefilledAddress;
+  String? _contactName;
 
-  final List<Widget> _screens = [
+  // Pending prefill to publish after switching to the Send tab
+  String? _pendingPrefillAddress;
+  String? _pendingPrefillName;
+
+  List<Widget> get _screens => [
     const WalletDashboardScreen(),
-    const SendScreenModern(),
+    SendScreenModern(
+      key: ValueKey('send_${_prefilledAddress ?? 'empty'}_${_contactName ?? 'none'}'),
+      prefilledAddress: _prefilledAddress,
+      contactName: _contactName,
+    ),
     const ReceiveScreenModern(),
     const PaginatedTransactionHistoryScreen(),
-    // CliDemoPage(), // Removed - CLI demo no longer used
-    const SettingsScreen(),
+    ContactsScreen(
+      onSendToContact: navigateToSendWithContact,
+    ),
   ];
 
   final List<BottomNavigationBarItem> _navItems = [
@@ -58,36 +91,33 @@ class _MainScreenState extends State<MainScreen>
       activeIcon: Icon(Icons.history),
       label: 'History',
     ),
-    // Removed - CLI demo no longer used
-    // const BottomNavigationBarItem(
-    //   icon: Icon(Icons.terminal),
-    //   activeIcon: Icon(Icons.terminal),
-    //   label: 'CLI Demo',
-    // ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.settings),
-      activeIcon: Icon(Icons.settings),
-      label: 'Settings',
+      icon: Icon(Icons.contacts),
+      activeIcon: Icon(Icons.contacts),
+      label: 'Contacts',
     ),
   ];
 
   @override
   void initState() {
     super.initState();
+    MainScreen._currentInstance = this; // Set static reference
     _pageController = PageController(initialPage: _currentIndex);
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
     
-    // Start initial sync
+    // Start initial sync and initialize contacts
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeWallet();
+      _initializeContacts();
     });
   }
 
   @override
   void dispose() {
+    MainScreen._currentInstance = null; // Clear static reference
     _pageController.dispose();
     _animationController.dispose();
     super.dispose();
@@ -156,8 +186,32 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
+  Future<void> _initializeContacts() async {
+    try {
+      final contactProvider = Provider.of<ContactProvider>(context, listen: false);
+      await contactProvider.loadContacts();
+      if (kDebugMode) print('✅ MainScreen: Contacts initialized');
+    } catch (e) {
+      if (kDebugMode) print('⚠️ MainScreen: Contact initialization failed: $e');
+    }
+  }
+
+  void _navigateToSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SettingsScreen(),
+      ),
+    );
+  }
+
   void onNavItemTapped(int index) {
     if (_currentIndex == index) return;
+    
+    // Clear contact data when navigating away from send tab
+    if (_currentIndex == 1 && index != 1) {
+      clearContactData();
+    }
     
     setState(() {
       _currentIndex = index;
@@ -172,15 +226,90 @@ class _MainScreenState extends State<MainScreen>
 
   void _onPageChanged(int index) {
     if (_currentIndex != index) {
+      // Clear contact data when navigating away from send tab
+      if (_currentIndex == 1 && index != 1) {
+        clearContactData();
+      }
+      
       setState(() {
         _currentIndex = index;
       });
     }
   }
 
+  // Method to navigate to send tab with contact data
+  void navigateToSendWithContact(String address, String contactName) {
+    print('🎯 MainScreen.navigateToSendWithContact (instance method) called');
+    print('🎯 MainScreen: Setting _prefilledAddress = $address');
+    print('🎯 MainScreen: Setting _contactName = $contactName');
+    print('🎯 MainScreen: Current _currentIndex = $_currentIndex');
+
+    // Defer publishing to the bus until after we've switched to the Send tab
+    _pendingPrefillAddress = address;
+    _pendingPrefillName = contactName;
+
+    setState(() {
+      _prefilledAddress = address;
+      _contactName = contactName;
+      // Set the current index in the same setState to avoid double rebuilds
+      if (_currentIndex != 1) {
+        print('🎯 MainScreen: Changing _currentIndex from $_currentIndex to 1');
+        _currentIndex = 1;
+      } else {
+        print('🎯 MainScreen: Already on send tab (index 1)');
+      }
+    });
+
+    print('🎯 MainScreen: setState completed, _prefilledAddress = $_prefilledAddress, _contactName = $_contactName');
+
+    // Use post-frame callback to ensure PageView is rebuilt with new key
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Navigate to send tab (index 1) after the PageView is rebuilt
+      if (_pageController.hasClients && _currentIndex == 1) {
+        _pageController.animateToPage(
+          1,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+
+        // Now that we've navigated to the Send tab, publish the prefill
+        if (_pendingPrefillAddress != null) {
+          SendPrefillBus.set(_pendingPrefillAddress!, _pendingPrefillName);
+          _pendingPrefillAddress = null;
+          _pendingPrefillName = null;
+        }
+      }
+    });
+  }
+
+  // Method to clear contact data
+  void clearContactData() {
+    // Do not clear the bus here; allow the Send screen to consume existing prefill.
+    setState(() {
+      _prefilledAddress = null;
+      _contactName = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('BitcoinZ Wallet'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _navigateToSettings,
+            tooltip: 'Settings',
+          ),
+        ],
+      ),
       body: Consumer2<WalletProvider, AuthProvider>(
         builder: (context, walletProvider, authProvider, child) {
           return PageView(
