@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'dart:typed_data';
 import '../../models/contact_model.dart';
 import '../../providers/contact_provider.dart';
+import '../../services/image_helper_service.dart';
 import '../main_screen.dart';
 import '../wallet/send_screen_modern.dart';
 import 'contact_form_screen.dart';
@@ -35,6 +35,7 @@ class ContactDetailScreen extends StatelessWidget {
       'action': 'send_to_contact',
       'address': contact.address,
       'name': contact.name,
+      'photo': contact.pictureBase64,
     });
   }
 
@@ -196,12 +197,7 @@ class ContactDetailScreen extends StatelessWidget {
                 CircleAvatar(
                   radius: 50,
                   backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                  backgroundImage: contact.pictureBase64 != null
-                      ? MemoryImage(
-                          // TODO: Implement proper base64 decoding
-                          Uint8List.fromList(contact.pictureBase64!.codeUnits),
-                        )
-                      : null,
+                  backgroundImage: ImageHelperService.getMemoryImage(contact.pictureBase64),
                   child: contact.pictureBase64 == null
                       ? Text(
                           contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',

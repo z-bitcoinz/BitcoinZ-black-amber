@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../providers/contact_provider.dart';
 import '../../models/contact_model.dart';
+import '../../services/image_helper_service.dart';
 import '../wallet/qr_scanner_screen.dart';
 
 class ContactFormScreen extends StatefulWidget {
@@ -22,10 +24,12 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _imageHelper = ImageHelperService();
   
   bool _isFavorite = false;
   bool _isLoading = false;
   String? _errorMessage;
+  String? _pictureBase64;
   
   bool get _isEditing => widget.contact != null;
 
@@ -39,6 +43,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
       _addressController.text = contact.address;
       _descriptionController.text = contact.description ?? '';
       _isFavorite = contact.isFavorite;
+      _pictureBase64 = contact.pictureBase64;
     }
   }
 
@@ -166,6 +171,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
           description: _descriptionController.text.trim().isEmpty 
               ? null 
               : _descriptionController.text.trim(),
+          pictureBase64: _pictureBase64,
           isFavorite: _isFavorite,
         );
         success = await contactProvider.updateContact(updatedContact);
@@ -177,6 +183,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
           description: _descriptionController.text.trim().isEmpty 
               ? null 
               : _descriptionController.text.trim(),
+          pictureBase64: _pictureBase64,
           isFavorite: _isFavorite,
         );
       }
@@ -212,6 +219,101 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
         });
       }
     }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final base64Image = await _imageHelper.pickAndProcessImage(
+        source: source,
+        cropTitle: 'Crop Contact Photo',
+      );
+      
+      if (base64Image != null && mounted) {
+        setState(() {
+          _pictureBase64 = base64Image;
+        });
+        
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo added successfully'),
+            backgroundColor: Color(0xFF4CAF50),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error selecting photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  void _showPhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('Take Photo'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('Choose from Gallery'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+                if (_pictureBase64 != null)
+                  ListTile(
+                    leading: const Icon(Icons.delete, color: Colors.red),
+                    title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _pictureBase64 = null;
+                      });
+                      HapticFeedback.lightImpact();
+                    },
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.close),
+                  title: const Text('Cancel'),
+                  onTap: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -275,6 +377,53 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
               ),
               const SizedBox(height: 16),
             ],
+            
+            // Contact Photo
+            Center(
+              child: GestureDetector(
+                onTap: _isLoading ? null : _showPhotoOptions,
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.grey.withOpacity(0.2),
+                      backgroundImage: _pictureBase64 != null 
+                          ? ImageHelperService.getMemoryImage(_pictureBase64)
+                          : null,
+                      child: _pictureBase64 == null
+                          ? Icon(
+                              Icons.person,
+                              size: 60,
+                              color: Colors.white.withOpacity(0.5),
+                            )
+                          : null,
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            width: 2,
+                          ),
+                        ),
+                        child: Icon(
+                          _pictureBase64 != null ? Icons.edit : Icons.camera_alt,
+                          size: 20,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 24),
             
             // Name field
             TextFormField(

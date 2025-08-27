@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library to select contact photos.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to camera to take contact photos.</string>
 </dict>
 </plist>

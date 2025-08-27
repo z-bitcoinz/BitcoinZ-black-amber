@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:typed_data';
 import '../../providers/contact_provider.dart';
 import '../../models/contact_model.dart';
+import '../../services/image_helper_service.dart';
 import 'contact_form_screen.dart';
 import 'contact_detail_screen.dart';
 import '../main_screen.dart';
 
 class ContactsScreen extends StatefulWidget {
-  final Function(String address, String contactName)? onSendToContact;
+  final Function(String address, String contactName, String? photo)? onSendToContact;
 
   const ContactsScreen({
     super.key,
@@ -101,10 +101,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
       if (action == 'send_to_contact') {
         final address = result['address'] as String;
         final name = result['name'] as String;
+        final photo = result['photo'] as String?;
 
         print('🎯 ContactsScreen: Received send_to_contact action');
         print('🎯 ContactsScreen: Address: $address');
         print('🎯 ContactsScreen: Name: $name');
+        print('🎯 ContactsScreen: Photo: ${photo != null ? 'provided' : 'null'}');
         print('🎯 ContactsScreen: Callback available: ${widget.onSendToContact != null}');
 
         // Try multiple approaches
@@ -113,7 +115,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         // Approach 1: Use callback if available
         if (widget.onSendToContact != null) {
           print('🎯 ContactsScreen: Calling callback');
-          widget.onSendToContact!(address, name);
+          widget.onSendToContact!(address, name, photo);
           success = true;
         } else {
           print('🎯 ContactsScreen: No callback available');
@@ -122,7 +124,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         // Approach 2: Use static method
         if (!success) {
           print('🎯 ContactsScreen: Trying static method');
-          MainScreen.navigateToSendWithContact(address, name);
+          MainScreen.navigateToSendWithContact(address, name, photo);
           success = true;
         }
 
@@ -131,7 +133,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
           print('🎯 ContactsScreen: Trying MainScreen.of()');
           final mainScreenState = MainScreen.of(context);
           if (mainScreenState != null) {
-            mainScreenState.navigateToSendWithContact(address, name);
+            mainScreenState.navigateToSendWithContact(address, name, photo);
             success = true;
           }
         }
@@ -355,12 +357,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         leading: CircleAvatar(
           radius: 28,
           backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-          backgroundImage: contact.pictureBase64 != null
-              ? MemoryImage(
-                  // TODO: Implement proper base64 decoding
-                  Uint8List.fromList(contact.pictureBase64!.codeUnits),
-                )
-              : null,
+          backgroundImage: ImageHelperService.getMemoryImage(contact.pictureBase64),
           child: contact.pictureBase64 == null
               ? Text(
                   contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',

@@ -3,19 +3,20 @@ import 'package:flutter/foundation.dart';
 class SendPrefill {
   final String address;
   final String? name;
-  const SendPrefill({required this.address, this.name});
+  final String? photo;
+  const SendPrefill({required this.address, this.name, this.photo});
 }
 
 class SendPrefillBus {
   // Holds the latest requested prefill, or null when cleared
   static final ValueNotifier<SendPrefill?> current = ValueNotifier<SendPrefill?>(null);
 
-  static void set(String address, String? name) {
+  static void set(String address, String? name, [String? photo]) {
     if (kDebugMode) {
       // Use concise prints to avoid flooding logs
-      print('🎯 SendPrefillBus.set -> address: $address, name: $name');
+      print('🎯 SendPrefillBus.set -> address: $address, name: $name, photo: ${photo != null ? 'provided' : 'null'}');
     }
-    current.value = SendPrefill(address: address, name: name);
+    current.value = SendPrefill(address: address, name: name, photo: photo);
   }
 
   static void clear() {

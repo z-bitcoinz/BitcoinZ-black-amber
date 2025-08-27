@@ -12,15 +12,18 @@ import '../../widgets/sending_progress_overlay.dart';
 import '../../widgets/animated_progress_dots.dart';
 import 'qr_scanner_screen.dart';
 import '../../services/send_prefill_bus.dart';
+import '../../services/image_helper_service.dart';
 
 class SendScreenModern extends StatefulWidget {
   final String? prefilledAddress;
   final String? contactName;
+  final String? contactPhoto;
 
   const SendScreenModern({
     super.key,
     this.prefilledAddress,
     this.contactName,
+    this.contactPhoto,
   });
 
   @override
@@ -33,8 +36,9 @@ class _SendScreenModernState extends State<SendScreenModern> {
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
 
-  // Selected contact name (if coming from contacts or prefill bus)
+  // Selected contact info (if coming from contacts or prefill bus)
   String? _selectedContactName;
+  String? _selectedContactPhoto;
 
   bool _isSending = false;
   String _sendingStatus = '';
@@ -42,6 +46,9 @@ class _SendScreenModernState extends State<SendScreenModern> {
   bool _isShieldedTransaction = false;
   final double _estimatedFee = 0.00001; // Standard BitcoinZ fee (much lower)
   bool _isFiatInput = false;
+  
+  // Track if user manually cleared the form
+  bool _wasManuallyCleared = false;
 
   @override
   void initState() {
@@ -53,8 +60,9 @@ class _SendScreenModernState extends State<SendScreenModern> {
     // Listen for prefill events so we can update even when the widget is reused by PageView
     SendPrefillBus.current.addListener(_onPrefillChanged);
 
-    // Save incoming contact name (if any) for use across the flow
+    // Save incoming contact info (if any) for use across the flow
     _selectedContactName = widget.contactName;
+    _selectedContactPhoto = widget.contactPhoto;
 
     _handlePrefilledData();
   }
@@ -83,6 +91,9 @@ class _SendScreenModernState extends State<SendScreenModern> {
     final prefill = SendPrefillBus.current.value;
     print('🎯 SendScreenModern._onPrefillChanged: $prefill');
     if (prefill != null) {
+      // Reset manual clear flag when new prefill arrives
+      _wasManuallyCleared = false;
+      
       if (prefill.address.isNotEmpty) {
         print('🎯 SendScreenModern: Applying bus prefill address: ${prefill.address}');
         _addressController.text = prefill.address;
@@ -90,6 +101,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
       }
       if (prefill.name != null && prefill.name!.isNotEmpty) {
         _selectedContactName = prefill.name;
+        _selectedContactPhoto = prefill.photo;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -108,17 +120,25 @@ class _SendScreenModernState extends State<SendScreenModern> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    
+    // Don't apply prefill if user manually cleared the form
+    if (_wasManuallyCleared) {
+      print('🎯 SendScreenModern.didChangeDependencies: Skipping prefill - user manually cleared');
+      return;
+    }
+    
     // If there is a prefill waiting on the bus when we become active, apply it.
     final prefill = SendPrefillBus.current.value;
     if (prefill != null) {
-      if (prefill.address.isNotEmpty) {
+      if (prefill.address.isNotEmpty && _addressController.text.isEmpty) {
         print('🎯 SendScreenModern.didChangeDependencies: applying pending prefill address');
         _addressController.text = prefill.address;
         _isValidBitcoinZAddress(prefill.address);
       }
-      if (prefill.name != null && prefill.name!.isNotEmpty) {
+      if (prefill.name != null && prefill.name!.isNotEmpty && _selectedContactName == null) {
         print('🎯 SendScreenModern.didChangeDependencies: applying pending prefill name: ${prefill.name}');
         _selectedContactName = prefill.name;
+        _selectedContactPhoto = prefill.photo;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) setState(() {}); // refresh UI banner/title
         });
@@ -144,10 +164,12 @@ class _SendScreenModernState extends State<SendScreenModern> {
       print('🎯 SendScreenModern: No prefilled address provided');
     }
 
-    // Apply contact name (independent of whether address came via widget or bus)
+    // Apply contact name and photo (independent of whether address came via widget or bus)
     if (widget.contactName != null && widget.contactName!.isNotEmpty) {
       _selectedContactName = widget.contactName;
+      _selectedContactPhoto = widget.contactPhoto;
       print('🎯 SendScreenModern: Applying contact name for UI: ${widget.contactName!}');
+      print('🎯 SendScreenModern: Contact photo: ${widget.contactPhoto != null ? 'provided' : 'null'}');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -188,6 +210,24 @@ class _SendScreenModernState extends State<SendScreenModern> {
     }
 
     return false;
+  }
+
+  void _clearRecipient() {
+    setState(() {
+      _addressController.clear();
+      _selectedContactName = null;
+      _selectedContactPhoto = null;
+      _isShieldedTransaction = false;
+      _wasManuallyCleared = true; // Mark as manually cleared
+    });
+    
+    // Clear any error message
+    _errorMessage = null;
+    
+    // Clear the prefill bus to prevent auto-refill
+    SendPrefillBus.clear();
+    
+    HapticFeedback.lightImpact();
   }
 
   double? _getAmountValue() {
@@ -397,6 +437,8 @@ class _SendScreenModernState extends State<SendScreenModern> {
       _addressController.text = selectedContact.address;
       _isValidBitcoinZAddress(selectedContact.address);
       _selectedContactName = selectedContact.name; // wire name for banner, dialogs, title
+      _selectedContactPhoto = selectedContact.pictureBase64; // wire photo for display
+      _wasManuallyCleared = false; // Reset manual clear flag when selecting new contact
 
       HapticFeedback.lightImpact();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -588,17 +630,19 @@ class _SendScreenModernState extends State<SendScreenModern> {
                     ),
                     child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.person,
-                            color: Theme.of(context).colorScheme.primary,
-                            size: 24,
-                          ),
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                          backgroundImage: _selectedContactPhoto != null 
+                              ? ImageHelperService.getMemoryImage(_selectedContactPhoto)
+                              : null,
+                          child: _selectedContactPhoto == null
+                              ? Icon(
+                                  Icons.person,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  size: 24,
+                                )
+                              : null,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -625,10 +669,16 @@ class _SendScreenModernState extends State<SendScreenModern> {
                             ],
                           ),
                         ),
-                        Icon(
-                          Icons.check_circle,
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 20,
+                        IconButton(
+                          icon: Icon(
+                            Icons.close,
+                            color: Colors.white.withOpacity(0.7),
+                            size: 20,
+                          ),
+                          onPressed: _clearRecipient,
+                          tooltip: 'Clear selection',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
                         ),
                       ],
                     ),
@@ -961,6 +1011,16 @@ class _SendScreenModernState extends State<SendScreenModern> {
                           suffixIcon: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (_addressController.text.isNotEmpty)
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.clear,
+                                    color: Colors.white.withOpacity(0.5),
+                                    size: 18,
+                                  ),
+                                  onPressed: _clearRecipient,
+                                  tooltip: 'Clear',
+                                ),
                               IconButton(
                                 icon: Icon(
                                   Icons.contacts,
@@ -994,7 +1054,9 @@ class _SendScreenModernState extends State<SendScreenModern> {
                           return null;
                         },
                         onChanged: (value) {
-                          _isValidBitcoinZAddress(value);
+                          setState(() {
+                            _isValidBitcoinZAddress(value);
+                          });
                         },
                       ),
                     ),

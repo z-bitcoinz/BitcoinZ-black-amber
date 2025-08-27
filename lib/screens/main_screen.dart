@@ -31,11 +31,11 @@ class MainScreen extends StatefulWidget {
   static _MainScreenState? _currentInstance;
 
   // Global method to navigate to send with contact
-  static void navigateToSendWithContact(String address, String contactName) {
-    print('🎯 MainScreen.navigateToSendWithContact called with: $address, $contactName');
+  static void navigateToSendWithContact(String address, String contactName, [String? photo]) {
+    print('🎯 MainScreen.navigateToSendWithContact called with: $address, $contactName, photo: ${photo != null ? 'provided' : 'null'}');
     if (_currentInstance != null) {
       print('🎯 MainScreen: Found current instance, calling method');
-      _currentInstance!.navigateToSendWithContact(address, contactName);
+      _currentInstance!.navigateToSendWithContact(address, contactName, photo);
     } else {
       print('🎯 MainScreen: No current instance found!');
     }
@@ -51,10 +51,12 @@ class _MainScreenState extends State<MainScreen>
   // Contact data for sending
   String? _prefilledAddress;
   String? _contactName;
+  String? _contactPhoto;
 
   // Pending prefill to publish after switching to the Send tab
   String? _pendingPrefillAddress;
   String? _pendingPrefillName;
+  String? _pendingPrefillPhoto;
 
   List<Widget> get _screens => [
     const WalletDashboardScreen(),
@@ -62,11 +64,12 @@ class _MainScreenState extends State<MainScreen>
       key: ValueKey('send_${_prefilledAddress ?? 'empty'}_${_contactName ?? 'none'}'),
       prefilledAddress: _prefilledAddress,
       contactName: _contactName,
+      contactPhoto: _contactPhoto,
     ),
     const ReceiveScreenModern(),
     const PaginatedTransactionHistoryScreen(),
     ContactsScreen(
-      onSendToContact: navigateToSendWithContact,
+      onSendToContact: (address, name, photo) => navigateToSendWithContact(address, name, photo),
     ),
   ];
 
@@ -238,19 +241,22 @@ class _MainScreenState extends State<MainScreen>
   }
 
   // Method to navigate to send tab with contact data
-  void navigateToSendWithContact(String address, String contactName) {
+  void navigateToSendWithContact(String address, String contactName, [String? photo]) {
     print('🎯 MainScreen.navigateToSendWithContact (instance method) called');
     print('🎯 MainScreen: Setting _prefilledAddress = $address');
     print('🎯 MainScreen: Setting _contactName = $contactName');
+    print('🎯 MainScreen: Setting _contactPhoto = ${photo != null ? 'provided' : 'null'}');
     print('🎯 MainScreen: Current _currentIndex = $_currentIndex');
 
     // Defer publishing to the bus until after we've switched to the Send tab
     _pendingPrefillAddress = address;
     _pendingPrefillName = contactName;
+    _pendingPrefillPhoto = photo;
 
     setState(() {
       _prefilledAddress = address;
       _contactName = contactName;
+      _contactPhoto = photo;
       // Set the current index in the same setState to avoid double rebuilds
       if (_currentIndex != 1) {
         print('🎯 MainScreen: Changing _currentIndex from $_currentIndex to 1');
@@ -260,7 +266,7 @@ class _MainScreenState extends State<MainScreen>
       }
     });
 
-    print('🎯 MainScreen: setState completed, _prefilledAddress = $_prefilledAddress, _contactName = $_contactName');
+    print('🎯 MainScreen: setState completed, _prefilledAddress = $_prefilledAddress, _contactName = $_contactName, _contactPhoto = ${_contactPhoto != null ? 'provided' : 'null'}');
 
     // Use post-frame callback to ensure PageView is rebuilt with new key
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -274,9 +280,10 @@ class _MainScreenState extends State<MainScreen>
 
         // Now that we've navigated to the Send tab, publish the prefill
         if (_pendingPrefillAddress != null) {
-          SendPrefillBus.set(_pendingPrefillAddress!, _pendingPrefillName);
+          SendPrefillBus.set(_pendingPrefillAddress!, _pendingPrefillName, _pendingPrefillPhoto);
           _pendingPrefillAddress = null;
           _pendingPrefillName = null;
+          _pendingPrefillPhoto = null;
         }
       }
     });
