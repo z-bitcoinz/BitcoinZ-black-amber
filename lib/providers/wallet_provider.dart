@@ -10,6 +10,8 @@ import '../models/wallet_model.dart';
 import '../models/balance_model.dart';
 import '../models/transaction_model.dart';
 import '../models/address_model.dart';
+import '../models/message_label.dart';
+import '../models/transaction_category.dart';
 // import '../services/bitcoinz_service.dart'; // Not used - using Rust service instead
 import '../services/database_service.dart';
 import '../services/bitcoinz_rust_service.dart';
@@ -58,13 +60,18 @@ class WalletProvider with ChangeNotifier {
   double _syncSpeed = 0.0; // blocks per second
   Duration? _estimatedTimeRemaining;
   
-  // Pagination state
+  // Pagination state - optimized for performance
   int _currentPage = 0;
-  static const int _pageSize = 50;
+  static const int _pageSize = 40; // Reduced from 50 for better performance
   bool _hasMoreTransactions = true;
   bool _isLoadingMore = false;
   String? _searchQuery;
   String? _filterType;
+
+  // Intelligent caching for large datasets
+  final Map<int, List<TransactionModel>> _pageCache = {};
+  static const int _maxCachedPages = 5; // Cache up to 5 pages (200 transactions)
+  final List<int> _cachedPageOrder = []; // Track page access order for LRU eviction
   
   // Block height caching for real confirmation calculation
   int? _cachedBlockHeight;
@@ -77,6 +84,12 @@ class WalletProvider with ChangeNotifier {
   Map<String, bool> _memoReadStatusCache = {}; // In-memory cache for memo read status
   SharedPreferences? _prefs; // For fallback storage when database fails
   bool _prefsInitialized = false; // Track if SharedPreferences is ready
+
+  // Message labels cache for fast access
+  final Map<String, List<MessageLabel>> _messageLabelsCache = {};
+
+  // Transaction categories cache for fast access
+  final Map<String, TransactionCategory> _transactionCategoriesCache = {};
   
   // Temporary storage for generated wallet data
   
@@ -2576,6 +2589,9 @@ class WalletProvider with ChangeNotifier {
   }) async {
     if (resetList) {
       _currentPage = 0;
+      _pageCache.clear();
+      _cachedPageOrder.clear();
+
       // Don't clear transactions if Rust Bridge is providing live data
       // Only clear if we need to load from database (when no live RPC data available)
       if (_transactions.isEmpty || (searchQuery != null || filterType != null)) {
@@ -2596,12 +2612,29 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final transactions = await _databaseService.getTransactions(
-        limit: _pageSize,
-        offset: page * _pageSize,
-        type: filterType,
-        searchQuery: searchQuery,
-      );
+      List<TransactionModel> transactions;
+
+      // Check cache first for better performance
+      if (_pageCache.containsKey(page) && searchQuery == null && filterType == null) {
+        transactions = _pageCache[page]!;
+        _updatePageCacheAccess(page);
+        if (kDebugMode) print('📄 Loaded page $page from cache (${transactions.length} transactions)');
+      } else {
+        // Load from database
+        transactions = await _databaseService.getTransactions(
+          limit: _pageSize,
+          offset: page * _pageSize,
+          type: filterType,
+          searchQuery: searchQuery,
+        );
+
+        // Cache the page if no search/filter (only cache clean data)
+        if (searchQuery == null && filterType == null) {
+          _cacheTransactionPage(page, transactions);
+        }
+
+        if (kDebugMode) print('📄 Loaded page $page from database (${transactions.length} transactions)');
+      }
 
       if (resetList) {
         _transactions = transactions;
@@ -2611,10 +2644,7 @@ class WalletProvider with ChangeNotifier {
 
       _hasMoreTransactions = transactions.length == _pageSize;
       _currentPage = page;
-      
-      if (kDebugMode) {
-        print('📄 Loaded page $page with ${transactions.length} transactions');
-      }
+
     } catch (e) {
       if (kDebugMode) print('❌ Error loading transactions page: $e');
       _setError('Failed to load transactions: $e');
@@ -2650,6 +2680,345 @@ class WalletProvider with ChangeNotifier {
       filterType: type,
       resetList: true,
     );
+  }
+
+  /// Cache a page of transactions with LRU eviction
+  void _cacheTransactionPage(int page, List<TransactionModel> transactions) {
+    // Remove page if already cached to update access order
+    if (_pageCache.containsKey(page)) {
+      _cachedPageOrder.remove(page);
+    }
+
+    // Add to cache
+    _pageCache[page] = List.from(transactions); // Create copy to avoid reference issues
+    _cachedPageOrder.add(page);
+
+    // Evict oldest pages if cache is full
+    while (_cachedPageOrder.length > _maxCachedPages) {
+      final oldestPage = _cachedPageOrder.removeAt(0);
+      _pageCache.remove(oldestPage);
+      if (kDebugMode) print('📄 Evicted page $oldestPage from cache');
+    }
+  }
+
+  /// Update page access order for LRU cache
+  void _updatePageCacheAccess(int page) {
+    _cachedPageOrder.remove(page);
+    _cachedPageOrder.add(page);
+  }
+
+  /// Clear transaction cache (useful for memory management)
+  void clearTransactionCache() {
+    _pageCache.clear();
+    _cachedPageOrder.clear();
+    if (kDebugMode) print('📄 Cleared transaction cache');
+  }
+
+  // Message Label Management
+
+  /// Get message labels for a transaction (with caching)
+  Future<List<MessageLabel>> getMessageLabels(String txid) async {
+    // Check cache first
+    if (_messageLabelsCache.containsKey(txid)) {
+      return _messageLabelsCache[txid]!;
+    }
+
+    try {
+      final labels = await _databaseService.getMessageLabelsForTransaction(txid);
+      _messageLabelsCache[txid] = labels;
+      return labels;
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to load message labels for $txid: $e');
+      return [];
+    }
+  }
+
+  /// Add a message label to a transaction
+  Future<void> addMessageLabel(MessageLabel label) async {
+    try {
+      await _databaseService.insertMessageLabel(label);
+
+      // Update cache
+      _messageLabelsCache.putIfAbsent(label.txid, () => []).add(label);
+
+      // Auto-generate label if memo exists and no labels yet
+      if (_messageLabelsCache[label.txid]!.length == 1) {
+        final transaction = _transactions.firstWhere(
+          (tx) => tx.txid == label.txid,
+          orElse: () => throw StateError('Transaction not found'),
+        );
+
+        if (transaction.hasMemo && !label.isAutoGenerated) {
+          // This was the first manual label, so we might want to suggest auto-generation
+          if (kDebugMode) print('💡 First label added for transaction with memo');
+        }
+      }
+
+      notifyListeners();
+      if (kDebugMode) print('🏷️ Added label "${label.labelName}" to transaction ${label.txid}');
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to add message label: $e');
+      throw Exception('Failed to add label: $e');
+    }
+  }
+
+  /// Remove a message label from a transaction
+  Future<void> removeMessageLabel(MessageLabel label) async {
+    try {
+      if (label.id != null) {
+        await _databaseService.deleteMessageLabel(label.id!);
+      }
+
+      // Update cache
+      _messageLabelsCache[label.txid]?.removeWhere((l) => l.id == label.id);
+
+      notifyListeners();
+      if (kDebugMode) print('🗑️ Removed label "${label.labelName}" from transaction ${label.txid}');
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to remove message label: $e');
+      throw Exception('Failed to remove label: $e');
+    }
+  }
+
+  /// Get all unique message labels (for suggestions)
+  Future<List<String>> getAllMessageLabelNames() async {
+    try {
+      final allLabels = await _databaseService.getAllMessageLabels();
+      final uniqueNames = allLabels.map((l) => l.labelName).toSet().toList();
+      uniqueNames.sort();
+      return uniqueNames;
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to load all message labels: $e');
+      return [];
+    }
+  }
+
+  /// Clear message labels cache
+  void clearMessageLabelsCache() {
+    _messageLabelsCache.clear();
+    if (kDebugMode) print('🏷️ Cleared message labels cache');
+  }
+
+  // Transaction Category Management
+
+  /// Get or auto-generate category for a transaction
+  Future<TransactionCategory> getTransactionCategory(String txid) async {
+    // Check cache first
+    if (_transactionCategoriesCache.containsKey(txid)) {
+      return _transactionCategoriesCache[txid]!;
+    }
+
+    try {
+      // Check database
+      final categoryData = await _databaseService.getTransactionCategory(txid);
+
+      if (categoryData != null) {
+        // Found in database, create category object
+        final category = TransactionCategorizer.getCategoryByName(categoryData['category_name'] as String);
+        if (category != null) {
+          final categoryWithScore = TransactionCategory(
+            type: category.type,
+            name: category.name,
+            description: category.description,
+            icon: category.icon,
+            color: category.color,
+            keywords: category.keywords,
+            confidenceScore: categoryData['confidence_score'] as double,
+          );
+          _transactionCategoriesCache[txid] = categoryWithScore;
+          return categoryWithScore;
+        }
+      }
+
+      // Not found in database, auto-categorize
+      final transaction = _transactions.firstWhere(
+        (tx) => tx.txid == txid,
+        orElse: () => throw StateError('Transaction not found'),
+      );
+
+      final autoCategory = TransactionCategorizer.categorizeTransaction(transaction);
+
+      // Save to database
+      await _databaseService.insertTransactionCategory(
+        txid: txid,
+        categoryType: autoCategory.type.toString().split('.').last,
+        categoryName: autoCategory.name,
+        confidenceScore: autoCategory.confidenceScore,
+        isManual: false,
+      );
+
+      // Cache it
+      _transactionCategoriesCache[txid] = autoCategory;
+
+      if (kDebugMode) {
+        print('🏷️ Auto-categorized transaction $txid as ${autoCategory.name} (confidence: ${autoCategory.confidenceScore.toStringAsFixed(2)})');
+      }
+
+      return autoCategory;
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to get category for transaction $txid: $e');
+
+      // Return default category
+      final defaultCategory = TransactionCategorizer.getCategoryByName('Miscellaneous')!;
+      _transactionCategoriesCache[txid] = defaultCategory;
+      return defaultCategory;
+    }
+  }
+
+  /// Manually set category for a transaction
+  Future<void> setTransactionCategory(String txid, TransactionCategory category) async {
+    try {
+      // Check if category already exists in database
+      final existingCategory = await _databaseService.getTransactionCategory(txid);
+
+      if (existingCategory != null) {
+        // Update existing
+        await _databaseService.updateTransactionCategory(
+          txid: txid,
+          categoryType: category.type.toString().split('.').last,
+          categoryName: category.name,
+          confidenceScore: 1.0, // Manual categorization has full confidence
+          isManual: true,
+        );
+      } else {
+        // Insert new
+        await _databaseService.insertTransactionCategory(
+          txid: txid,
+          categoryType: category.type.toString().split('.').last,
+          categoryName: category.name,
+          confidenceScore: 1.0, // Manual categorization has full confidence
+          isManual: true,
+        );
+      }
+
+      // Update cache
+      _transactionCategoriesCache[txid] = category;
+
+      notifyListeners();
+      if (kDebugMode) print('🏷️ Manually set category for transaction $txid to ${category.name}');
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to set category for transaction $txid: $e');
+      throw Exception('Failed to set category: $e');
+    }
+  }
+
+  /// Get category counts for statistics
+  Future<Map<String, int>> getCategoryTypeCounts() async {
+    try {
+      return await _databaseService.getCategoryTypeCounts();
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to get category counts: $e');
+      return {};
+    }
+  }
+
+  /// Auto-categorize all transactions (useful for initial setup)
+  Future<void> autoCategorizeAllTransactions() async {
+    try {
+      if (kDebugMode) print('🏷️ Starting auto-categorization of all transactions...');
+
+      int categorized = 0;
+      for (final transaction in _transactions) {
+        final existingCategory = await _databaseService.getTransactionCategory(transaction.txid);
+
+        // Only auto-categorize if not already categorized
+        if (existingCategory == null) {
+          final category = TransactionCategorizer.categorizeTransaction(transaction);
+
+          await _databaseService.insertTransactionCategory(
+            txid: transaction.txid,
+            categoryType: category.type.toString().split('.').last,
+            categoryName: category.name,
+            confidenceScore: category.confidenceScore,
+            isManual: false,
+          );
+
+          _transactionCategoriesCache[transaction.txid] = category;
+          categorized++;
+        }
+      }
+
+      if (kDebugMode) print('🏷️ Auto-categorized $categorized transactions');
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to auto-categorize transactions: $e');
+    }
+  }
+
+  /// Clear transaction categories cache
+  void clearTransactionCategoriesCache() {
+    _transactionCategoriesCache.clear();
+    if (kDebugMode) print('🏷️ Cleared transaction categories cache');
+  }
+
+  // Enhanced Unread Messages Management
+
+  /// Get count of unread messages
+  int get unreadMessageCount {
+    return _transactions.where((tx) =>
+      tx.hasMemo && !getTransactionMemoReadStatus(tx.txid, tx.memoRead)
+    ).length;
+  }
+
+  /// Get all transactions with unread messages
+  List<TransactionModel> get unreadMessageTransactions {
+    return _transactions.where((tx) =>
+      tx.hasMemo && !getTransactionMemoReadStatus(tx.txid, tx.memoRead)
+    ).toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  /// Get all transactions with messages (read and unread)
+  List<TransactionModel> get allMessageTransactions {
+    return _transactions.where((tx) => tx.hasMemo).toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  /// Mark multiple memos as read
+  Future<void> markMultipleMemosAsRead(List<String> txids) async {
+    try {
+      for (final txid in txids) {
+        await markMemoAsRead(txid);
+      }
+      if (kDebugMode) print('📱 Marked ${txids.length} memos as read');
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to mark multiple memos as read: $e');
+      throw Exception('Failed to mark memos as read: $e');
+    }
+  }
+
+  /// Mark multiple memos as unread
+  Future<void> markMultipleMemosAsUnread(List<String> txids) async {
+    try {
+      for (final txid in txids) {
+        await markMemoAsUnread(txid);
+      }
+      if (kDebugMode) print('📱 Marked ${txids.length} memos as unread');
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to mark multiple memos as unread: $e');
+      throw Exception('Failed to mark memos as unread: $e');
+    }
+  }
+
+  /// Mark all messages as read
+  Future<void> markAllMessagesAsRead() async {
+    final unreadTxids = unreadMessageTransactions.map((tx) => tx.txid).toList();
+    if (unreadTxids.isNotEmpty) {
+      await markMultipleMemosAsRead(unreadTxids);
+    }
+  }
+
+  /// Mark all messages as unread
+  Future<void> markAllMessagesAsUnread() async {
+    final allMessageTxids = allMessageTransactions.map((tx) => tx.txid).toList();
+    if (allMessageTxids.isNotEmpty) {
+      await markMultipleMemosAsUnread(allMessageTxids);
+    }
+  }
+
+  /// Check if there are new unread messages (for notifications)
+  bool get hasNewUnreadMessages {
+    // This could be enhanced to track "new" vs "existing" unread messages
+    return unreadMessageCount > 0;
   }
 
   /// Refresh transactions from database (reload first page)
@@ -2729,29 +3098,60 @@ class WalletProvider with ChangeNotifier {
     try {
       // Update in-memory cache first
       _memoReadStatusCache[txid] = true;
-      
+
       // Always save to SharedPreferences for persistence
       await _saveMemoStatusToPrefs(txid, true);
-      
+
       // Also try to update in database (but don't fail if it doesn't work)
       try {
         await _databaseService.markTransactionMemoAsRead(txid);
       } catch (dbError) {
         if (kDebugMode) print('⚠️ Database update failed (using SharedPreferences): $dbError');
       }
-      
+
       // Update in memory
       final index = _transactions.indexWhere((tx) => tx.txid == txid);
       if (index != -1) {
         _transactions[index] = _transactions[index].copyWith(memoRead: true);
       }
-      
+
       // Update unread count
       await updateUnreadMemoCount();
-      
+
       notifyListeners();
     } catch (e) {
       if (kDebugMode) print('❌ Error marking memo as read: $e');
+    }
+  }
+
+  /// Mark a transaction memo as unread
+  Future<void> markMemoAsUnread(String txid) async {
+    try {
+      // Update in-memory cache first
+      _memoReadStatusCache[txid] = false;
+
+      // Always save to SharedPreferences for persistence
+      await _saveMemoStatusToPrefs(txid, false);
+
+      // Also try to update in database (but don't fail if it doesn't work)
+      try {
+        await _databaseService.markTransactionMemoAsUnread(txid);
+      } catch (dbError) {
+        if (kDebugMode) print('⚠️ Database update failed (using SharedPreferences): $dbError');
+      }
+
+      // Update in memory
+      final index = _transactions.indexWhere((tx) => tx.txid == txid);
+      if (index != -1) {
+        _transactions[index] = _transactions[index].copyWith(memoRead: false);
+      }
+
+      // Update unread count
+      await updateUnreadMemoCount();
+
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) print('❌ Error marking memo as unread: $e');
     }
   }
   

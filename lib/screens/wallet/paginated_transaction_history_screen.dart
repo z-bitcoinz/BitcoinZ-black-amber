@@ -6,6 +6,11 @@ import 'package:intl/intl.dart';
 import '../../providers/wallet_provider.dart';
 import '../../providers/currency_provider.dart';
 import '../../models/transaction_model.dart';
+import '../../models/message_label.dart';
+import '../../models/transaction_category.dart';
+import '../../widgets/message_label_dialog.dart';
+import '../../widgets/transaction_category_chip.dart';
+import '../../screens/wallet/all_messages_screen.dart';
 import '../../utils/responsive.dart';
 // import '../../services/btcz_cli_service.dart'; // Removed - CLI no longer used
 
@@ -31,6 +36,8 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
   bool _isRefreshing = false;
   Map<String, int> _transactionStats = {};
   bool _filterUnreadMemos = false; // Filter for unread memos from notification
+  TransactionCategoryType? _selectedCategoryFilter;
+  bool _showMessagesOnly = false;
   
   // Block height caching
   int? _cachedBlockHeight;
@@ -81,8 +88,11 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= 
-        _scrollController.position.maxScrollExtent - 200) {
+    // Optimized scroll detection - load more when 80% scrolled
+    final position = _scrollController.position;
+    final threshold = position.maxScrollExtent * 0.8;
+
+    if (position.pixels >= threshold) {
       // Load more when near the bottom
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
       if (walletProvider.hasMoreTransactions && !walletProvider.isLoadingMore) {
@@ -157,13 +167,81 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
       setState(() {
         _currentFilter = filter;
       });
-      
+
       // BitcoinZ Blue approach: Just update local filter, no database calls
       if (kDebugMode) print('📄 Filter changed to: $filter (filtering locally)');
-      
+
       // The build method will filter transactions locally based on _currentFilter
       // No need for database calls - much faster and simpler
     }
+  }
+
+  void _handleFilterAction(String action) {
+    setState(() {
+      switch (action) {
+        case 'messages_only':
+          _showMessagesOnly = !_showMessagesOnly;
+          _selectedCategoryFilter = null;
+          _filterUnreadMemos = false;
+          break;
+        case 'unread_only':
+          _filterUnreadMemos = !_filterUnreadMemos;
+          _showMessagesOnly = false;
+          _selectedCategoryFilter = null;
+          break;
+        case 'category_income':
+          _selectedCategoryFilter = _selectedCategoryFilter == TransactionCategoryType.income
+              ? null : TransactionCategoryType.income;
+          _showMessagesOnly = false;
+          _filterUnreadMemos = false;
+          break;
+        case 'category_expenses':
+          _selectedCategoryFilter = _selectedCategoryFilter == TransactionCategoryType.expenses
+              ? null : TransactionCategoryType.expenses;
+          _showMessagesOnly = false;
+          _filterUnreadMemos = false;
+          break;
+        case 'category_transfers':
+          _selectedCategoryFilter = _selectedCategoryFilter == TransactionCategoryType.transfers
+              ? null : TransactionCategoryType.transfers;
+          _showMessagesOnly = false;
+          _filterUnreadMemos = false;
+          break;
+        case 'category_investments':
+          _selectedCategoryFilter = _selectedCategoryFilter == TransactionCategoryType.investments
+              ? null : TransactionCategoryType.investments;
+          _showMessagesOnly = false;
+          _filterUnreadMemos = false;
+          break;
+        case 'category_other':
+          _selectedCategoryFilter = _selectedCategoryFilter == TransactionCategoryType.other
+              ? null : TransactionCategoryType.other;
+          _showMessagesOnly = false;
+          _filterUnreadMemos = false;
+          break;
+        case 'clear_filters':
+          _selectedCategoryFilter = null;
+          _showMessagesOnly = false;
+          _filterUnreadMemos = false;
+          _currentFilter = TransactionFilter.all;
+          _searchController.clear();
+          _searchQuery = '';
+          break;
+      }
+    });
+  }
+
+  String _getAppBarTitle() {
+    if (_filterUnreadMemos) return 'Unread Messages';
+    if (_showMessagesOnly) return 'All Messages';
+    if (_selectedCategoryFilter != null) {
+      return '${TransactionCategorizer.getCategoryTypeDisplayName(_selectedCategoryFilter!)} Transactions';
+    }
+    return 'Transaction History';
+  }
+
+  bool _hasActiveFilters() {
+    return _filterUnreadMemos || _showMessagesOnly || _selectedCategoryFilter != null;
   }
 
   /// Get current block height with caching
@@ -202,11 +280,233 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_filterUnreadMemos ? 'Unread Messages' : 'Transaction History'),
+        title: Text(_getAppBarTitle()),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: _filterUnreadMemos, // Show back button when filtering
+        automaticallyImplyLeading: _hasActiveFilters(), // Show back button when filtering
         actions: [
+          // Messages button with unread count
+          Consumer<WalletProvider>(
+            builder: (context, walletProvider, _) {
+              final unreadCount = walletProvider.unreadMessageCount;
+
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.message),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AllMessagesScreen(),
+                        ),
+                      );
+                    },
+                    tooltip: 'View all messages',
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+
+          // Filter menu
+          PopupMenuButton<String>(
+            icon: Icon(
+              Icons.filter_list,
+              color: (_selectedCategoryFilter != null || _showMessagesOnly || _filterUnreadMemos)
+                  ? Theme.of(context).colorScheme.primary
+                  : null,
+            ),
+            onSelected: _handleFilterAction,
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'messages_only',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.message,
+                      color: _showMessagesOnly ? Theme.of(context).colorScheme.primary : null,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Messages Only',
+                      style: TextStyle(
+                        fontWeight: _showMessagesOnly ? FontWeight.bold : null,
+                        color: _showMessagesOnly ? Theme.of(context).colorScheme.primary : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'unread_only',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.mark_email_unread,
+                      color: _filterUnreadMemos ? Theme.of(context).colorScheme.primary : null,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Unread Messages',
+                      style: TextStyle(
+                        fontWeight: _filterUnreadMemos ? FontWeight.bold : null,
+                        color: _filterUnreadMemos ? Theme.of(context).colorScheme.primary : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'category_income',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.trending_up,
+                      color: _selectedCategoryFilter == TransactionCategoryType.income
+                          ? Colors.green : Colors.green.withOpacity(0.7),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Income',
+                      style: TextStyle(
+                        fontWeight: _selectedCategoryFilter == TransactionCategoryType.income
+                            ? FontWeight.bold : null,
+                        color: _selectedCategoryFilter == TransactionCategoryType.income
+                            ? Colors.green : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'category_expenses',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.trending_down,
+                      color: _selectedCategoryFilter == TransactionCategoryType.expenses
+                          ? Colors.orange : Colors.orange.withOpacity(0.7),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Expenses',
+                      style: TextStyle(
+                        fontWeight: _selectedCategoryFilter == TransactionCategoryType.expenses
+                            ? FontWeight.bold : null,
+                        color: _selectedCategoryFilter == TransactionCategoryType.expenses
+                            ? Colors.orange : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'category_transfers',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.swap_horiz,
+                      color: _selectedCategoryFilter == TransactionCategoryType.transfers
+                          ? Colors.blue : Colors.blue.withOpacity(0.7),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Transfers',
+                      style: TextStyle(
+                        fontWeight: _selectedCategoryFilter == TransactionCategoryType.transfers
+                            ? FontWeight.bold : null,
+                        color: _selectedCategoryFilter == TransactionCategoryType.transfers
+                            ? Colors.blue : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'category_investments',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.show_chart,
+                      color: _selectedCategoryFilter == TransactionCategoryType.investments
+                          ? Colors.purple : Colors.purple.withOpacity(0.7),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Investments',
+                      style: TextStyle(
+                        fontWeight: _selectedCategoryFilter == TransactionCategoryType.investments
+                            ? FontWeight.bold : null,
+                        color: _selectedCategoryFilter == TransactionCategoryType.investments
+                            ? Colors.purple : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'category_other',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.more_horiz,
+                      color: _selectedCategoryFilter == TransactionCategoryType.other
+                          ? Colors.grey : Colors.grey.withOpacity(0.7),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Other',
+                      style: TextStyle(
+                        fontWeight: _selectedCategoryFilter == TransactionCategoryType.other
+                            ? FontWeight.bold : null,
+                        color: _selectedCategoryFilter == TransactionCategoryType.other
+                            ? Colors.grey : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'clear_filters',
+                child: Row(
+                  children: [
+                    Icon(Icons.clear),
+                    SizedBox(width: 8),
+                    Text('Clear Filters'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
           if (_filterUnreadMemos)
             TextButton(
               onPressed: () {
@@ -312,6 +612,85 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
           },
         ),
       ),
+      floatingActionButton: Consumer<WalletProvider>(
+        builder: (context, walletProvider, _) {
+          final unreadCount = walletProvider.unreadMessageCount;
+          final hasMessages = walletProvider.allMessageTransactions.isNotEmpty;
+
+          if (!hasMessages) return const SizedBox.shrink();
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Quick actions for messages
+              if (unreadCount > 0)
+                FloatingActionButton.small(
+                  heroTag: "mark_all_read",
+                  onPressed: () async {
+                    await walletProvider.markAllMessagesAsRead();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('All messages marked as read')),
+                      );
+                    }
+                  },
+                  backgroundColor: Colors.green,
+                  child: const Icon(Icons.mark_email_read, color: Colors.white),
+                  tooltip: 'Mark all as read',
+                ),
+
+              if (unreadCount > 0) const SizedBox(height: 8),
+
+              // Main messages FAB
+              FloatingActionButton(
+                heroTag: "messages_main",
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AllMessagesScreen(),
+                    ),
+                  );
+                },
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                child: Stack(
+                  children: [
+                    const Icon(Icons.message),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 12,
+                            minHeight: 12,
+                          ),
+                          child: Text(
+                            '$unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                tooltip: unreadCount > 0
+                    ? 'View messages ($unreadCount unread)'
+                    : 'View all messages',
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -319,16 +698,45 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
     // Filter transactions locally (BitcoinZ Blue approach)
     List<TransactionModel> filteredTransactions = walletProvider.transactions;
     
-    // Apply unread memo filter if coming from notification icon
+    // Apply messages only filter
+    if (_showMessagesOnly) {
+      filteredTransactions = filteredTransactions.where((tx) => tx.hasMemo).toList();
+    }
+
+    // Apply unread memo filter
     if (_filterUnreadMemos) {
       filteredTransactions = filteredTransactions.where((tx) {
         if (!tx.hasMemo) return false;
         // Use cached memo status to check if unread
         final isRead = walletProvider.getTransactionMemoReadStatus(
-          tx.txid, 
+          tx.txid,
           tx.memoRead
         );
         return !isRead; // Only show unread memos
+      }).toList();
+    }
+
+    // Apply category filter
+    if (_selectedCategoryFilter != null) {
+      // Use a simpler synchronous approach based on transaction properties
+      filteredTransactions = filteredTransactions.where((tx) {
+        switch (_selectedCategoryFilter!) {
+          case TransactionCategoryType.income:
+            return tx.isReceived;
+          case TransactionCategoryType.expenses:
+            return tx.isSent && !(tx.memo?.toLowerCase().contains('transfer') == true);
+          case TransactionCategoryType.transfers:
+            return tx.memo?.toLowerCase().contains('transfer') == true ||
+                   tx.memo?.toLowerCase().contains('exchange') == true ||
+                   tx.memo?.toLowerCase().contains('swap') == true;
+          case TransactionCategoryType.investments:
+            return tx.memo?.toLowerCase().contains('stake') == true ||
+                   tx.memo?.toLowerCase().contains('trade') == true ||
+                   tx.memo?.toLowerCase().contains('defi') == true;
+          case TransactionCategoryType.other:
+            return tx.memo?.toLowerCase().contains('donation') == true ||
+                   tx.memo?.toLowerCase().contains('tip') == true;
+        }
       }).toList();
     }
     
@@ -410,8 +818,17 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
       child: ListView.builder(
         controller: _scrollController,
         padding: ResponsiveUtils.getScreenPadding(context),
-        itemCount: filteredTransactions.length, // Use filtered list
+        itemCount: filteredTransactions.length + (walletProvider.isLoadingMore ? 1 : 0),
+        // Optimize for large lists
+        cacheExtent: 1000, // Cache more items for smoother scrolling
+        addAutomaticKeepAlives: false, // Don't keep items alive unnecessarily
+        addRepaintBoundaries: true, // Improve repaint performance
         itemBuilder: (context, index) {
+          // Show loading indicator at the end
+          if (index >= filteredTransactions.length) {
+            return _buildLoadingIndicator(walletProvider);
+          }
+
           final transaction = filteredTransactions[index];
           return _buildTransactionItem(transaction, index);
         },
@@ -513,7 +930,30 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                       ),
                   ],
                 ),
-                
+
+                // Label indicator (small icon next to transaction icon)
+                Consumer<WalletProvider>(
+                  builder: (context, walletProvider, _) {
+                    return FutureBuilder<List<MessageLabel>>(
+                      future: walletProvider.getMessageLabels(transaction.txid),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                          final labels = snapshot.data!;
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Icon(
+                              Icons.label,
+                              size: 14,
+                              color: Color(int.parse(labels.first.labelColor.substring(1), radix: 16) + 0xFF000000),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    );
+                  },
+                ),
+
                 SizedBox(width: ResponsiveUtils.isSmallMobile(context) ? 12 : 16),
                 
                 // Transaction Details
@@ -628,6 +1068,17 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
+                            const Spacer(),
+                            // Transaction category chip
+                            Consumer<WalletProvider>(
+                              builder: (context, walletProvider, _) {
+                                return AsyncTransactionCategoryChip(
+                                  categoryFuture: walletProvider.getTransactionCategory(transaction.txid),
+                                  showIcon: false,
+                                  fontSize: 9,
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ],
@@ -715,6 +1166,9 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                 // Memo prominently displayed if exists (same as main page)
                 if (transaction.memo?.isNotEmpty == true)
                   _buildMemoCard(transaction.memo!),
+
+                // Message labels section
+                _buildMessageLabelsSection(transaction),
                 
                 // Status and confirmations
                 _buildDetailRow('Status', transaction.isPending ? 'Confirming' : 'Confirmed'),
@@ -787,6 +1241,141 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
         ],
       ),
     );
+  }
+
+  Widget _buildMessageLabelsSection(TransactionModel transaction) {
+    return Consumer<WalletProvider>(
+      builder: (context, walletProvider, _) {
+        return FutureBuilder<List<MessageLabel>>(
+          future: walletProvider.getMessageLabels(transaction.txid),
+          builder: (context, snapshot) {
+            final labels = snapshot.data ?? [];
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.label,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Labels',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.secondary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () => _showLabelDialog(transaction, labels),
+                        icon: const Icon(Icons.edit, size: 16),
+                        label: const Text('Manage'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (labels.isEmpty)
+                    Text(
+                      'No labels yet. Tap "Manage" to add labels.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    )
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: labels.map((label) => _buildLabelChip(label)).toList(),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLabelChip(MessageLabel label) {
+    final color = Color(int.parse(label.labelColor.substring(1), radix: 16) + 0xFF000000);
+    final textColor = _getContrastColor(color);
+
+    return Chip(
+      label: Text(
+        label.labelName,
+        style: TextStyle(
+          color: textColor,
+          fontWeight: FontWeight.w500,
+          fontSize: 12,
+        ),
+      ),
+      backgroundColor: color,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+
+  void _showLabelDialog(TransactionModel transaction, List<MessageLabel> existingLabels) {
+    showDialog(
+      context: context,
+      builder: (context) => MessageLabelDialog(
+        txid: transaction.txid,
+        currentMemo: transaction.memo,
+        existingLabels: existingLabels,
+        onLabelAdded: (label) async {
+          final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+          try {
+            await walletProvider.addMessageLabel(label);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Added label "${label.labelName}"')),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to add label: $e')),
+              );
+            }
+          }
+        },
+        onLabelRemoved: (label) async {
+          final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+          try {
+            await walletProvider.removeMessageLabel(label);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Removed label "${label.labelName}"')),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to remove label: $e')),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  Color _getContrastColor(Color color) {
+    // Calculate luminance to determine if we need light or dark text
+    final luminance = (0.299 * color.red + 0.587 * color.green + 0.114 * color.blue) / 255;
+    return luminance > 0.5 ? Colors.black : Colors.white;
   }
 
   Widget _buildDetailRow(String label, String value, {bool copyable = false}) {

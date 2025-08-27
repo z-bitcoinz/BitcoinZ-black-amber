@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import '../models/transaction_model.dart';
 import '../models/address_model.dart';
 import '../models/contact_model.dart';
+import '../models/message_label.dart';
+import '../models/transaction_category.dart';
 import './wallet_storage_service.dart';
 
 class DatabaseService {
@@ -75,7 +77,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 4, // Increment version for message labels
+      version: 5, // Increment version for transaction categories
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
       singleInstance: true,
@@ -149,6 +151,21 @@ class DatabaseService {
       )
     ''');
 
+    // Create transaction_categories table for automatic categorization
+    await db.execute('''
+      CREATE TABLE transaction_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        txid TEXT NOT NULL UNIQUE,
+        category_type TEXT NOT NULL,
+        category_name TEXT NOT NULL,
+        confidence_score REAL NOT NULL DEFAULT 0.0,
+        is_manual INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (txid) REFERENCES transactions (txid) ON DELETE CASCADE
+      )
+    ''');
+
     // Create indexes for better performance
     await db.execute('CREATE INDEX idx_transactions_txid ON transactions(txid)');
     await db.execute('CREATE INDEX idx_transactions_timestamp ON transactions(timestamp DESC)');
@@ -163,6 +180,9 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_contacts_favorite ON contacts(is_favorite)');
     await db.execute('CREATE INDEX idx_message_labels_txid ON message_labels(txid)');
     await db.execute('CREATE INDEX idx_message_labels_name ON message_labels(label_name)');
+    await db.execute('CREATE INDEX idx_transaction_categories_txid ON transaction_categories(txid)');
+    await db.execute('CREATE INDEX idx_transaction_categories_type ON transaction_categories(category_type)');
+    await db.execute('CREATE INDEX idx_transaction_categories_name ON transaction_categories(category_name)');
   }
 
   Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
@@ -216,6 +236,28 @@ class DatabaseService {
       // Add missing indexes for better performance
       await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_memo ON transactions(memo)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_memo_read ON transactions(memo_read)');
+    }
+
+    if (oldVersion < 5) {
+      // Create transaction_categories table for automatic categorization
+      await db.execute('''
+        CREATE TABLE transaction_categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          txid TEXT NOT NULL UNIQUE,
+          category_type TEXT NOT NULL,
+          category_name TEXT NOT NULL,
+          confidence_score REAL NOT NULL DEFAULT 0.0,
+          is_manual INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY (txid) REFERENCES transactions (txid) ON DELETE CASCADE
+        )
+      ''');
+
+      // Create indexes for transaction categories
+      await db.execute('CREATE INDEX idx_transaction_categories_txid ON transaction_categories(txid)');
+      await db.execute('CREATE INDEX idx_transaction_categories_type ON transaction_categories(category_type)');
+      await db.execute('CREATE INDEX idx_transaction_categories_name ON transaction_categories(category_name)');
     }
   }
 
@@ -426,6 +468,40 @@ class DatabaseService {
           await db.update(
             'transactions',
             {'memo_read': 1, 'updated_at': DateTime.now().millisecondsSinceEpoch},
+            where: 'txid = ?',
+            whereArgs: [txid],
+          );
+          if (kDebugMode) print('✅ Retry successful!');
+          return;
+        } catch (retryError) {
+          if (kDebugMode) print('⚠️ Retry failed: $retryError');
+        }
+      }
+      // Continue silently - memo status will be stored in memory/SharedPreferences
+    }
+  }
+
+  Future<void> markTransactionMemoAsUnread(String txid) async {
+    try {
+      final db = await database;
+      await db.update(
+        'transactions',
+        {'memo_read': 0, 'updated_at': DateTime.now().millisecondsSinceEpoch},
+        where: 'txid = ?',
+        whereArgs: [txid],
+      );
+    } catch (e) {
+      if (kDebugMode) print('Warning: Failed to mark memo as unread: $e');
+
+      // If authorization error, try to reset and retry once
+      if (e.toString().contains('authorization') && !e.toString().contains('retry')) {
+        try {
+          if (kDebugMode) print('🔄 Retrying after database reset...');
+          await forceReset();
+          final db = await database;
+          await db.update(
+            'transactions',
+            {'memo_read': 0, 'updated_at': DateTime.now().millisecondsSinceEpoch},
             where: 'txid = ?',
             whereArgs: [txid],
           );
@@ -776,6 +852,212 @@ class DatabaseService {
     await _deleteDatabaseFile();
   }
 
+  // Message Label CRUD operations
+  Future<void> insertMessageLabel(MessageLabel label) async {
+    final db = await database;
+    await db.insert(
+      'message_labels',
+      _messageLabelToMap(label),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<MessageLabel>> getMessageLabelsForTransaction(String txid) async {
+    final db = await database;
+    final results = await db.query(
+      'message_labels',
+      where: 'txid = ?',
+      whereArgs: [txid],
+      orderBy: 'created_at ASC',
+    );
+
+    return results.map((map) => _mapToMessageLabel(map)).toList();
+  }
+
+  Future<List<MessageLabel>> getAllMessageLabels() async {
+    final db = await database;
+    final results = await db.query(
+      'message_labels',
+      orderBy: 'label_name ASC',
+    );
+
+    return results.map((map) => _mapToMessageLabel(map)).toList();
+  }
+
+  Future<void> updateMessageLabel(MessageLabel label) async {
+    final db = await database;
+    await db.update(
+      'message_labels',
+      _messageLabelToMap(label),
+      where: 'id = ?',
+      whereArgs: [label.id],
+    );
+  }
+
+  Future<void> deleteMessageLabel(int labelId) async {
+    final db = await database;
+    await db.delete(
+      'message_labels',
+      where: 'id = ?',
+      whereArgs: [labelId],
+    );
+  }
+
+  Future<void> deleteMessageLabelsForTransaction(String txid) async {
+    final db = await database;
+    await db.delete(
+      'message_labels',
+      where: 'txid = ?',
+      whereArgs: [txid],
+    );
+  }
+
+  /// Get transactions with their message labels (optimized query)
+  Future<Map<String, List<MessageLabel>>> getTransactionLabelsMap({
+    List<String>? txids,
+  }) async {
+    final db = await database;
+
+    String whereClause = '';
+    List<Object?> whereArgs = [];
+
+    if (txids != null && txids.isNotEmpty) {
+      final placeholders = List.filled(txids.length, '?').join(',');
+      whereClause = 'WHERE txid IN ($placeholders)';
+      whereArgs = txids;
+    }
+
+    final results = await db.rawQuery('''
+      SELECT * FROM message_labels
+      $whereClause
+      ORDER BY txid, created_at ASC
+    ''', whereArgs);
+
+    final Map<String, List<MessageLabel>> labelsMap = {};
+    for (final row in results) {
+      final label = _mapToMessageLabel(row);
+      labelsMap.putIfAbsent(label.txid, () => []).add(label);
+    }
+
+    return labelsMap;
+  }
+
+  // Transaction Category CRUD operations
+  Future<void> insertTransactionCategory({
+    required String txid,
+    required String categoryType,
+    required String categoryName,
+    required double confidenceScore,
+    bool isManual = false,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    await db.insert(
+      'transaction_categories',
+      {
+        'txid': txid,
+        'category_type': categoryType,
+        'category_name': categoryName,
+        'confidence_score': confidenceScore,
+        'is_manual': isManual ? 1 : 0,
+        'created_at': now,
+        'updated_at': now,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<Map<String, dynamic>?> getTransactionCategory(String txid) async {
+    final db = await database;
+    final results = await db.query(
+      'transaction_categories',
+      where: 'txid = ?',
+      whereArgs: [txid],
+    );
+
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  Future<Map<String, Map<String, dynamic>>> getTransactionCategoriesMap({
+    List<String>? txids,
+  }) async {
+    final db = await database;
+
+    String whereClause = '';
+    List<Object?> whereArgs = [];
+
+    if (txids != null && txids.isNotEmpty) {
+      final placeholders = List.filled(txids.length, '?').join(',');
+      whereClause = 'WHERE txid IN ($placeholders)';
+      whereArgs = txids;
+    }
+
+    final results = await db.rawQuery('''
+      SELECT * FROM transaction_categories
+      $whereClause
+      ORDER BY created_at DESC
+    ''', whereArgs);
+
+    final Map<String, Map<String, dynamic>> categoriesMap = {};
+    for (final row in results) {
+      categoriesMap[row['txid'] as String] = row;
+    }
+
+    return categoriesMap;
+  }
+
+  Future<void> updateTransactionCategory({
+    required String txid,
+    required String categoryType,
+    required String categoryName,
+    required double confidenceScore,
+    bool isManual = false,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    await db.update(
+      'transaction_categories',
+      {
+        'category_type': categoryType,
+        'category_name': categoryName,
+        'confidence_score': confidenceScore,
+        'is_manual': isManual ? 1 : 0,
+        'updated_at': now,
+      },
+      where: 'txid = ?',
+      whereArgs: [txid],
+    );
+  }
+
+  Future<void> deleteTransactionCategory(String txid) async {
+    final db = await database;
+    await db.delete(
+      'transaction_categories',
+      where: 'txid = ?',
+      whereArgs: [txid],
+    );
+  }
+
+  /// Get transaction count by category type
+  Future<Map<String, int>> getCategoryTypeCounts() async {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT category_type, COUNT(*) as count
+      FROM transaction_categories
+      GROUP BY category_type
+      ORDER BY count DESC
+    ''');
+
+    final Map<String, int> counts = {};
+    for (final row in results) {
+      counts[row['category_type'] as String] = row['count'] as int;
+    }
+
+    return counts;
+  }
+
   // Conversion methods
   Map<String, dynamic> _transactionToMap(TransactionModel transaction) {
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -862,6 +1144,30 @@ class DatabaseService {
       description: map['description'] as String?,
       pictureBase64: map['picture_base64'] as String?,
       isFavorite: (map['is_favorite'] as int? ?? 0) == 1,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
+    );
+  }
+
+  Map<String, dynamic> _messageLabelToMap(MessageLabel label) {
+    return {
+      if (label.id != null) 'id': label.id,
+      'txid': label.txid,
+      'label_name': label.labelName,
+      'label_color': label.labelColor,
+      'is_auto_generated': label.isAutoGenerated ? 1 : 0,
+      'created_at': label.createdAt.millisecondsSinceEpoch,
+      'updated_at': label.updatedAt.millisecondsSinceEpoch,
+    };
+  }
+
+  MessageLabel _mapToMessageLabel(Map<String, dynamic> map) {
+    return MessageLabel(
+      id: map['id'] as int?,
+      txid: map['txid'] as String,
+      labelName: map['label_name'] as String,
+      labelColor: map['label_color'] as String? ?? '#2196F3',
+      isAutoGenerated: (map['is_auto_generated'] as int? ?? 0) == 1,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
     );
