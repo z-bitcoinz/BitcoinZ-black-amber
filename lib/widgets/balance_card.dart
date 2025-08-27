@@ -6,6 +6,7 @@ import '../providers/wallet_provider.dart';
 import '../providers/currency_provider.dart';
 import '../utils/responsive.dart';
 import 'animated_progress_dots.dart';
+import '../screens/settings/settings_screen.dart';
 
 class BalanceCard extends StatefulWidget {
   const BalanceCard({super.key});
@@ -213,6 +214,42 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                     // Removed redundant "Confirming:" display from balance card
                     // This is already shown on the main dashboard
                   ],
+                ),
+              ),
+              // Settings icon positioned in top-right corner
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.settings,
+                      color: Colors.white.withOpacity(0.8),
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SettingsScreen(),
+                        ),
+                      );
+                    },
+                    tooltip: 'Settings',
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
+                  ),
                 ),
               ),
             ],

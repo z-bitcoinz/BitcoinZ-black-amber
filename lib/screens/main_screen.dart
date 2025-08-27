@@ -302,13 +302,6 @@ class _MainScreenState extends State<MainScreen>
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _navigateToSettings,
-            tooltip: 'Settings',
-          ),
-        ],
       ),
       body: Consumer2<WalletProvider, AuthProvider>(
         builder: (context, walletProvider, authProvider, child) {
