@@ -3,6 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:file_selector/file_selector.dart';
+import 'dart:io';
 import '../../providers/wallet_provider.dart';
 import '../../models/transaction_model.dart';
 import '../../models/transaction_category.dart';
@@ -43,6 +47,8 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    // Clean up temporary export files
+    _cleanupTempFiles();
     super.dispose();
   }
 
@@ -177,24 +183,18 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
               ? const Center(child: Text('No analytics data available'))
               : Column(
                   children: [
-                    // Period selector and summary
+                    // Period selector only (no summary cards here)
                     Container(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Text(
-                            _getPeriodDisplayName(),
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          AnalyticsSummaryCards(analytics: _analytics!),
-                        ],
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Text(
+                        _getPeriodDisplayName(),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
 
-                    // Tab content
+                    // Tab content - now takes full available space
                     Expanded(
                       child: TabBarView(
                         controller: _tabController,
@@ -225,6 +225,11 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Summary cards - only on Overview tab
+          AnalyticsSummaryCards(analytics: _analytics!),
+
+          const SizedBox(height: 24),
+
           // Quick stats widget
           QuickStatsWidget(analytics: _analytics!),
 
@@ -241,6 +246,9 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
 
           // Financial insights
           AnalyticsInsights(insights: _insights),
+
+          // Bottom padding for better scrolling
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -256,6 +264,16 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header for trends
+          Text(
+            'Financial Trends Analysis',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
           // Monthly trends line chart
           TrendsLineChart(
             dataPoints: _analytics!.monthlyData,
@@ -281,6 +299,9 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
 
           // Growth rate indicators
           _buildGrowthIndicators(),
+
+          // Bottom padding for better scrolling
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -291,41 +312,76 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
       return const Center(child: Text('No category data available'));
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _analytics!.categoryBreakdown.length,
-      itemBuilder: (context, index) {
-        final category = _analytics!.categoryBreakdown[index];
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: Icon(
-              TransactionCategorizer.getCategoryTypeIcon(category.categoryType),
-              color: category.color,
-            ),
-            title: Text(category.categoryName),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('${category.percentage.toStringAsFixed(1)}% of total'),
-                Text('${category.transactionCount} transactions'),
-              ],
-            ),
-            trailing: Text(
-              '${category.totalAmount.toStringAsFixed(2)} BTCZ',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: category.color,
+    return Column(
+      children: [
+        // Header section
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Category Breakdown',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            onTap: () {
-              // Could navigate to detailed category view
-              _showCategoryDetails(category);
+              const SizedBox(height: 8),
+              Text(
+                '${_analytics!.categoryBreakdown.length} categories with transactions',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Scrollable category list
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _analytics!.categoryBreakdown.length + 1, // +1 for bottom padding
+            itemBuilder: (context, index) {
+              // Bottom padding item
+              if (index == _analytics!.categoryBreakdown.length) {
+                return const SizedBox(height: 32);
+              }
+
+              final category = _analytics!.categoryBreakdown[index];
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: Icon(
+                    TransactionCategorizer.getCategoryTypeIcon(category.categoryType),
+                    color: category.color,
+                  ),
+                  title: Text(category.categoryName),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${category.percentage.toStringAsFixed(1)}% of total'),
+                      Text('${category.transactionCount} transactions'),
+                    ],
+                  ),
+                  trailing: Text(
+                    '${category.totalAmount.toStringAsFixed(2)} BTCZ',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: category.color,
+                    ),
+                  ),
+                  onTap: () {
+                    // Could navigate to detailed category view
+                    _showCategoryDetails(category);
+                  },
+                ),
+              );
             },
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 
@@ -339,6 +395,16 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header for flow analysis
+          Text(
+            'Cash Flow Analysis',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
           // Income vs Expenses comparison
           ComparisonBarChart(
             data: {
@@ -368,6 +434,9 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
 
           // Cash flow metrics
           _buildCashFlowMetrics(),
+
+          // Bottom padding for better scrolling
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -545,46 +614,336 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
 
   // Export and Sharing Methods
 
-  void _shareAnalytics() {
+  Future<void> _shareAnalytics() async {
     if (_analytics == null) return;
 
-    final summary = _generateAnalyticsSummary();
-    Clipboard.setData(ClipboardData(text: summary));
+    // Check if widget is still mounted before using context
+    if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Analytics summary copied to clipboard'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    try {
+      // Generate quick summary for sharing
+      final summary = _generateAnalyticsSummary();
+
+      // Share as text (no file needed for quick summary)
+      await Share.share(
+        summary,
+        subject: 'BitcoinZ Financial Analytics - ${_getPeriodDisplayName()}',
+      );
+
+      // Also copy to clipboard as backup
+      Clipboard.setData(ClipboardData(text: summary));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Analytics summary shared successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Fallback to clipboard only
+      final summary = _generateAnalyticsSummary();
+      Clipboard.setData(ClipboardData(text: summary));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Analytics summary copied to clipboard'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
-  void _exportToCSV() {
-    if (_analytics == null) return;
 
-    final csv = _generateCSVData();
-    Clipboard.setData(ClipboardData(text: csv));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('CSV data copied to clipboard'),
-        backgroundColor: Colors.green,
-      ),
-    );
+  /// Clean up temporary export files (called when screen is disposed)
+  Future<void> _cleanupTempFiles() async {
+    try {
+      final directory = await getTemporaryDirectory();
+      final tempFiles = directory.listSync()
+          .whereType<File>()
+          .where((file) => file.path.contains('bitcoinz_analytics') || file.path.contains('bitcoinz_financial_report'));
+
+      for (final file in tempFiles) {
+        try {
+          await file.delete();
+        } catch (e) {
+          // Ignore individual file deletion errors
+        }
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
   }
 
-  void _exportSummary() {
+  Future<void> _exportToCSV() async {
     if (_analytics == null) return;
 
-    final summary = _generateDetailedSummary();
-    Clipboard.setData(ClipboardData(text: summary));
+    // Check if widget is still mounted before using context
+    if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Detailed summary copied to clipboard'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    try {
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Text('Creating CSV file...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Generate CSV content
+      final csv = _generateCSVData();
+
+      // Create default file name
+      final fileName = 'bitcoinz_analytics_${_getPeriodDisplayName().replaceAll(' ', '_').toLowerCase()}_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.csv';
+
+      // macOS-specific native file save dialog
+      if (Platform.isMacOS) {
+        final FileSaveLocation? result = await getSaveLocation(
+          suggestedName: fileName,
+          acceptedTypeGroups: [
+            const XTypeGroup(
+              label: 'CSV files',
+              extensions: ['csv'],
+            ),
+          ],
+        );
+
+        if (result != null) {
+          // User selected a location, save the file directly
+          final file = File(result.path);
+          await file.writeAsString(csv);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('CSV file saved successfully!'),
+                    Text(
+                      'Saved to: ${result.path}',
+                      style: const TextStyle(fontSize: 12, color: Colors.white70),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+                action: SnackBarAction(
+                  label: 'Share',
+                  textColor: Colors.white,
+                  onPressed: () => _shareFile(result.path),
+                ),
+              ),
+            );
+          }
+          return;
+        } else {
+          // User cancelled the save dialog, fall back to share dialog
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Save cancelled. Opening share dialog...'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      }
+
+      // For non-macOS platforms or if macOS save was cancelled, use share dialog
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsString(csv);
+
+      // Share the file (allows user to save it anywhere)
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'BitcoinZ Financial Analytics - ${_getPeriodDisplayName()}',
+        subject: 'BitcoinZ Analytics Export CSV',
+      );
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('CSV file created and ready to save!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error message (check mounted again)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportSummary() async {
+    if (_analytics == null) return;
+
+    // Check if widget is still mounted before using context
+    if (!mounted) return;
+
+    try {
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Text('Creating financial report...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Generate detailed summary content
+      final summary = _generateDetailedSummary();
+
+      // Create default file name
+      final fileName = 'bitcoinz_financial_report_${_getPeriodDisplayName().replaceAll(' ', '_').toLowerCase()}_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.txt';
+
+      // macOS-specific native file save dialog
+      if (Platform.isMacOS) {
+        final FileSaveLocation? result = await getSaveLocation(
+          suggestedName: fileName,
+          acceptedTypeGroups: [
+            const XTypeGroup(
+              label: 'Text files',
+              extensions: ['txt'],
+            ),
+          ],
+        );
+
+        if (result != null) {
+          // User selected a location, save the file directly
+          final file = File(result.path);
+          await file.writeAsString(summary);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Financial report saved successfully!'),
+                    Text(
+                      'Saved to: ${result.path}',
+                      style: const TextStyle(fontSize: 12, color: Colors.white70),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+                action: SnackBarAction(
+                  label: 'Share',
+                  textColor: Colors.white,
+                  onPressed: () => _shareFile(result.path),
+                ),
+              ),
+            );
+          }
+          return;
+        } else {
+          // User cancelled the save dialog, fall back to share dialog
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Save cancelled. Opening share dialog...'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      }
+
+      // For non-macOS platforms or if macOS save was cancelled, use share dialog
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsString(summary);
+
+      // Share the file (allows user to save it anywhere)
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'BitcoinZ Detailed Financial Report - ${_getPeriodDisplayName()}',
+        subject: 'BitcoinZ Financial Report',
+      );
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Financial report created and ready to save!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error message (check mounted again)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  // Helper function to share an already saved file
+  Future<void> _shareFile(String filePath) async {
+    try {
+      await Share.shareXFiles(
+        [XFile(filePath)],
+        text: 'BitcoinZ Analytics Export',
+        subject: 'BitcoinZ Analytics Export',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Share failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   String _generateAnalyticsSummary() {
@@ -621,21 +980,41 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen>
 
     final buffer = StringBuffer();
 
-    // Header
-    buffer.writeln('Category,Amount (BTCZ),Percentage,Transaction Count');
+    // File header with metadata
+    buffer.writeln('BitcoinZ Wallet - Financial Analytics Export');
+    buffer.writeln('Generated: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}');
+    buffer.writeln('Period: ${_getPeriodDisplayName()}');
+    buffer.writeln('Analysis Period: ${DateFormat('yyyy-MM-dd').format(_analytics!.startDate)} to ${DateFormat('yyyy-MM-dd').format(_analytics!.endDate)}');
+    buffer.writeln('');
 
-    // Category data
+    // Summary section
+    buffer.writeln('SUMMARY');
+    buffer.writeln('Metric,Value,Unit');
+    buffer.writeln('Total Income,${_analytics!.totalIncome.toStringAsFixed(2)},BTCZ');
+    buffer.writeln('Total Expenses,${_analytics!.totalExpenses.toStringAsFixed(2)},BTCZ');
+    buffer.writeln('Net Flow,${_analytics!.netFlow.toStringAsFixed(2)},BTCZ');
+    buffer.writeln('Savings Rate,${_analytics!.savingsRate.toStringAsFixed(1)},%');
+    buffer.writeln('Average Transaction,${_analytics!.averageTransactionAmount.toStringAsFixed(2)},BTCZ');
+    buffer.writeln('Total Transactions,${_analytics!.totalTransactions},Count');
+    buffer.writeln('Income Growth Rate,${_analytics!.incomeGrowthRate.toStringAsFixed(1)},%');
+    buffer.writeln('Expense Growth Rate,${_analytics!.expenseGrowthRate.toStringAsFixed(1)},%');
+    buffer.writeln('');
+
+    // Category breakdown
+    buffer.writeln('CATEGORY BREAKDOWN');
+    buffer.writeln('Category Name,Amount (BTCZ),Percentage (%),Transaction Count,Category Type');
     for (final category in _analytics!.categoryBreakdown) {
-      buffer.writeln('${category.categoryName},${category.totalAmount.toStringAsFixed(2)},${category.percentage.toStringAsFixed(2)},${category.transactionCount}');
+      buffer.writeln('${category.categoryName},${category.totalAmount.toStringAsFixed(2)},${category.percentage.toStringAsFixed(2)},${category.transactionCount},${category.categoryType.toString().split('.').last}');
     }
 
     buffer.writeln('');
-    buffer.writeln('Monthly Data');
-    buffer.writeln('Date,Income,Expenses,Net Flow,Transaction Count');
+    buffer.writeln('MONTHLY TRENDS');
+    buffer.writeln('Month,Income (BTCZ),Expenses (BTCZ),Net Flow (BTCZ),Transaction Count,Savings Rate (%)');
 
-    // Monthly data
+    // Monthly data with calculated savings rate
     for (final dataPoint in _analytics!.monthlyData) {
-      buffer.writeln('${DateFormat('yyyy-MM').format(dataPoint.date)},${dataPoint.income.toStringAsFixed(2)},${dataPoint.expenses.toStringAsFixed(2)},${dataPoint.netFlow.toStringAsFixed(2)},${dataPoint.transactionCount}');
+      final savingsRate = dataPoint.income > 0 ? ((dataPoint.income - dataPoint.expenses) / dataPoint.income * 100) : 0.0;
+      buffer.writeln('${DateFormat('yyyy-MM').format(dataPoint.date)},${dataPoint.income.toStringAsFixed(2)},${dataPoint.expenses.toStringAsFixed(2)},${dataPoint.netFlow.toStringAsFixed(2)},${dataPoint.transactionCount},${savingsRate.toStringAsFixed(1)}');
     }
 
     return buffer.toString();
