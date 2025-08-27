@@ -68,6 +68,9 @@ dependencies:
   # Desktop window management
   window_manager: ^0.3.7
 
+  # Charts and analytics
+  fl_chart: ^0.68.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

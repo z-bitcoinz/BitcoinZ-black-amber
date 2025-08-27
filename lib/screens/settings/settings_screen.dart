@@ -4,12 +4,15 @@ import 'currency_settings_screen.dart';
 import 'change_pin_screen.dart';
 import 'backup_wallet_screen.dart';
 import 'help_screen.dart';
+import 'analytics_help_screen.dart';
 import 'network_settings_screen.dart';
+import '../analytics/financial_analytics_screen.dart';
 import 'contacts_backup_screen.dart';
 import '../../providers/currency_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/network_provider.dart';
 import '../../providers/contact_provider.dart';
+import '../../providers/interface_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -35,12 +38,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: Consumer<CurrencyProvider>(
-        builder: (context, currencyProvider, child) {
+      body: Consumer2<CurrencyProvider, InterfaceProvider>(
+        builder: (context, currencyProvider, interfaceProvider, child) {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Currency Settings
+              // Display Settings
               _buildSettingsSection(
                 title: 'Display',
                 children: [
@@ -70,6 +73,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           builder: (context) => const CurrencySettingsScreen(),
                         ),
                       );
+                    },
+                  ),
+                  _buildSettingsTile(
+                    context: context,
+                    icon: Icons.analytics,
+                    title: 'Show Analytics Tab',
+                    subtitle: interfaceProvider.analyticsTabVisible
+                        ? 'Analytics tab visible in main navigation'
+                        : 'Analytics tab hidden (accessible via Settings)',
+                    trailing: Switch(
+                      value: interfaceProvider.analyticsTabVisible,
+                      onChanged: (value) {
+                        interfaceProvider.setAnalyticsTabVisible(value);
+                      },
+                      activeColor: Theme.of(context).colorScheme.primary,
+                    ),
+                    onTap: () {
+                      interfaceProvider.toggleAnalyticsTabVisible();
                     },
                   ),
                 ],
@@ -229,6 +250,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => const HelpScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildSettingsTile(
+                    context: context,
+                    icon: Icons.analytics,
+                    title: 'Analytics & Address Labels Guide',
+                    subtitle: 'Learn how to use financial analytics and address labeling',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AnalyticsHelpScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // Analytics Access section (always available)
+              _buildSettingsSection(
+                title: 'Analytics & Tools',
+                children: [
+                  _buildSettingsTile(
+                    context: context,
+                    icon: Icons.analytics,
+                    title: 'Financial Analytics',
+                    subtitle: interfaceProvider.analyticsTabVisible
+                        ? 'View detailed financial insights and trends'
+                        : 'Access analytics (tab hidden from main navigation)',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!interfaceProvider.analyticsTabVisible)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              'DIRECT ACCESS',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FinancialAnalyticsScreen(),
                         ),
                       );
                     },

@@ -9,6 +9,7 @@ import '../models/address_model.dart';
 import '../models/contact_model.dart';
 import '../models/message_label.dart';
 import '../models/transaction_category.dart';
+import '../models/address_label.dart';
 import './wallet_storage_service.dart';
 
 class DatabaseService {
@@ -77,7 +78,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 5, // Increment version for transaction categories
+      version: 6, // Increment version for address labels
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
       singleInstance: true,
@@ -166,6 +167,24 @@ class DatabaseService {
       )
     ''');
 
+    // Create address_labels table for address labeling and analytics
+    await db.execute('''
+      CREATE TABLE address_labels (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        address TEXT NOT NULL,
+        label_name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        type TEXT NOT NULL,
+        description TEXT,
+        color TEXT NOT NULL DEFAULT '#9E9E9E',
+        is_owned INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE(address, label_name)
+      )
+    ''');
+
     // Create indexes for better performance
     await db.execute('CREATE INDEX idx_transactions_txid ON transactions(txid)');
     await db.execute('CREATE INDEX idx_transactions_timestamp ON transactions(timestamp DESC)');
@@ -183,6 +202,10 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_transaction_categories_txid ON transaction_categories(txid)');
     await db.execute('CREATE INDEX idx_transaction_categories_type ON transaction_categories(category_type)');
     await db.execute('CREATE INDEX idx_transaction_categories_name ON transaction_categories(category_name)');
+    await db.execute('CREATE INDEX idx_address_labels_address ON address_labels(address)');
+    await db.execute('CREATE INDEX idx_address_labels_category ON address_labels(category)');
+    await db.execute('CREATE INDEX idx_address_labels_type ON address_labels(type)');
+    await db.execute('CREATE INDEX idx_address_labels_owned ON address_labels(is_owned)');
   }
 
   Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
@@ -258,6 +281,32 @@ class DatabaseService {
       await db.execute('CREATE INDEX idx_transaction_categories_txid ON transaction_categories(txid)');
       await db.execute('CREATE INDEX idx_transaction_categories_type ON transaction_categories(category_type)');
       await db.execute('CREATE INDEX idx_transaction_categories_name ON transaction_categories(category_name)');
+    }
+
+    if (oldVersion < 6) {
+      // Create address_labels table for address labeling and analytics
+      await db.execute('''
+        CREATE TABLE address_labels (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          address TEXT NOT NULL,
+          label_name TEXT NOT NULL,
+          category TEXT NOT NULL,
+          type TEXT NOT NULL,
+          description TEXT,
+          color TEXT NOT NULL DEFAULT '#9E9E9E',
+          is_owned INTEGER NOT NULL DEFAULT 0,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          UNIQUE(address, label_name)
+        )
+      ''');
+
+      // Create indexes for address labels
+      await db.execute('CREATE INDEX idx_address_labels_address ON address_labels(address)');
+      await db.execute('CREATE INDEX idx_address_labels_category ON address_labels(category)');
+      await db.execute('CREATE INDEX idx_address_labels_type ON address_labels(type)');
+      await db.execute('CREATE INDEX idx_address_labels_owned ON address_labels(is_owned)');
     }
   }
 
@@ -1056,6 +1105,215 @@ class DatabaseService {
     }
 
     return counts;
+  }
+
+  // Address Label CRUD operations
+
+  /// Insert a new address label
+  Future<int> insertAddressLabel(AddressLabel label) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    return await db.insert(
+      'address_labels',
+      {
+        'address': label.address,
+        'label_name': label.labelName,
+        'category': label.category.toString().split('.').last,
+        'type': label.type.toString().split('.').last,
+        'description': label.description,
+        'color': label.color,
+        'is_owned': label.isOwned ? 1 : 0,
+        'is_active': label.isActive ? 1 : 0,
+        'created_at': now,
+        'updated_at': now,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Get address label by ID
+  Future<AddressLabel?> getAddressLabel(int id) async {
+    final db = await database;
+    final results = await db.query(
+      'address_labels',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (results.isNotEmpty) {
+      return _addressLabelFromMap(results.first);
+    }
+    return null;
+  }
+
+  /// Get all labels for a specific address
+  Future<List<AddressLabel>> getAddressLabels(String address) async {
+    final db = await database;
+    final results = await db.query(
+      'address_labels',
+      where: 'address = ? AND is_active = 1',
+      whereArgs: [address],
+      orderBy: 'created_at DESC',
+    );
+
+    return results.map((row) => _addressLabelFromMap(row)).toList();
+  }
+
+  /// Get all address labels with optional filters
+  Future<List<AddressLabel>> getAllAddressLabels({
+    AddressLabelCategory? category,
+    bool? isOwned,
+    bool activeOnly = true,
+  }) async {
+    final db = await database;
+
+    String whereClause = '';
+    List<Object?> whereArgs = [];
+
+    List<String> conditions = [];
+
+    if (activeOnly) {
+      conditions.add('is_active = 1');
+    }
+
+    if (category != null) {
+      conditions.add('category = ?');
+      whereArgs.add(category.toString().split('.').last);
+    }
+
+    if (isOwned != null) {
+      conditions.add('is_owned = ?');
+      whereArgs.add(isOwned ? 1 : 0);
+    }
+
+    if (conditions.isNotEmpty) {
+      whereClause = 'WHERE ${conditions.join(' AND ')}';
+    }
+
+    final results = await db.rawQuery('''
+      SELECT * FROM address_labels
+      $whereClause
+      ORDER BY created_at DESC
+    ''', whereArgs);
+
+    return results.map((row) => _addressLabelFromMap(row)).toList();
+  }
+
+  /// Update an address label
+  Future<void> updateAddressLabel(AddressLabel label) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    await db.update(
+      'address_labels',
+      {
+        'label_name': label.labelName,
+        'category': label.category.toString().split('.').last,
+        'type': label.type.toString().split('.').last,
+        'description': label.description,
+        'color': label.color,
+        'is_owned': label.isOwned ? 1 : 0,
+        'is_active': label.isActive ? 1 : 0,
+        'updated_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [label.id],
+    );
+  }
+
+  /// Delete an address label (soft delete by setting is_active = 0)
+  Future<void> deleteAddressLabel(int id) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    await db.update(
+      'address_labels',
+      {
+        'is_active': 0,
+        'updated_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Hard delete an address label
+  Future<void> hardDeleteAddressLabel(int id) async {
+    final db = await database;
+    await db.delete(
+      'address_labels',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Get address labels grouped by category
+  Future<Map<AddressLabelCategory, List<AddressLabel>>> getAddressLabelsByCategory({
+    bool? isOwned,
+    bool activeOnly = true,
+  }) async {
+    final labels = await getAllAddressLabels(isOwned: isOwned, activeOnly: activeOnly);
+    final Map<AddressLabelCategory, List<AddressLabel>> grouped = {};
+
+    for (final label in labels) {
+      if (!grouped.containsKey(label.category)) {
+        grouped[label.category] = [];
+      }
+      grouped[label.category]!.add(label);
+    }
+
+    return grouped;
+  }
+
+  /// Get statistics about address labels
+  Future<Map<String, int>> getAddressLabelStats() async {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT
+        category,
+        is_owned,
+        COUNT(*) as count
+      FROM address_labels
+      WHERE is_active = 1
+      GROUP BY category, is_owned
+      ORDER BY category, is_owned
+    ''');
+
+    final Map<String, int> stats = {};
+    for (final row in results) {
+      final category = row['category'] as String;
+      final isOwned = (row['is_owned'] as int) == 1;
+      final count = row['count'] as int;
+
+      final key = '${category}_${isOwned ? 'owned' : 'external'}';
+      stats[key] = count;
+    }
+
+    return stats;
+  }
+
+  /// Helper method to convert database row to AddressLabel
+  AddressLabel _addressLabelFromMap(Map<String, dynamic> map) {
+    return AddressLabel(
+      id: map['id'] as int,
+      address: map['address'] as String,
+      labelName: map['label_name'] as String,
+      category: AddressLabelCategory.values.firstWhere(
+        (e) => e.toString().split('.').last == map['category'],
+        orElse: () => AddressLabelCategory.other,
+      ),
+      type: AddressLabelType.values.firstWhere(
+        (e) => e.toString().split('.').last == map['type'],
+        orElse: () => AddressLabelType.custom,
+      ),
+      description: map['description'] as String?,
+      color: map['color'] as String,
+      isOwned: (map['is_owned'] as int) == 1,
+      isActive: (map['is_active'] as int) == 1,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
+    );
   }
 
   // Conversion methods

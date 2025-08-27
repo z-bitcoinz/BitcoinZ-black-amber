@@ -12,6 +12,8 @@ import '../models/transaction_model.dart';
 import '../models/address_model.dart';
 import '../models/message_label.dart';
 import '../models/transaction_category.dart';
+import '../models/analytics_data.dart';
+import '../models/address_label.dart';
 // import '../services/bitcoinz_service.dart'; // Not used - using Rust service instead
 import '../services/database_service.dart';
 import '../services/bitcoinz_rust_service.dart';
@@ -90,6 +92,13 @@ class WalletProvider with ChangeNotifier {
 
   // Transaction categories cache for fast access
   final Map<String, TransactionCategory> _transactionCategoriesCache = {};
+
+  // Address labels cache for fast access
+  final Map<String, List<AddressLabel>> _addressLabelsCache = {};
+
+  // Analytics cache for performance optimization
+  final Map<String, FinancialAnalytics> _analyticsCache = {};
+  final Map<String, DateTime> _analyticsCacheTimestamps = {};
   
   // Temporary storage for generated wallet data
   
@@ -3021,6 +3030,567 @@ class WalletProvider with ChangeNotifier {
     return unreadMessageCount > 0;
   }
 
+  // Financial Analytics Methods
+
+  /// Generate comprehensive financial analytics for a given period
+  Future<FinancialAnalytics> getFinancialAnalytics({
+    AnalyticsPeriod period = AnalyticsPeriod.threeMonths,
+    DateTime? customStartDate,
+    DateTime? customEndDate,
+    bool useCache = true,
+  }) async {
+    try {
+      // Generate cache key
+      final cacheKey = '${period.toString()}_${customStartDate?.millisecondsSinceEpoch ?? 'null'}_${customEndDate?.millisecondsSinceEpoch ?? 'null'}';
+
+      // Check cache if enabled
+      if (useCache && _analyticsCache.containsKey(cacheKey)) {
+        final cacheTimestamp = _analyticsCacheTimestamps[cacheKey];
+        if (cacheTimestamp != null &&
+            DateTime.now().difference(cacheTimestamp).inMinutes < 5) { // Cache for 5 minutes
+          if (kDebugMode) print('📊 Using cached analytics for $cacheKey');
+          return _analyticsCache[cacheKey]!;
+        }
+      }
+
+      // Generate new analytics
+      if (kDebugMode) print('📊 Generating new analytics for $cacheKey');
+      final analytics = FinancialAnalytics.fromTransactions(
+        transactions: _transactions,
+        period: period,
+        customStartDate: customStartDate,
+        customEndDate: customEndDate,
+      );
+
+      // Cache the result
+      if (useCache) {
+        _analyticsCache[cacheKey] = analytics;
+        _analyticsCacheTimestamps[cacheKey] = DateTime.now();
+
+        // Clean old cache entries (keep only last 10)
+        if (_analyticsCache.length > 10) {
+          final oldestKey = _analyticsCacheTimestamps.entries
+              .reduce((a, b) => a.value.isBefore(b.value) ? a : b)
+              .key;
+          _analyticsCache.remove(oldestKey);
+          _analyticsCacheTimestamps.remove(oldestKey);
+        }
+      }
+
+      return analytics;
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to generate financial analytics: $e');
+      rethrow;
+    }
+  }
+
+  /// Get spending breakdown by category for a specific period
+  Future<Map<TransactionCategoryType, double>> getSpendingByCategory({
+    AnalyticsPeriod period = AnalyticsPeriod.threeMonths,
+  }) async {
+    try {
+      final analytics = await getFinancialAnalytics(period: period);
+      return analytics.categoryTotals;
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get spending by category: $e');
+      return {};
+    }
+  }
+
+  /// Get income vs expenses comparison for a period
+  Future<Map<String, double>> getIncomeVsExpenses({
+    AnalyticsPeriod period = AnalyticsPeriod.threeMonths,
+  }) async {
+    try {
+      final analytics = await getFinancialAnalytics(period: period);
+      return {
+        'income': analytics.totalIncome,
+        'expenses': analytics.totalExpenses,
+        'netFlow': analytics.netFlow,
+        'savingsRate': analytics.savingsRate,
+      };
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get income vs expenses: $e');
+      return {};
+    }
+  }
+
+  /// Get monthly trends data
+  Future<List<AnalyticsDataPoint>> getMonthlyTrends({
+    AnalyticsPeriod period = AnalyticsPeriod.oneYear,
+  }) async {
+    try {
+      final analytics = await getFinancialAnalytics(period: period);
+      return analytics.monthlyData;
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get monthly trends: $e');
+      return [];
+    }
+  }
+
+  /// Get top spending categories
+  Future<List<CategoryAnalytics>> getTopSpendingCategories({
+    AnalyticsPeriod period = AnalyticsPeriod.threeMonths,
+    int limit = 5,
+  }) async {
+    try {
+      final analytics = await getFinancialAnalytics(period: period);
+      final expenseCategories = analytics.categoryBreakdown
+          .where((cat) => cat.transactions.any((tx) => !tx.isReceived))
+          .toList()
+        ..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+
+      return expenseCategories.take(limit).toList();
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get top spending categories: $e');
+      return [];
+    }
+  }
+
+  /// Get financial insights and recommendations
+  Future<List<String>> getFinancialInsights({
+    AnalyticsPeriod period = AnalyticsPeriod.threeMonths,
+  }) async {
+    try {
+      final analytics = await getFinancialAnalytics(period: period);
+      final insights = <String>[];
+
+      // Savings rate insights
+      if (analytics.savingsRate > 20) {
+        insights.add('Great job! You\'re saving ${analytics.savingsRate.toStringAsFixed(1)}% of your income.');
+      } else if (analytics.savingsRate > 0) {
+        insights.add('You\'re saving ${analytics.savingsRate.toStringAsFixed(1)}% of your income. Consider increasing to 20%.');
+      } else {
+        insights.add('Your expenses exceed your income. Consider reviewing your spending habits.');
+      }
+
+      // Growth rate insights
+      if (analytics.incomeGrowthRate > 0) {
+        insights.add('Your income has grown by ${analytics.incomeGrowthRate.toStringAsFixed(1)}% this period.');
+      } else if (analytics.incomeGrowthRate < -10) {
+        insights.add('Your income has decreased by ${analytics.incomeGrowthRate.abs().toStringAsFixed(1)}%. Consider diversifying income sources.');
+      }
+
+      // Top category insights
+      final topExpenseCategory = analytics.categoryBreakdown
+          .where((cat) => cat.transactions.any((tx) => !tx.isReceived))
+          .firstOrNull;
+
+      if (topExpenseCategory != null) {
+        insights.add('Your largest expense category is ${topExpenseCategory.categoryName} (${topExpenseCategory.percentage.toStringAsFixed(1)}%).');
+      }
+
+      // Transaction frequency insights
+      if (analytics.totalTransactions > 0) {
+        final avgPerDay = analytics.totalTransactions /
+            analytics.endDate.difference(analytics.startDate).inDays;
+        if (avgPerDay > 5) {
+          insights.add('You make ${avgPerDay.toStringAsFixed(1)} transactions per day on average. Consider consolidating purchases.');
+        }
+      }
+
+      return insights;
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get financial insights: $e');
+      return ['Unable to generate insights at this time.'];
+    }
+  }
+
+  // Address Label Management
+
+  /// Get all address labels
+  Future<List<AddressLabel>> getAllAddressLabels({
+    AddressLabelCategory? category,
+    bool? isOwned,
+    bool activeOnly = true,
+  }) async {
+    try {
+      return await _databaseService.getAllAddressLabels(
+        category: category,
+        isOwned: isOwned,
+        activeOnly: activeOnly,
+      );
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get address labels: $e');
+      return [];
+    }
+  }
+
+  /// Get labels for a specific address
+  Future<List<AddressLabel>> getAddressLabels(String address) async {
+    // Check cache first
+    if (_addressLabelsCache.containsKey(address)) {
+      return _addressLabelsCache[address]!;
+    }
+
+    try {
+      final labels = await _databaseService.getAddressLabels(address);
+      _addressLabelsCache[address] = labels;
+      return labels;
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get labels for address $address: $e');
+      return [];
+    }
+  }
+
+  /// Add a new address label
+  Future<void> addAddressLabel(AddressLabel label) async {
+    try {
+      await _databaseService.insertAddressLabel(label);
+
+      // Update cache
+      final existingLabels = _addressLabelsCache[label.address] ?? [];
+      _addressLabelsCache[label.address] = [...existingLabels, label];
+
+      notifyListeners();
+      if (kDebugMode) print('✅ Added address label: ${label.labelName} for ${label.address}');
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to add address label: $e');
+      throw Exception('Failed to add address label: $e');
+    }
+  }
+
+  /// Update an existing address label
+  Future<void> updateAddressLabel(AddressLabel label) async {
+    try {
+      await _databaseService.updateAddressLabel(label);
+
+      // Update cache
+      final existingLabels = _addressLabelsCache[label.address] ?? [];
+      final updatedLabels = existingLabels.map((l) => l.id == label.id ? label : l).toList();
+      _addressLabelsCache[label.address] = updatedLabels;
+
+      notifyListeners();
+      if (kDebugMode) print('✅ Updated address label: ${label.labelName}');
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to update address label: $e');
+      throw Exception('Failed to update address label: $e');
+    }
+  }
+
+  /// Delete an address label
+  Future<void> deleteAddressLabel(AddressLabel label) async {
+    try {
+      await _databaseService.deleteAddressLabel(label.id!);
+
+      // Update cache
+      final existingLabels = _addressLabelsCache[label.address] ?? [];
+      _addressLabelsCache[label.address] = existingLabels.where((l) => l.id != label.id).toList();
+
+      notifyListeners();
+      if (kDebugMode) print('✅ Deleted address label: ${label.labelName}');
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to delete address label: $e');
+      throw Exception('Failed to delete address label: $e');
+    }
+  }
+
+  /// Get address labels grouped by category
+  Future<Map<AddressLabelCategory, List<AddressLabel>>> getAddressLabelsByCategory({
+    bool? isOwned,
+    bool activeOnly = true,
+  }) async {
+    try {
+      return await _databaseService.getAddressLabelsByCategory(
+        isOwned: isOwned,
+        activeOnly: activeOnly,
+      );
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get address labels by category: $e');
+      return {};
+    }
+  }
+
+  /// Get address label statistics
+  Future<Map<String, int>> getAddressLabelStats() async {
+    try {
+      return await _databaseService.getAddressLabelStats();
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get address label stats: $e');
+      return {};
+    }
+  }
+
+  /// Check if an address has any labels
+  Future<bool> hasAddressLabels(String address) async {
+    final labels = await getAddressLabels(address);
+    return labels.isNotEmpty;
+  }
+
+  /// Get the primary label for an address (first active label)
+  Future<AddressLabel?> getPrimaryAddressLabel(String address) async {
+    final labels = await getAddressLabels(address);
+    return labels.isNotEmpty ? labels.first : null;
+  }
+
+  /// Clear address labels cache
+  void clearAddressLabelsCache() {
+    _addressLabelsCache.clear();
+    if (kDebugMode) print('🏷️ Cleared address labels cache');
+  }
+
+  // External Address Tracking and Analysis
+
+  /// Get frequently transacted external addresses
+  Future<List<Map<String, dynamic>>> getFrequentExternalAddresses({
+    int minTransactions = 3,
+    int limit = 10,
+  }) async {
+    try {
+      final Map<String, Map<String, dynamic>> addressStats = {};
+
+      // Get all own addresses to exclude them
+      final ownAddresses = <String>{};
+      for (final address in _addresses['transparent'] ?? []) {
+        ownAddresses.add(address);
+      }
+      for (final address in _addresses['shielded'] ?? []) {
+        ownAddresses.add(address);
+      }
+
+      // Analyze transactions to find external addresses
+      for (final transaction in _transactions) {
+        String? externalAddress;
+
+        if (transaction.isReceived) {
+          // For received transactions, the external address is the sender
+          // This would be in the transaction details if available
+          if (transaction.fromAddress?.isNotEmpty == true && !ownAddresses.contains(transaction.fromAddress!)) {
+            externalAddress = transaction.fromAddress!;
+          }
+        } else {
+          // For sent transactions, the external address is the recipient
+          if (transaction.toAddress?.isNotEmpty == true && !ownAddresses.contains(transaction.toAddress!)) {
+            externalAddress = transaction.toAddress!;
+          }
+        }
+
+        if (externalAddress != null) {
+          if (!addressStats.containsKey(externalAddress)) {
+            addressStats[externalAddress] = {
+              'address': externalAddress,
+              'transactionCount': 0,
+              'totalAmount': 0.0,
+              'lastTransaction': transaction.timestamp,
+              'firstTransaction': transaction.timestamp,
+              'isReceived': transaction.isReceived,
+              'transactions': <TransactionModel>[],
+            };
+          }
+
+          final stats = addressStats[externalAddress]!;
+          stats['transactionCount'] = (stats['transactionCount'] as int) + 1;
+          stats['totalAmount'] = (stats['totalAmount'] as double) + transaction.amount.abs();
+
+          // Update first/last transaction dates
+          if (transaction.timestamp.isAfter(stats['lastTransaction'] as DateTime)) {
+            stats['lastTransaction'] = transaction.timestamp;
+          }
+          if (transaction.timestamp.isBefore(stats['firstTransaction'] as DateTime)) {
+            stats['firstTransaction'] = transaction.timestamp;
+          }
+
+          (stats['transactions'] as List<TransactionModel>).add(transaction);
+        }
+      }
+
+      // Filter by minimum transactions and sort by frequency
+      final frequentAddresses = addressStats.values
+          .where((stats) => (stats['transactionCount'] as int) >= minTransactions)
+          .toList()
+        ..sort((a, b) => (b['transactionCount'] as int).compareTo(a['transactionCount'] as int));
+
+      return frequentAddresses.take(limit).toList();
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get frequent external addresses: $e');
+      return [];
+    }
+  }
+
+  /// Suggest labels for external addresses based on transaction patterns
+  Future<Map<String, AddressLabelType>> suggestLabelsForExternalAddresses(
+    List<Map<String, dynamic>> externalAddresses,
+  ) async {
+    final Map<String, AddressLabelType> suggestions = {};
+
+    for (final addressData in externalAddresses) {
+      final address = addressData['address'] as String;
+      final transactionCount = addressData['transactionCount'] as int;
+      final totalAmount = addressData['totalAmount'] as double;
+      final transactions = addressData['transactions'] as List<TransactionModel>;
+
+      // Check if already labeled
+      final existingLabels = await getAddressLabels(address);
+      if (existingLabels.isNotEmpty) continue;
+
+      // Analyze transaction patterns to suggest label type
+      AddressLabelType suggestedType = AddressLabelType.unknown;
+
+      // High frequency, high volume -> likely exchange
+      if (transactionCount >= 10 && totalAmount >= 100) {
+        suggestedType = AddressLabelType.exchange;
+      }
+      // Regular small amounts -> might be a service or merchant
+      else if (transactionCount >= 5 && totalAmount < 50) {
+        suggestedType = AddressLabelType.service;
+      }
+      // Few large transactions -> might be a friend or personal transfer
+      else if (transactionCount <= 5 && totalAmount >= 50) {
+        suggestedType = AddressLabelType.friend;
+      }
+      // Check memo patterns for additional hints
+      else {
+        final memos = transactions.map((t) => t.memo?.toLowerCase() ?? '').where((m) => m.isNotEmpty).toList();
+
+        if (memos.any((memo) => memo.contains('exchange') || memo.contains('trade'))) {
+          suggestedType = AddressLabelType.exchange;
+        } else if (memos.any((memo) => memo.contains('payment') || memo.contains('purchase'))) {
+          suggestedType = AddressLabelType.merchant;
+        } else if (memos.any((memo) => memo.contains('donation') || memo.contains('tip'))) {
+          suggestedType = AddressLabelType.donation;
+        } else {
+          suggestedType = AddressLabelType.unknown;
+        }
+      }
+
+      suggestions[address] = suggestedType;
+    }
+
+    return suggestions;
+  }
+
+  /// Get unlabeled external addresses that should be suggested for labeling
+  Future<List<Map<String, dynamic>>> getUnlabeledExternalAddresses() async {
+    try {
+      final frequentAddresses = await getFrequentExternalAddresses();
+      final unlabeled = <Map<String, dynamic>>[];
+
+      for (final addressData in frequentAddresses) {
+        final address = addressData['address'] as String;
+        final existingLabels = await getAddressLabels(address);
+
+        if (existingLabels.isEmpty) {
+          unlabeled.add(addressData);
+        }
+      }
+
+      return unlabeled;
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get unlabeled external addresses: $e');
+      return [];
+    }
+  }
+
+  /// Auto-suggest and create labels for external addresses
+  Future<List<AddressLabel>> autoSuggestExternalAddressLabels() async {
+    try {
+      final unlabeledAddresses = await getUnlabeledExternalAddresses();
+      final suggestions = await suggestLabelsForExternalAddresses(unlabeledAddresses);
+      final suggestedLabels = <AddressLabel>[];
+
+      for (final addressData in unlabeledAddresses) {
+        final address = addressData['address'] as String;
+        final suggestedType = suggestions[address];
+
+        if (suggestedType != null) {
+          final transactionCount = addressData['transactionCount'] as int;
+          final totalAmount = addressData['totalAmount'] as double;
+
+          // Generate a descriptive name
+          String labelName;
+          switch (suggestedType) {
+            case AddressLabelType.exchange:
+              labelName = 'Exchange ($transactionCount txs)';
+              break;
+            case AddressLabelType.merchant:
+              labelName = 'Merchant ($transactionCount txs)';
+              break;
+            case AddressLabelType.service:
+              labelName = 'Service ($transactionCount txs)';
+              break;
+            case AddressLabelType.friend:
+              labelName = 'Contact ($transactionCount txs)';
+              break;
+            case AddressLabelType.donation:
+              labelName = 'Donation Address';
+              break;
+            default:
+              labelName = 'External (${totalAmount.toStringAsFixed(1)} BTCZ)';
+          }
+
+          final label = AddressLabelManager.createLabel(
+            address: address,
+            labelName: labelName,
+            type: suggestedType,
+            isOwned: false,
+            description: 'Auto-suggested based on transaction patterns',
+          );
+
+          suggestedLabels.add(label);
+        }
+      }
+
+      return suggestedLabels;
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to auto-suggest external address labels: $e');
+      return [];
+    }
+  }
+
+  /// Get transaction patterns for an external address
+  Future<Map<String, dynamic>> getExternalAddressPatterns(String address) async {
+    try {
+      final transactions = _transactions
+          .where((tx) => tx.fromAddress == address || tx.toAddress == address)
+          .toList();
+
+      if (transactions.isEmpty) {
+        return {};
+      }
+
+      // Calculate patterns
+      final receivedTransactions = transactions.where((tx) => tx.isReceived).toList();
+      final sentTransactions = transactions.where((tx) => !tx.isReceived).toList();
+
+      final totalReceived = receivedTransactions.fold(0.0, (sum, tx) => sum + tx.amount.abs());
+      final totalSent = sentTransactions.fold(0.0, (sum, tx) => sum + tx.amount.abs());
+
+      // Time patterns
+      final firstTransaction = transactions.map((t) => t.timestamp).reduce((a, b) => a.isBefore(b) ? a : b);
+      final lastTransaction = transactions.map((t) => t.timestamp).reduce((a, b) => a.isAfter(b) ? a : b);
+      final daysBetween = lastTransaction.difference(firstTransaction).inDays;
+
+      // Frequency patterns
+      final averageAmount = transactions.fold(0.0, (sum, tx) => sum + tx.amount.abs()) / transactions.length;
+      final frequencyPerMonth = daysBetween > 0 ? (transactions.length / (daysBetween / 30.0)) : 0.0;
+
+      // Memo analysis
+      final memos = transactions.map((t) => t.memo ?? '').where((m) => m.isNotEmpty).toList();
+      final uniqueMemos = memos.toSet().toList();
+
+      return {
+        'address': address,
+        'totalTransactions': transactions.length,
+        'receivedTransactions': receivedTransactions.length,
+        'sentTransactions': sentTransactions.length,
+        'totalReceived': totalReceived,
+        'totalSent': totalSent,
+        'netFlow': totalReceived - totalSent,
+        'averageAmount': averageAmount,
+        'firstTransaction': firstTransaction,
+        'lastTransaction': lastTransaction,
+        'daysBetween': daysBetween,
+        'frequencyPerMonth': frequencyPerMonth,
+        'memos': memos,
+        'uniqueMemos': uniqueMemos,
+        'transactions': transactions,
+      };
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get external address patterns: $e');
+      return {};
+    }
+  }
+
   /// Refresh transactions from database (reload first page)
   Future<void> refreshTransactionsFromDatabase() async {
     await loadTransactionsPage(resetList: true);
@@ -3058,7 +3628,10 @@ class WalletProvider with ChangeNotifier {
 
       // Reload from database with pagination
       await loadTransactionsPage(resetList: true);
-      
+
+      // Clear analytics cache since transactions were updated
+      clearAnalyticsCache();
+
     } catch (e) {
       if (kDebugMode) print('❌ Error syncing to database: $e');
       _setError('Failed to sync to database: $e');
@@ -3509,5 +4082,25 @@ class WalletProvider with ChangeNotifier {
       _walletLocked = false;
       if (kDebugMode) print('🔓 Wallet unlocked - initialization complete and safe');
     }
+  }
+
+  /// Clear analytics cache (call when transactions are updated)
+  void clearAnalyticsCache() {
+    _analyticsCache.clear();
+    _analyticsCacheTimestamps.clear();
+    if (kDebugMode) print('📊 Cleared analytics cache');
+  }
+
+  /// Get analytics cache statistics
+  Map<String, dynamic> getAnalyticsCacheStats() {
+    return {
+      'cacheSize': _analyticsCache.length,
+      'oldestEntry': _analyticsCacheTimestamps.values.isNotEmpty
+          ? _analyticsCacheTimestamps.values.reduce((a, b) => a.isBefore(b) ? a : b)
+          : null,
+      'newestEntry': _analyticsCacheTimestamps.values.isNotEmpty
+          ? _analyticsCacheTimestamps.values.reduce((a, b) => a.isAfter(b) ? a : b)
+          : null,
+    };
   }
 }

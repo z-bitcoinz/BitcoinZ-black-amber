@@ -10,6 +10,7 @@ import 'providers/auth_provider.dart';
 import 'providers/currency_provider.dart';
 import 'providers/network_provider.dart';
 import 'providers/contact_provider.dart';
+import 'providers/interface_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_screen.dart';
 import 'utils/constants.dart';
@@ -124,6 +125,13 @@ class BitcoinZWalletApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => CurrencyProvider()),
         ChangeNotifierProvider(create: (_) => ContactProvider()),
+        ChangeNotifierProvider(
+          create: (_) {
+            final interfaceProvider = InterfaceProvider();
+            interfaceProvider.initialize(); // Initialize preferences
+            return interfaceProvider;
+          },
+        ),
       ],
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {

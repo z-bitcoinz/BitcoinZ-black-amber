@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/wallet_provider.dart';
+import '../../models/address_label.dart';
+import '../../widgets/address_label_dialog.dart';
+import '../analytics/address_monitoring_screen.dart';
 import '../../utils/responsive.dart';
 import '../../utils/constants.dart';
 
@@ -16,17 +19,43 @@ class _AddressListScreenState extends State<AddressListScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   bool _isCreatingAddress = false;
+  Map<String, List<AddressLabel>> _addressLabelsCache = {};
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAddressLabels();
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAddressLabels() async {
+    try {
+      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+      final allLabels = await walletProvider.getAllAddressLabels();
+
+      // Group labels by address
+      _addressLabelsCache.clear();
+      for (final label in allLabels) {
+        if (!_addressLabelsCache.containsKey(label.address)) {
+          _addressLabelsCache[label.address] = [];
+        }
+        _addressLabelsCache[label.address]!.add(label);
+      }
+
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print('Error loading address labels: $e');
+    }
   }
 
   Future<void> _createNewAddress(String type) async {
@@ -92,6 +121,19 @@ class _AddressListScreenState extends State<AddressListScreen>
         title: const Text('My Addresses'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.analytics),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const AddressMonitoringScreen(),
+                ),
+              );
+            },
+            tooltip: 'Address Analytics',
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -269,6 +311,9 @@ class _AddressListScreenState extends State<AddressListScreen>
   }
 
   Widget _buildAddressCard(String address, int index, String type, Color color) {
+    final labels = _addressLabelsCache[address] ?? [];
+    final primaryLabel = labels.isNotEmpty ? labels.first : null;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -279,21 +324,102 @@ class _AddressListScreenState extends State<AddressListScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '$type Address #${index + 1}',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: color,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (primaryLabel != null) ...[
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: Color(int.parse(primaryLabel.color.replaceFirst('#', '0xFF'))),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                primaryLabel.labelName,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(int.parse(primaryLabel.color.replaceFirst('#', '0xFF'))),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$type Address #${index + 1}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          '$type Address #${index + 1}',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.copy, size: 18),
-                  onPressed: () => _copyToClipboard(address, type),
-                  tooltip: 'Copy address',
-                  color: color,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        labels.isNotEmpty ? Icons.label : Icons.label_outline,
+                        size: 18,
+                      ),
+                      onPressed: () => _showLabelDialog(address),
+                      tooltip: labels.isNotEmpty ? 'Edit labels' : 'Add label',
+                      color: labels.isNotEmpty
+                          ? Color(int.parse(primaryLabel!.color.replaceFirst('#', '0xFF')))
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy, size: 18),
+                      onPressed: () => _copyToClipboard(address, type),
+                      tooltip: 'Copy address',
+                      color: color,
+                    ),
+                  ],
                 ),
               ],
             ),
+
+            // Show additional labels if any
+            if (labels.length > 1) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: labels.skip(1).map((label) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Color(int.parse(label.color.replaceFirst('#', '0xFF'))).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Color(int.parse(label.color.replaceFirst('#', '0xFF'))).withOpacity(0.3),
+                    ),
+                  ),
+                  child: Text(
+                    label.labelName,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Color(int.parse(label.color.replaceFirst('#', '0xFF'))),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                )).toList(),
+              ),
+            ],
             const SizedBox(height: 8),
             Container(
               width: double.infinity,
@@ -313,26 +439,75 @@ class _AddressListScreenState extends State<AddressListScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  Icons.check_circle,
-                  size: 16,
-                  color: Colors.green.withOpacity(0.7),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Active',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            // Show label category and type info if labeled
+            if (primaryLabel != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    AddressLabelManager.getIcon(primaryLabel.type),
+                    size: 14,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    AddressLabelManager.getCategoryDisplayName(primaryLabel.category),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    primaryLabel.isOwned ? 'Own Address' : 'External Address',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    size: 16,
                     color: Colors.green.withOpacity(0.7),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Active',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.green.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  void _showLabelDialog(String address) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AddressLabelDialog(prefilledAddress: address),
+    );
+
+    if (result == true) {
+      // Reload labels if a label was added/updated
+      _loadAddressLabels();
+    }
   }
 }
