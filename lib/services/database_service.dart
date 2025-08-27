@@ -67,7 +67,7 @@ class DatabaseService {
   Future<Database> _initDatabase() async {
     // Use WalletStorageService for consistent cross-platform paths
     final dbPath = await WalletStorageService.getDatabasePath();
-    
+
     if (kDebugMode) {
       print('📁 Database path: $dbPath');
       print('   App: BitcoinZ Black Amber');
@@ -75,7 +75,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 3,
+      version: 4, // Increment version for message labels
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
       singleInstance: true,
@@ -135,16 +135,34 @@ class DatabaseService {
       )
     ''');
 
+    // Create message_labels table for enhanced message management
+    await db.execute('''
+      CREATE TABLE message_labels (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        txid TEXT NOT NULL,
+        label_name TEXT NOT NULL,
+        label_color TEXT DEFAULT '#2196F3',
+        is_auto_generated INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (txid) REFERENCES transactions (txid) ON DELETE CASCADE
+      )
+    ''');
+
     // Create indexes for better performance
     await db.execute('CREATE INDEX idx_transactions_txid ON transactions(txid)');
     await db.execute('CREATE INDEX idx_transactions_timestamp ON transactions(timestamp DESC)');
     await db.execute('CREATE INDEX idx_transactions_type ON transactions(type)');
     await db.execute('CREATE INDEX idx_transactions_pending ON transactions(is_pending)');
+    await db.execute('CREATE INDEX idx_transactions_memo ON transactions(memo)');
+    await db.execute('CREATE INDEX idx_transactions_memo_read ON transactions(memo_read)');
     await db.execute('CREATE INDEX idx_addresses_address ON addresses(address)');
     await db.execute('CREATE INDEX idx_addresses_type ON addresses(type)');
     await db.execute('CREATE INDEX idx_contacts_address ON contacts(address)');
     await db.execute('CREATE INDEX idx_contacts_name ON contacts(name)');
     await db.execute('CREATE INDEX idx_contacts_favorite ON contacts(is_favorite)');
+    await db.execute('CREATE INDEX idx_message_labels_txid ON message_labels(txid)');
+    await db.execute('CREATE INDEX idx_message_labels_name ON message_labels(label_name)');
   }
 
   Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
@@ -153,7 +171,7 @@ class DatabaseService {
       // Add memo_read column to existing transactions table
       await db.execute('ALTER TABLE transactions ADD COLUMN memo_read INTEGER NOT NULL DEFAULT 0');
     }
-    
+
     if (oldVersion < 3) {
       // Create contacts table
       await db.execute('''
@@ -169,11 +187,35 @@ class DatabaseService {
           updated_at INTEGER NOT NULL
         )
       ''');
-      
+
       // Create indexes for contacts
       await db.execute('CREATE INDEX idx_contacts_address ON contacts(address)');
       await db.execute('CREATE INDEX idx_contacts_name ON contacts(name)');
       await db.execute('CREATE INDEX idx_contacts_favorite ON contacts(is_favorite)');
+    }
+
+    if (oldVersion < 4) {
+      // Create message_labels table for enhanced message management
+      await db.execute('''
+        CREATE TABLE message_labels (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          txid TEXT NOT NULL,
+          label_name TEXT NOT NULL,
+          label_color TEXT DEFAULT '#2196F3',
+          is_auto_generated INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY (txid) REFERENCES transactions (txid) ON DELETE CASCADE
+        )
+      ''');
+
+      // Create indexes for message labels
+      await db.execute('CREATE INDEX idx_message_labels_txid ON message_labels(txid)');
+      await db.execute('CREATE INDEX idx_message_labels_name ON message_labels(label_name)');
+
+      // Add missing indexes for better performance
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_memo ON transactions(memo)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_memo_read ON transactions(memo_read)');
     }
   }
 
