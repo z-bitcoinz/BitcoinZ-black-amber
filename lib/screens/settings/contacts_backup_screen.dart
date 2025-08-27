@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:file_selector/file_selector.dart';
 import '../../providers/contact_provider.dart';
 
 class ContactsBackupScreen extends StatefulWidget {
@@ -34,11 +35,34 @@ class _ContactsBackupScreenState extends State<ContactsBackupScreen> {
   Future<void> _exportContacts() async {
     if (_passwordController.text.trim().isEmpty) {
       _showError('Please enter a password to encrypt the backup');
+
+      // Show additional guidance
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('A password is required to encrypt your contacts backup'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
       return;
     }
 
     if (_passwordController.text.trim().length < 6) {
       _showError('Password must be at least 6 characters long');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Use a stronger password (minimum 6 characters)'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
       return;
     }
 
@@ -55,9 +79,34 @@ class _ContactsBackupScreenState extends State<ContactsBackupScreen> {
       if (backupData != null && mounted) {
         // Save to file and share
         await _saveAndShareBackup(backupData);
-        
+
         _passwordController.clear();
-        _showSuccess('Contacts backup created successfully!');
+        _showSuccess('Contacts backup created successfully! Keep your password safe.');
+
+        // Show additional success guidance
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.backup, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Backup created! Store both the file and password securely.',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
       } else {
         _showError('Failed to create backup');
       }
@@ -74,23 +123,47 @@ class _ContactsBackupScreenState extends State<ContactsBackupScreen> {
 
   Future<void> _saveAndShareBackup(String backupData) async {
     try {
-      final directory = await getApplicationDocumentsDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'bitcoinz_contacts_backup_$timestamp.txt';
-      final file = File('${directory.path}/$fileName');
-      
-      await file.writeAsString(backupData);
 
-      // Share the file
-      final result = await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'BitcoinZ Contacts Backup',
-        subject: 'BitcoinZ Contacts Backup - $fileName',
-      );
+      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+        // Use file save dialog for desktop platforms
+        final FileSaveLocation? result = await getSaveLocation(
+          suggestedName: fileName,
+          acceptedTypeGroups: [
+            const XTypeGroup(
+              label: 'Text files',
+              extensions: ['txt'],
+            ),
+          ],
+        );
 
-      if (result.status == ShareResultStatus.success) {
-        // Optionally delete the file after sharing
-        // await file.delete();
+        if (result != null) {
+          final file = File(result.path);
+          await file.writeAsString(backupData);
+          _showSuccess('Backup saved successfully to: ${result.path}');
+        } else {
+          // User cancelled the save dialog
+          _showError('Save cancelled');
+        }
+      } else {
+        // Use sharing for mobile platforms
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/$fileName');
+
+        await file.writeAsString(backupData);
+
+        // Share the file
+        final result = await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'BitcoinZ Contacts Backup',
+          subject: 'BitcoinZ Contacts Backup - $fileName',
+        );
+
+        if (result.status == ShareResultStatus.success) {
+          // Optionally delete the file after sharing
+          // await file.delete();
+        }
       }
     } catch (e) {
       _showError('Failed to save/share backup: $e');
@@ -98,13 +171,44 @@ class _ContactsBackupScreenState extends State<ContactsBackupScreen> {
   }
 
   Future<void> _importContacts() async {
+    // Validate password first
     if (_importPasswordController.text.trim().isEmpty) {
-      _showError('Please enter the backup password');
+      _showError('Please enter the backup password to decrypt and import your contacts');
+
+      // Show a snackbar with additional guidance
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password is required to decrypt the backup file'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
       return;
     }
 
+    // Validate backup data
     if (_importDataController.text.trim().isEmpty) {
-      _showError('Please paste the backup data');
+      _showError('Please paste the backup data or load it from a file');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No backup data found. Please paste or load from file'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Validate password length
+    if (_importPasswordController.text.trim().length < 6) {
+      _showError('Password must be at least 6 characters long');
       return;
     }
 
@@ -124,12 +228,64 @@ class _ContactsBackupScreenState extends State<ContactsBackupScreen> {
       if (success && mounted) {
         _importPasswordController.clear();
         _importDataController.clear();
-        _showSuccess('Contacts imported successfully!');
+
+        // Show success message
+        _showSuccess('Contacts imported successfully! Your contacts have been restored.');
+
+        // Show success snackbar with more details
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Contacts imported successfully! Check your contacts list.',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
       } else {
-        _showError(contactProvider.errorMessage ?? 'Import failed');
+        final errorMsg = contactProvider.errorMessage ?? 'Import failed';
+        _showError('Import failed: $errorMsg');
+
+        // Show additional guidance for common errors
+        if (errorMsg.toLowerCase().contains('password') ||
+            errorMsg.toLowerCase().contains('decrypt')) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Incorrect password. Please check your backup password.'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 4),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
       }
     } catch (e) {
-      _showError('Import failed: $e');
+      String errorMessage = 'Import failed: $e';
+
+      // Provide more user-friendly error messages
+      if (e.toString().toLowerCase().contains('password')) {
+        errorMessage = 'Incorrect password. Please verify your backup password.';
+      } else if (e.toString().toLowerCase().contains('format')) {
+        errorMessage = 'Invalid backup format. Please check your backup data.';
+      }
+
+      _showError(errorMessage);
     } finally {
       if (mounted) {
         setState(() {
@@ -144,7 +300,7 @@ class _ContactsBackupScreenState extends State<ContactsBackupScreen> {
       final clipboardData = await Clipboard.getData('text/plain');
       if (clipboardData?.text != null) {
         _importDataController.text = clipboardData!.text!;
-        
+
         HapticFeedback.lightImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -158,6 +314,35 @@ class _ContactsBackupScreenState extends State<ContactsBackupScreen> {
       }
     } catch (e) {
       _showError('Failed to paste from clipboard: $e');
+    }
+  }
+
+  Future<void> _loadFromFile() async {
+    try {
+      const XTypeGroup typeGroup = XTypeGroup(
+        label: 'Text files',
+        extensions: ['txt'],
+      );
+
+      final XFile? file = await openFile(
+        acceptedTypeGroups: [typeGroup],
+      );
+
+      if (file != null) {
+        final String contents = await file.readAsString();
+        _importDataController.text = contents;
+
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Loaded backup file: ${file.name}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      _showError('Failed to load file: $e');
     }
   }
 
@@ -383,12 +568,23 @@ class _ContactsBackupScreenState extends State<ContactsBackupScreen> {
                       controller: _importDataController,
                       decoration: InputDecoration(
                         labelText: 'Backup Data',
-                        hintText: 'Paste your backup data here',
+                        hintText: 'Paste your backup data here or load from file',
                         prefixIcon: const Icon(Icons.data_object),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.paste),
-                          onPressed: _isLoading ? null : _pasteFromClipboard,
-                          tooltip: 'Paste from clipboard',
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (Platform.isMacOS || Platform.isWindows || Platform.isLinux)
+                              IconButton(
+                                icon: const Icon(Icons.folder_open),
+                                onPressed: _isLoading ? null : _loadFromFile,
+                                tooltip: 'Load from file',
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.paste),
+                              onPressed: _isLoading ? null : _pasteFromClipboard,
+                              tooltip: 'Paste from clipboard',
+                            ),
+                          ],
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),

@@ -257,15 +257,15 @@ class ContactDetailScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: contact.isTransparent 
+                    color: contact.isTransparent
                         ? Colors.blue.withOpacity(0.2)
-                        : Colors.purple.withOpacity(0.2),
+                        : const Color(0xFFFFB800).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     contact.isTransparent ? 'Transparent Address' : 'Shielded Address',
                     style: TextStyle(
-                      color: contact.isTransparent ? Colors.blue : Colors.purple,
+                      color: contact.isTransparent ? Colors.blue : const Color(0xFFFFB800),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
