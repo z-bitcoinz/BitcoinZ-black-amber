@@ -3,6 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../providers/wallet_provider.dart';
+import '../../providers/currency_provider.dart';
+import '../../widgets/enhanced_amount_input.dart';
+import '../../services/qr_service.dart';
+import '../../services/sharing_service.dart';
 import 'address_list_screen.dart';
 
 class ReceiveScreenModern extends StatefulWidget {
@@ -55,36 +59,28 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
   String _generateQRData() {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     final address = _selectedAddress ?? walletProvider.currentAddress;
-    
+
     if (address == null) return '';
-    
-    // Basic URI format for BitcoinZ
-    String qrData = 'bitcoinz:$address';
-    
-    final amount = _amountController.text.trim();
+
+    final amountText = _amountController.text.trim();
     final memo = _memoController.text.trim();
-    
-    List<String> params = [];
-    
-    if (amount.isNotEmpty) {
-      params.add('amount=$amount');
+
+    double? amount;
+    if (amountText.isNotEmpty) {
+      amount = double.tryParse(amountText);
     }
-    
-    if (memo.isNotEmpty && _isShieldedAddress) {
-      params.add('memo=$memo');
-    }
-    
-    if (params.isNotEmpty) {
-      qrData += '?${params.join('&')}';
-    }
-    
-    return qrData;
+
+    return QRService.generatePaymentURI(
+      address: address,
+      amount: amount,
+      memo: memo.isNotEmpty && _isShieldedAddress ? memo : null,
+    );
   }
 
   void _copyToClipboard(String text, String message) {
     Clipboard.setData(ClipboardData(text: text));
     HapticFeedback.lightImpact();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -99,12 +95,38 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
     );
   }
 
-  void _shareAddress() {
-    final address = _selectedAddress ?? 
-        Provider.of<WalletProvider>(context, listen: false).currentAddress;
-    if (address != null) {
-      _copyToClipboard(address, 'Address copied to clipboard');
+  Future<void> _sharePaymentRequest() async {
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+    final address = _selectedAddress ?? walletProvider.currentAddress;
+
+    if (address == null) return;
+
+    final amountText = _amountController.text.trim();
+    final memo = _memoController.text.trim();
+
+    double? amount;
+    String? fiatAmount;
+
+    if (amountText.isNotEmpty) {
+      amount = double.tryParse(amountText);
+      if (amount != null && amount > 0) {
+        final fiatValue = currencyProvider.convertBtczToFiat(amount);
+        if (fiatValue != null) {
+          fiatAmount = currencyProvider.formatFiatAmount(amount);
+        }
+      }
     }
+
+    await SharingService.sharePaymentRequest(
+      context: context,
+      address: address,
+      amount: amount,
+      memo: memo.isNotEmpty && _isShieldedAddress ? memo : null,
+      fiatAmount: fiatAmount,
+      currency: currencyProvider.selectedCurrency.code,
+      includeQRImage: true,
+    );
   }
 
   void _switchAddressType() {
@@ -189,8 +211,8 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
           ),
           IconButton(
             icon: const Icon(Icons.share, size: 20),
-            onPressed: _shareAddress,
-            tooltip: 'Share Address',
+            onPressed: _sharePaymentRequest,
+            tooltip: 'Share Payment Request',
           ),
         ],
       ),
@@ -321,47 +343,35 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            child: qrData.isNotEmpty && hasAddresses
-                                ? QrImageView(
-                                    data: qrData,
-                                    version: QrVersions.auto,
-                                    size: 180,
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: Colors.black,
-                                    errorCorrectionLevel: QrErrorCorrectLevel.M,
-                                  )
-                                : Container(
-                                    width: 180,
-                                    height: 180,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.qr_code_2,
-                                          size: 48,
-                                          color: Colors.grey.withOpacity(0.5),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          hasAddresses 
-                                              ? 'QR Code'
-                                              : 'No address available',
-                                          style: TextStyle(
-                                            color: Colors.grey.withOpacity(0.5),
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                            child: QRService.generateQRWidget(
+                              data: qrData,
+                              size: 180,
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
+                              includeMargin: false,
+                            ),
                           ),
-                          
-                          const SizedBox(height: 20),
-                          
+
+                          const SizedBox(height: 16),
+
+                          // Share Button
+                          if (qrData.isNotEmpty && hasAddresses) ...[
+                            ElevatedButton.icon(
+                              onPressed: _sharePaymentRequest,
+                              icon: const Icon(Icons.share, size: 18),
+                              label: const Text('Share Payment Request'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF6B00),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+
                           // Address Display
                           if (currentAddress.isNotEmpty) ...[
                             Text(
@@ -541,78 +551,44 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
                       
                       if (_showAmountField) ...[
                         const SizedBox(height: 12),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2A2A2A),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
-                            ),
-                          ),
-                          child: TextField(
-                            controller: _amountController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: '0.00',
-                              hintStyle: TextStyle(
-                                color: Colors.white.withOpacity(0.3),
-                                fontSize: 16,
-                              ),
-                              prefixIcon: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                child: Container(
-                                  width: 28,
-                                  height: 28,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: Image.asset(
-                                      'assets/images/bitcoinz_logo.png',
-                                      width: 28,
-                                      height: 28,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        // Fallback to bitcoin icon if image fails to load
-                                        return Container(
-                                          width: 28,
-                                          height: 28,
-                                          decoration: BoxDecoration(
-                                            gradient: const LinearGradient(
-                                              colors: [
-                                                Color(0xFFFF6B00),
-                                                Color(0xFFFFAA00),
-                                              ],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            ),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Center(
-                                            child: Icon(
-                                              Icons.currency_bitcoin,
-                                              color: Colors.white.withOpacity(0.9),
-                                              size: 18,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
+                        Theme(
+                          data: Theme.of(context).copyWith(
+                            inputDecorationTheme: InputDecorationTheme(
+                              filled: true,
+                              fillColor: const Color(0xFF2A2A2A),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.1),
                                 ),
                               ),
-                              suffixText: 'BTCZ',
-                              suffixStyle: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
                               ),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFFF6B00),
+                                  width: 2,
+                                ),
+                              ),
                             ),
+                            textTheme: Theme.of(context).textTheme.copyWith(
+                              bodyLarge: const TextStyle(color: Colors.white),
+                              bodyMedium: const TextStyle(color: Colors.white),
+                            ),
+                            colorScheme: Theme.of(context).colorScheme.copyWith(
+                              primary: const Color(0xFFFF6B00),
+                              onSurface: Colors.white,
+                            ),
+                          ),
+                          child: EnhancedAmountInput(
+                            controller: _amountController,
+                            label: 'Request Amount (Optional)',
+                            hintText: '0.00000000',
                             onChanged: (value) {
                               setState(() {}); // Rebuild to update QR code
                             },

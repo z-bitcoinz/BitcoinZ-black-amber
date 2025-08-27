@@ -3,6 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../providers/wallet_provider.dart';
+import '../../providers/currency_provider.dart';
+import '../../widgets/enhanced_amount_input.dart';
+import '../../services/qr_service.dart';
+import '../../services/sharing_service.dart';
 import '../../utils/responsive.dart';
 import 'address_list_screen.dart';
 
@@ -56,30 +60,22 @@ class _ReceiveScreenState extends State<ReceiveScreen>
   String _generateQRData() {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     final address = _selectedAddress ?? walletProvider.currentAddress;
-    
+
     if (address == null) return '';
-    
-    // Basic URI format for BitcoinZ
-    String qrData = 'bitcoinz:$address';
-    
-    final amount = _amountController.text.trim();
+
+    final amountText = _amountController.text.trim();
     final memo = _memoController.text.trim();
-    
-    List<String> params = [];
-    
-    if (amount.isNotEmpty) {
-      params.add('amount=$amount');
+
+    double? amount;
+    if (amountText.isNotEmpty) {
+      amount = double.tryParse(amountText);
     }
-    
-    if (memo.isNotEmpty && _isShieldedAddress) {
-      params.add('memo=$memo');
-    }
-    
-    if (params.isNotEmpty) {
-      qrData += '?${params.join('&')}';
-    }
-    
-    return qrData;
+
+    return QRService.generatePaymentURI(
+      address: address,
+      amount: amount,
+      memo: memo.isNotEmpty && _isShieldedAddress ? memo : null,
+    );
   }
 
   void _copyToClipboard(String text, String message) {
@@ -96,11 +92,38 @@ class _ReceiveScreenState extends State<ReceiveScreen>
     );
   }
 
-  void _shareQRCode() {
-    // Implement share functionality
-    // For now, copy to clipboard
-    final qrData = _generateQRData();
-    _copyToClipboard(qrData, 'Payment request copied to clipboard');
+  Future<void> _sharePaymentRequest() async {
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+    final address = _selectedAddress ?? walletProvider.currentAddress;
+
+    if (address == null) return;
+
+    final amountText = _amountController.text.trim();
+    final memo = _memoController.text.trim();
+
+    double? amount;
+    String? fiatAmount;
+
+    if (amountText.isNotEmpty) {
+      amount = double.tryParse(amountText);
+      if (amount != null && amount > 0) {
+        final fiatValue = currencyProvider.convertBtczToFiat(amount);
+        if (fiatValue != null) {
+          fiatAmount = currencyProvider.formatFiatAmount(amount);
+        }
+      }
+    }
+
+    await SharingService.sharePaymentRequest(
+      context: context,
+      address: address,
+      amount: amount,
+      memo: memo.isNotEmpty && _isShieldedAddress ? memo : null,
+      fiatAmount: fiatAmount,
+      currency: currencyProvider.selectedCurrency.code,
+      includeQRImage: true,
+    );
   }
 
   void _switchAddressType() {
@@ -170,7 +193,7 @@ class _ReceiveScreenState extends State<ReceiveScreen>
           ),
           IconButton(
             icon: const Icon(Icons.share),
-            onPressed: _shareQRCode,
+            onPressed: _sharePaymentRequest,
             tooltip: 'Share Payment Request',
           ),
         ],
@@ -306,15 +329,13 @@ class _ReceiveScreenState extends State<ReceiveScreen>
                         ),
                         child: Column(
                           children: [
-                            if (qrData.isNotEmpty && hasAddresses)
-                              QrImageView(
-                                data: qrData,
-                                version: QrVersions.auto,
-                                size: ResponsiveUtils.isSmallMobile(context) ? 200 : 250,
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black,
-                                errorCorrectionLevel: QrErrorCorrectLevel.M,
-                              )
+                            QRService.generateQRWidget(
+                              data: qrData,
+                              size: ResponsiveUtils.isSmallMobile(context) ? 200 : 250,
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
+                              includeMargin: false,
+                            )
                             else
                               Container(
                                 width: ResponsiveUtils.isSmallMobile(context) ? 200 : 250,
@@ -478,28 +499,10 @@ class _ReceiveScreenState extends State<ReceiveScreen>
                                   ),
                                 ),
                                 SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 6 : 8),
-                                TextField(
+                                EnhancedAmountInput(
                                   controller: _amountController,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  decoration: InputDecoration(
-                                    hintText: '0.00000000',
-                                    suffixText: 'BTCZ',
-                                    suffixStyle: TextStyle(
-                                      fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.9,
-                                      fontWeight: FontWeight.w600,
-                                      color: Theme.of(context).colorScheme.primary,
-                                    ),
-                                    filled: true,
-                                    fillColor: Theme.of(context).colorScheme.background,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context) * 0.75),
-                                    ),
-                                    contentPadding: ResponsiveUtils.getInputFieldPadding(context),
-                                  ),
-                                  style: TextStyle(
-                                    fontSize: ResponsiveUtils.getBodyTextSize(context),
-                                    fontFamily: 'monospace',
-                                  ),
+                                  label: 'Request Amount (Optional)',
+                                  hintText: '0.00000000',
                                   onChanged: (value) {
                                     setState(() {}); // Rebuild to update QR code
                                   },
