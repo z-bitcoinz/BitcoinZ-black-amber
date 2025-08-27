@@ -294,15 +294,6 @@ class _MainScreenState extends State<MainScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('BitcoinZ Wallet'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-      ),
       body: Consumer2<WalletProvider, AuthProvider>(
         builder: (context, walletProvider, authProvider, child) {
           return PageView(
