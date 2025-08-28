@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import 'package:bip39/bip39.dart' as bip39;
 import '../../providers/wallet_provider.dart';
 import '../../utils/responsive.dart';
 import '../main_screen.dart';
+import '../../widgets/wallet_restore_success_dialog.dart';
 
 class RestoreWalletScreen extends StatefulWidget {
   const RestoreWalletScreen({super.key});
@@ -117,6 +119,17 @@ class _RestoreWalletScreenState extends State<RestoreWalletScreen>
       await walletProvider.restoreWallet(_seedPhrase, birthdayHeight: birthdayHeight);
 
       if (mounted) {
+        // Show success dialog for a cohesive experience
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => WalletRestoreSuccessDialog(
+            onClose: () {
+              Navigator.of(ctx).pop();
+            },
+          ),
+        );
+
         // Navigate to main screen
         Navigator.of(context).pushAndRemoveUntil(
           PageRouteBuilder(
@@ -188,6 +201,10 @@ class _RestoreWalletScreenState extends State<RestoreWalletScreen>
 
   @override
   Widget build(BuildContext context) {
+    final bool isAndroid = Platform.isAndroid;
+    final double _spacingFactor = isAndroid ? 1.2 : 1.0;
+    final double _aspectScale = isAndroid ? 0.7 : 0.8; // Taller inputs on Android
+    final double _sectionSpacing = (ResponsiveUtils.isSmallScreen(context) ? 20 : 32) * (isAndroid ? 1.1 : 1.0);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Restore Wallet'),
@@ -259,12 +276,12 @@ class _RestoreWalletScreenState extends State<RestoreWalletScreen>
                     ),
                   ),
                   
-                  SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 20 : 32),
-                  
+                  SizedBox(height: _sectionSpacing),
+
                   // Seed Phrase Input
                   Container(
                     width: double.infinity,
-                    padding: EdgeInsets.all(ResponsiveUtils.getHorizontalPadding(context)),
+                    padding: EdgeInsets.all(ResponsiveUtils.getHorizontalPadding(context) * (isAndroid ? 1.1 : 1.0)),
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context)),
@@ -278,20 +295,20 @@ class _RestoreWalletScreenState extends State<RestoreWalletScreen>
                           'Recovery Phrase',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
-                            fontSize: ResponsiveUtils.getTitleTextSize(context),
+                            fontSize: ResponsiveUtils.getTitleTextSize(context) * (isAndroid ? 1.02 : 1.0),
                           ),
                         ),
-                        SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 24),
-                        
+                        SizedBox(height: (ResponsiveUtils.isSmallScreen(context) ? 16 : 24) * (isAndroid ? 1.1 : 1.0)),
+
                         // Word input grid
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: ResponsiveUtils.getSeedPhraseGridColumns(context),
-                            childAspectRatio: ResponsiveUtils.getSeedPhraseAspectRatio(context) * 0.8, // Slightly taller for input
-                            crossAxisSpacing: ResponsiveUtils.getSeedPhraseSpacing(context),
-                            mainAxisSpacing: ResponsiveUtils.getSeedPhraseSpacing(context),
+                            childAspectRatio: ResponsiveUtils.getSeedPhraseAspectRatio(context) * _aspectScale, // Taller inputs on Android
+                            crossAxisSpacing: ResponsiveUtils.getSeedPhraseSpacing(context) * _spacingFactor,
+                            mainAxisSpacing: ResponsiveUtils.getSeedPhraseSpacing(context) * _spacingFactor,
                           ),
                           itemCount: _wordCount,
                           itemBuilder: (context, index) {
@@ -363,9 +380,9 @@ class _RestoreWalletScreenState extends State<RestoreWalletScreen>
                                           _errorMessage = null;
                                         });
                                         
-                                        // Auto-advance to next field if word is valid
-                                        if (value.trim().isNotEmpty && 
-                                            value.trim().length >= 3 && 
+                                        // Auto-advance when user types a space after a word (paste/type friendly)
+                                        if (value.isNotEmpty &&
+                                            value.endsWith(' ') &&
                                             index < _wordCount - 1) {
                                           _focusNodes[index + 1].requestFocus();
                                         }
