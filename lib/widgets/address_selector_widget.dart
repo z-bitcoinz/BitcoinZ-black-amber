@@ -117,120 +117,125 @@ class _AddressSelectorWidgetState extends State<AddressSelectorWidget> {
         final currentAddress = widget.selectedAddress ?? addresses.first;
         final currentLabel = _addressLabels[currentAddress];
 
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: addresses.length > 1 ? _showAddressSelector : null,
             borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context)),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Padding(
-                padding: EdgeInsets.all(ResponsiveUtils.getHorizontalPadding(context) * 0.75),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context)),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                ),
+              ),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: ResponsiveUtils.getHorizontalPadding(context) * 0.5,
+                  vertical: ResponsiveUtils.isSmallScreen(context) ? 8 : 10,
+                ),
                 child: Row(
                   children: [
+                    // Address type icon
                     Icon(
                       widget.isShieldedAddress ? Icons.shield : Icons.visibility,
-                      size: ResponsiveUtils.getIconSize(context, base: 20),
+                      size: ResponsiveUtils.getIconSize(context, base: 18),
                       color: Theme.of(context).colorScheme.primary,
                     ),
-                    SizedBox(width: ResponsiveUtils.isSmallScreen(context) ? 8 : 12),
+                    SizedBox(width: ResponsiveUtils.isSmallScreen(context) ? 6 : 8),
+
+                    // Address info (two lines)
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Line 1: Label name and tag
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _getAddressDisplayName(currentAddress, currentLabel),
+                                  style: TextStyle(
+                                    fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.95,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (currentLabel != null) ...[
+                                SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Color(int.parse(currentLabel.color.replaceFirst('#', '0xFF'))).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        AddressLabelManager.getIcon(currentLabel.type),
+                                        size: 9,
+                                        color: Color(int.parse(currentLabel.color.replaceFirst('#', '0xFF'))),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        currentLabel.labelName,
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(int.parse(currentLabel.color.replaceFirst('#', '0xFF'))),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+
+                          SizedBox(height: 1),
+
+                          // Line 2: Formatted address
                           Text(
-                            'Selected Address',
+                            _formatAddress(currentAddress),
                             style: TextStyle(
-                              fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.9,
+                              fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.75,
+                              fontFamily: 'monospace',
                               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                             ),
-                          ),
-                          SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 2 : 4),
-                          Text(
-                            _getAddressDisplayName(currentAddress, currentLabel),
-                            style: TextStyle(
-                              fontSize: ResponsiveUtils.getBodyTextSize(context),
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
-                    if (addresses.length > 1)
-                      IconButton(
-                        onPressed: _showAddressSelector,
-                        icon: Icon(
-                          Icons.keyboard_arrow_down,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        tooltip: 'Select Address',
-                      ),
-                  ],
-                ),
-              ),
-              
-              // Address preview
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(ResponsiveUtils.getHorizontalPadding(context) * 0.75),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(ResponsiveUtils.getCardBorderRadius(context)),
-                    bottomRight: Radius.circular(ResponsiveUtils.getCardBorderRadius(context)),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _formatAddress(currentAddress),
-                        style: TextStyle(
-                          fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.85,
-                          fontFamily: 'monospace',
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                        ),
-                      ),
-                    ),
-                    if (currentLabel != null) ...[
-                      SizedBox(width: ResponsiveUtils.isSmallScreen(context) ? 8 : 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Color(int.parse(currentLabel.color.replaceFirst('#', '0xFF'))).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              AddressLabelManager.getIcon(currentLabel.type),
-                              size: 12,
-                              color: Color(int.parse(currentLabel.color.replaceFirst('#', '0xFF'))),
+
+                    // Dropdown arrow (if multiple addresses)
+                    if (addresses.length > 1) ...[
+                      SizedBox(width: 8),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _showAddressSelector,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Icon(
+                              Icons.keyboard_arrow_down,
+                              size: ResponsiveUtils.getIconSize(context, base: 22),
+                              color: Theme.of(context).colorScheme.primary,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              currentLabel.labelName,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Color(int.parse(currentLabel.color.replaceFirst('#', '0xFF'))),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         );
       },
@@ -240,6 +245,25 @@ class _AddressSelectorWidgetState extends State<AddressSelectorWidget> {
   void _showAddressSelector() {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     final addresses = walletProvider.getAddressesOfType(widget.isShieldedAddress);
+
+    // Sort addresses: tagged addresses first, then unlabeled ones
+    final sortedAddresses = List<String>.from(addresses);
+    sortedAddresses.sort((a, b) {
+      final labelA = _addressLabels[a];
+      final labelB = _addressLabels[b];
+
+      // Tagged addresses come first
+      if (labelA != null && labelB == null) return -1;
+      if (labelA == null && labelB != null) return 1;
+
+      // If both have labels, sort by label name
+      if (labelA != null && labelB != null) {
+        return labelA.labelName.compareTo(labelB.labelName);
+      }
+
+      // If both are unlabeled, sort by address
+      return a.compareTo(b);
+    });
     
     showModalBottomSheet(
       context: context,
@@ -282,9 +306,9 @@ class _AddressSelectorWidgetState extends State<AddressSelectorWidget> {
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
-                itemCount: addresses.length,
+                itemCount: sortedAddresses.length,
                 itemBuilder: (context, index) {
-                  final address = addresses[index];
+                  final address = sortedAddresses[index];
                   final label = _addressLabels[address];
                   final isSelected = address == widget.selectedAddress;
                   
