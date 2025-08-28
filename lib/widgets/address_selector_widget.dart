@@ -21,13 +21,43 @@ class AddressSelectorWidget extends StatefulWidget {
   State<AddressSelectorWidget> createState() => _AddressSelectorWidgetState();
 }
 
-class _AddressSelectorWidgetState extends State<AddressSelectorWidget> {
+class _AddressSelectorWidgetState extends State<AddressSelectorWidget> with WidgetsBindingObserver {
   Map<String, AddressLabel?> _addressLabels = {};
+  bool _isLoading = false;
+  WalletProvider? _walletProvider;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadAddressLabels();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _walletProvider?.removeListener(_onWalletProviderChanged);
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final newWalletProvider = Provider.of<WalletProvider>(context, listen: false);
+    if (_walletProvider != newWalletProvider) {
+      _walletProvider?.removeListener(_onWalletProviderChanged);
+      _walletProvider = newWalletProvider;
+      _walletProvider?.addListener(_onWalletProviderChanged);
+      // Refresh labels when provider changes
+      _loadAddressLabels();
+    }
+  }
+
+  void _onWalletProviderChanged() {
+    // Refresh labels when wallet provider notifies changes
+    if (mounted) {
+      _loadAddressLabels();
+    }
   }
 
   @override
@@ -38,19 +68,45 @@ class _AddressSelectorWidgetState extends State<AddressSelectorWidget> {
     }
   }
 
-  Future<void> _loadAddressLabels() async {
-    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    final addresses = walletProvider.getAddressesOfType(widget.isShieldedAddress);
-
-    final Map<String, AddressLabel?> labels = {};
-    for (final address in addresses) {
-      final addressLabels = await walletProvider.getAddressLabels(address);
-      labels[address] = addressLabels.isNotEmpty ? addressLabels.first : null;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Refresh labels when app becomes active (user returns from another screen)
+    if (state == AppLifecycleState.resumed) {
+      _loadAddressLabels();
     }
+  }
+
+  Future<void> _loadAddressLabels() async {
+    if (_isLoading) return;
 
     setState(() {
-      _addressLabels = labels;
+      _isLoading = true;
     });
+
+    try {
+      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+      final addresses = walletProvider.getAddressesOfType(widget.isShieldedAddress);
+
+      final Map<String, AddressLabel?> labels = {};
+      for (final address in addresses) {
+        final addressLabels = await walletProvider.getAddressLabels(address);
+        labels[address] = addressLabels.isNotEmpty ? addressLabels.first : null;
+      }
+
+      if (mounted) {
+        setState(() {
+          _addressLabels = labels;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   String _getAddressDisplayName(String address, AddressLabel? label) {
@@ -74,6 +130,11 @@ class _AddressSelectorWidgetState extends State<AddressSelectorWidget> {
   String _formatAddress(String address) {
     if (address.length <= 16) return address;
     return '${address.substring(0, 8)}...${address.substring(address.length - 8)}';
+  }
+
+  /// Refresh address labels - can be called externally when returning from other screens
+  Future<void> refreshLabels() async {
+    await _loadAddressLabels();
   }
 
   @override

@@ -21,12 +21,15 @@ class _ReceiveScreenState extends State<ReceiveScreen>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  
+
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
-  
+
   bool _isShieldedAddress = false;
   String? _selectedAddress;
+
+  // Key to force refresh of AddressSelectorWidget
+  Key _addressSelectorKey = UniqueKey();
   
   @override
   void initState() {
@@ -147,12 +150,16 @@ class _ReceiveScreenState extends State<ReceiveScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.list),
-            onPressed: () {
-              Navigator.of(context).push(
+            onPressed: () async {
+              await Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => const AddressListScreen(),
                 ),
               );
+              // Refresh address selector when returning from address list
+              setState(() {
+                _addressSelectorKey = UniqueKey();
+              });
             },
             tooltip: 'View All Addresses',
           ),
@@ -232,6 +239,7 @@ class _ReceiveScreenState extends State<ReceiveScreen>
                       Padding(
                         padding: EdgeInsets.symmetric(vertical: ResponsiveUtils.isSmallScreen(context) ? 12 : 16),
                         child: AddressSelectorWidget(
+                          key: _addressSelectorKey,
                           isShieldedAddress: _isShieldedAddress,
                           selectedAddress: _selectedAddress,
                           onAddressSelected: (address) {
