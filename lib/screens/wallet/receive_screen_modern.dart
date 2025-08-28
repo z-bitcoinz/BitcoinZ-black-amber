@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../providers/wallet_provider.dart';
 import '../../providers/currency_provider.dart';
 import '../../widgets/enhanced_amount_input.dart';
+import '../../widgets/address_selector_widget.dart';
 import '../../services/qr_service.dart';
 import '../../services/sharing_service.dart';
 import 'address_list_screen.dart';
@@ -58,7 +59,8 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
 
   String _generateQRData() {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    final address = _selectedAddress ?? walletProvider.currentAddress;
+    // Fix: Use correct address type instead of defaulting to currentAddress
+    final address = _selectedAddress ?? walletProvider.getAddressByType(_isShieldedAddress);
 
     if (address == null) return '';
 
@@ -98,7 +100,8 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
   Future<void> _sharePaymentRequest() async {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
-    final address = _selectedAddress ?? walletProvider.currentAddress;
+    // Fix: Use correct address type instead of defaulting to currentAddress
+    final address = _selectedAddress ?? walletProvider.getAddressByType(_isShieldedAddress);
 
     if (address == null) return;
 
@@ -136,51 +139,7 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
     });
   }
   
-  Future<void> _createNewAddress() async {
-    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    
-    try {
-      final addressType = _isShieldedAddress ? 'shielded' : 'transparent';
-      final newAddress = await walletProvider.generateNewAddress(addressType);
-      
-      if (newAddress != null) {
-        setState(() {
-          _selectedAddress = newAddress;
-        });
-        
-        if (mounted) {
-          HapticFeedback.lightImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('New ${_isShieldedAddress ? 'shielded' : 'transparent'} address created'),
-              backgroundColor: const Color(0xFF4CAF50),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              margin: const EdgeInsets.all(16),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create address: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -314,9 +273,22 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
                         ],
                       ),
                     ),
-                    
+
+                    const SizedBox(height: 16),
+
+                    // Address Selector
+                    AddressSelectorWidget(
+                      isShieldedAddress: _isShieldedAddress,
+                      selectedAddress: _selectedAddress,
+                      onAddressSelected: (address) {
+                        setState(() {
+                          _selectedAddress = address;
+                        });
+                      },
+                    ),
+
                     const SizedBox(height: 24),
-                    
+
                     // QR Code Container
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -424,83 +396,39 @@ class _ReceiveScreenModernState extends State<ReceiveScreenModern>
                       ),
                     ),
                     
-                    const SizedBox(height: 16),
-                    
-                    // New Address Button
-                    if (hasAddresses)
-                      OutlinedButton.icon(
-                        onPressed: walletProvider.isLoading ? null : _createNewAddress,
-                        icon: walletProvider.isLoading 
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B00)),
-                                ),
-                              )
-                            : const Icon(Icons.add, size: 18),
-                        label: Text(
-                          walletProvider.isLoading 
-                              ? 'Creating...' 
-                              : 'New ${_isShieldedAddress ? 'Shielded' : 'Transparent'} Address',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFFF6B00),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          side: BorderSide(
-                            color: const Color(0xFFFF6B00).withOpacity(0.5),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      )
-                    else
+                    if (!hasAddresses) ...[
+                      const SizedBox(height: 16),
                       Container(
-                        height: 48,
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [const Color(0xFFFF6B00), const Color(0xFFFFAA00)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                          color: const Color(0xFF2A2A2A),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFFF6B00).withOpacity(0.3),
                           ),
-                          borderRadius: BorderRadius.circular(24),
                         ),
-                        child: ElevatedButton.icon(
-                          onPressed: walletProvider.isLoading ? null : _createNewAddress,
-                          icon: walletProvider.isLoading 
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : const Icon(Icons.add, size: 18),
-                          label: Text(
-                            walletProvider.isLoading 
-                                ? 'Creating...' 
-                                : 'Create First Address',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: const Color(0xFFFF6B00),
+                              size: 20,
                             ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Go to Address List to create new addresses',
+                                style: TextStyle(
+                                  color: const Color(0xFFFF6B00),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
+                    ],
                     
                     // Amount Request (Optional)
                     if (hasAddresses) ...[

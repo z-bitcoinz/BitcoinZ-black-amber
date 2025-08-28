@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import '../../providers/wallet_provider.dart';
 import '../../providers/currency_provider.dart';
 import '../../widgets/enhanced_amount_input.dart';
+import '../../widgets/address_selector_widget.dart';
 import '../../services/qr_service.dart';
 import '../../services/sharing_service.dart';
 import '../../utils/responsive.dart';
@@ -26,7 +26,6 @@ class _ReceiveScreenState extends State<ReceiveScreen>
   final _memoController = TextEditingController();
   
   bool _isShieldedAddress = false;
-  bool _showAdvanced = false;
   String? _selectedAddress;
   
   @override
@@ -59,7 +58,8 @@ class _ReceiveScreenState extends State<ReceiveScreen>
 
   String _generateQRData() {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    final address = _selectedAddress ?? walletProvider.currentAddress;
+    // Fix: Use correct address type instead of defaulting to currentAddress
+    final address = _selectedAddress ?? walletProvider.getAddressByType(_isShieldedAddress);
 
     if (address == null) return '';
 
@@ -95,7 +95,8 @@ class _ReceiveScreenState extends State<ReceiveScreen>
   Future<void> _sharePaymentRequest() async {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
-    final address = _selectedAddress ?? walletProvider.currentAddress;
+    // Fix: Use correct address type instead of defaulting to currentAddress
+    final address = _selectedAddress ?? walletProvider.getAddressByType(_isShieldedAddress);
 
     if (address == null) return;
 
@@ -133,43 +134,7 @@ class _ReceiveScreenState extends State<ReceiveScreen>
     });
   }
   
-  Future<void> _createNewAddress() async {
-    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    
-    try {
-      final addressType = _isShieldedAddress ? 'shielded' : 'transparent';
-      final newAddress = await walletProvider.generateNewAddress(addressType);
-      
-      if (newAddress != null) {
-        setState(() {
-          _selectedAddress = newAddress;
-        });
-        
-        if (mounted) {
-          HapticFeedback.lightImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('New ${_isShieldedAddress ? 'shielded' : 'transparent'} address created'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create new address: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -243,7 +208,7 @@ class _ReceiveScreenState extends State<ReceiveScreen>
                                   ),
                                   SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 4 : 6),
                                   Text(
-                                    _isShieldedAddress 
+                                    _isShieldedAddress
                                         ? 'Private transactions with memo support'
                                         : 'Public transactions, faster and lower fees',
                                     style: TextStyle(
@@ -262,54 +227,20 @@ class _ReceiveScreenState extends State<ReceiveScreen>
                           ],
                         ),
                       ),
-                      
-                      // Create New Address Button
-                      if (hasAddresses)
-                        Padding(
-                          padding: EdgeInsets.symmetric(vertical: ResponsiveUtils.isSmallScreen(context) ? 12 : 16),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: walletProvider.isLoading ? null : _createNewAddress,
-                              icon: walletProvider.isLoading 
-                                  ? SizedBox(
-                                      width: ResponsiveUtils.getIconSize(context, base: 16),
-                                      height: ResponsiveUtils.getIconSize(context, base: 16),
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Theme.of(context).colorScheme.primary,
-                                        ),
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.add,
-                                      size: ResponsiveUtils.getIconSize(context, base: 18),
-                                    ),
-                              label: Text(
-                                walletProvider.isLoading 
-                                    ? 'Creating...' 
-                                    : 'Create New ${_isShieldedAddress ? 'Shielded' : 'Transparent'} Address',
-                                style: TextStyle(
-                                  fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.9,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: ResponsiveUtils.getHorizontalPadding(context),
-                                  vertical: ResponsiveUtils.isSmallScreen(context) ? 12 : 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context) * 0.75),
-                                ),
-                                side: BorderSide(
-                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                                ),
-                              ),
-                            ),
-                          ),
+
+                      // Address Selector
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: ResponsiveUtils.isSmallScreen(context) ? 12 : 16),
+                        child: AddressSelectorWidget(
+                          isShieldedAddress: _isShieldedAddress,
+                          selectedAddress: _selectedAddress,
+                          onAddressSelected: (address) {
+                            setState(() {
+                              _selectedAddress = address;
+                            });
+                          },
                         ),
+                      ),
                       
                       SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 24 : 32),
                       
@@ -327,17 +258,15 @@ class _ReceiveScreenState extends State<ReceiveScreen>
                             ),
                           ],
                         ),
-                        child: Column(
-                          children: [
-                            QRService.generateQRWidget(
+                        child: qrData.isNotEmpty
+                          ? QRService.generateQRWidget(
                               data: qrData,
                               size: ResponsiveUtils.isSmallMobile(context) ? 200 : 250,
                               backgroundColor: Colors.white,
                               foregroundColor: Colors.black,
                               includeMargin: false,
                             )
-                            else
-                              Container(
+                          : Container(
                                 width: ResponsiveUtils.isSmallMobile(context) ? 200 : 250,
                                 height: ResponsiveUtils.isSmallMobile(context) ? 200 : 250,
                                 decoration: BoxDecoration(
@@ -354,7 +283,7 @@ class _ReceiveScreenState extends State<ReceiveScreen>
                                     ),
                                     SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 12 : 16),
                                     Text(
-                                      hasAddresses 
+                                      hasAddresses
                                           ? 'QR Code will appear here'
                                           : 'No ${_isShieldedAddress ? 'shielded' : 'transparent'} addresses available',
                                       style: TextStyle(
@@ -365,44 +294,20 @@ class _ReceiveScreenState extends State<ReceiveScreen>
                                     ),
                                     if (!hasAddresses) ...[
                                       SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 12 : 16),
-                                      ElevatedButton.icon(
-                                        onPressed: walletProvider.isLoading ? null : _createNewAddress,
-                                        icon: walletProvider.isLoading 
-                                            ? SizedBox(
-                                                width: ResponsiveUtils.getIconSize(context, base: 16),
-                                                height: ResponsiveUtils.getIconSize(context, base: 16),
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                ),
-                                              )
-                                            : Icon(
-                                                Icons.add,
-                                                size: ResponsiveUtils.getIconSize(context, base: 16),
-                                              ),
-                                        label: Text(
-                                          walletProvider.isLoading 
-                                              ? 'Creating...' 
-                                              : 'Create First Address',
-                                          style: TextStyle(
-                                            fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.85,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                      Text(
+                                        'Go to Address List to create new addresses',
+                                        style: TextStyle(
+                                          fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.85,
+                                          color: Theme.of(context).colorScheme.primary,
+                                          fontWeight: FontWeight.w500,
                                         ),
-                                        style: ElevatedButton.styleFrom(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: ResponsiveUtils.getHorizontalPadding(context),
-                                            vertical: ResponsiveUtils.isSmallScreen(context) ? 8 : 12,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context) * 0.5),
-                                          ),
-                                        ),
+                                        textAlign: TextAlign.center,
                                       ),
                                     ],
                                   ],
                                 ),
                               ),
+                      ),
                             
                             SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 20),
                             
@@ -577,7 +482,7 @@ class _ReceiveScreenState extends State<ReceiveScreen>
                         ],
                       ),
                       
-                      SizedBox(height: ResponsiveUtils.getVerticalPadding(context)),
+                      SizedBox(height: 24),
                     ],
                   ),
                 ),
