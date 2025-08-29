@@ -54,13 +54,20 @@ class WalletProvider with ChangeNotifier {
   String _syncMessage = '';
   Timer? _syncStatusTimer;
   bool _autoSyncEnabled = true;
-  
+
   // Enhanced sync tracking
   DateTime? _syncStartTime;
   DateTime? _lastSyncTime;
   int _lastSyncedBlocks = 0;
   double _syncSpeed = 0.0; // blocks per second
   Duration? _estimatedTimeRemaining;
+
+  // Stuck detection / checkpointing
+  DateTime? _lastStatusMovementAt;
+  int? _lastTxnScanBlocks;
+  int? _lastBatchNum;
+  int? _lastStartBlock;
+  int? _lastEndBlock;
   
   // Pagination state - optimized for performance
   int _currentPage = 0;
@@ -1588,7 +1595,51 @@ class WalletProvider with ChangeNotifier {
         _totalBlocks = status['total_blocks'] ?? 0;
         _batchNum = status['batch_num'] ?? 0;
         _batchTotal = status['batch_total'] ?? 0;
-        
+
+        // Track movement / detect staleness
+        final int tdb = status['trial_decryptions_blocks'] ?? 0;
+        final int tsb = status['txn_scan_blocks'] ?? 0;
+        final int sbStart = status['start_block'] ?? 0;
+        final int sbEnd = status['end_block'] ?? 0;
+        final bool progressed = (_lastTxnScanBlocks == null) || (tsb != _lastTxnScanBlocks) || (_batchNum != _lastBatchNum);
+        if (progressed) {
+          _lastStatusMovementAt = DateTime.now();
+          _lastTxnScanBlocks = tsb;
+          _lastBatchNum = _batchNum;
+          _lastStartBlock = sbStart;
+          _lastEndBlock = sbEnd;
+        } else {
+          // If stuck for > 120s while fully downloaded/decrypted, checkpoint a birthday so restart won’t genesis
+          final stuckFor = _lastStatusMovementAt != null ? DateTime.now().difference(_lastStatusMovementAt!) : Duration.zero;
+          final fullyDownloaded = _totalBlocks > 0 && _syncedBlocks >= _totalBlocks && tdb >= _totalBlocks;
+          if (fullyDownloaded && tsb < _totalBlocks && stuckFor.inSeconds >= 120) {
+            final checkpoint = [sbStart, sbEnd].where((v) => v != null && v > 0).fold<int>(1 << 30, (a, b) => a < b ? a : b);
+            if (checkpoint != (1 << 30)) {
+              final safeBirthday = (checkpoint - 200) > 1 ? (checkpoint - 200) : 1;
+              try {
+                final authProvider = AuthProvider();
+                await authProvider.initialize();
+                // Update wallet model in memory
+                if (_wallet != null) {
+                  _wallet = _wallet!.copyWith(birthdayHeight: safeBirthday);
+                }
+                await authProvider.updateWalletData({
+                  'walletId': _wallet?.walletId,
+                  'transparentAddresses': _addresses['transparent'] ?? [],
+                  'shieldedAddresses': _addresses['shielded'] ?? [],
+                  'birthdayHeight': safeBirthday,
+                  'updatedAt': DateTime.now().toIso8601String(),
+                });
+                if (kDebugMode) print('💾 Checkpointed birthday height due to staleness: $safeBirthday (batch $_batchNum/$_batchTotal, start=$sbStart end=$sbEnd)');
+              } catch (e) {
+                if (kDebugMode) print('⚠️ Failed to checkpoint birthday: $e');
+              }
+              // Reset the timer so we don’t spam
+              _lastStatusMovementAt = DateTime.now();
+            }
+          }
+        }
+
         // Calculate sync speed and ETA
         if (_syncStartTime != null && _syncedBlocks > _lastSyncedBlocks) {
           final elapsed = DateTime.now().difference(_syncStartTime!);
@@ -1673,13 +1724,45 @@ class WalletProvider with ChangeNotifier {
           try {
             final authProvider = AuthProvider();
             await authProvider.initialize();
-            // Use Rust-reported birthday if available, else preserve existing
-            final bday = _rustService.getBirthday();
+
+            // Derive a reliable non-zero birthday
+            int? finalBirthday = _rustService.getBirthday();
+
+            // If Rust didn't provide a useful birthday (e.g., restored with 0), try to infer one
+            if (finalBirthday == null || finalBirthday == 0) {
+              // 1) Try reading latest sync status and use the lower bound of the last scanned range
+              final lastStatus = await _rustService.getSyncStatus();
+              if (lastStatus != null) {
+                final int sb = lastStatus['start_block'] ?? 0;
+                final int eb = lastStatus['end_block'] ?? 0;
+                if (sb > 0 || eb > 0) {
+                  // Choose the smaller of the two as a conservative birthday floor
+                  finalBirthday = [sb, eb].where((v) => v > 0).fold<int>(1 << 30, (a, b) => a < b ? a : b);
+                }
+              }
+              // 2) As a last resort, use current tip minus a small safety buffer
+              if (finalBirthday == null || finalBirthday == 0 || finalBirthday == (1 << 30)) {
+                try {
+                  final tip = await _rustService.getCurrentBlockHeight();
+                  // Keep a buffer so re-scan covers recent history just in case
+                  finalBirthday = (tip - 200);
+                  if (finalBirthday! < 1) finalBirthday = 1;
+                } catch (_) {
+                  finalBirthday = _wallet?.birthdayHeight ?? 1;
+                }
+              }
+            }
+
+            // Update in-memory model too
+            if (_wallet != null) {
+              _wallet = _wallet!.copyWith(birthdayHeight: finalBirthday);
+            }
+
             await authProvider.updateWalletData({
               'walletId': _wallet?.walletId,
               'transparentAddresses': _addresses['transparent'] ?? [],
               'shieldedAddresses': _addresses['shielded'] ?? [],
-              'birthdayHeight': bday ?? _wallet?.birthdayHeight ?? 0,
+              'birthdayHeight': finalBirthday ?? 1,
               'updatedAt': DateTime.now().toIso8601String(),
               'cachedBalance': {
                 'transparent': _balance.transparent,
@@ -1688,7 +1771,7 @@ class WalletProvider with ChangeNotifier {
                 'total': _balance.total,
               },
             });
-            if (kDebugMode) print('💾 Persisted birthday height after sync: ${bday ?? _wallet?.birthdayHeight ?? 0}');
+            if (kDebugMode) print('💾 Persisted birthday height after sync: ${finalBirthday ?? 1}');
           } catch (e) {
             if (kDebugMode) print('⚠️ Failed to persist birthday after sync: $e');
           }
