@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:bip39/bip39.dart' as bip39;
 import '../../providers/wallet_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../utils/responsive.dart';
 import '../main_screen.dart';
 import '../../widgets/wallet_restore_success_dialog.dart';
@@ -116,7 +117,8 @@ class _RestoreWalletScreenState extends State<RestoreWalletScreen>
       
       // Restore wallet with the seed phrase
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-      await walletProvider.restoreWallet(_seedPhrase, birthdayHeight: birthdayHeight);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await walletProvider.restoreWallet(_seedPhrase, birthdayHeight: birthdayHeight, authProvider: authProvider);
 
       if (mounted) {
         // Show success dialog for a cohesive experience

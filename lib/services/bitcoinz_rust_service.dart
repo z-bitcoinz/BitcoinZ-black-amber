@@ -71,6 +71,9 @@ class BitcoinzRustService {
   DateTime? _lastUpdateTime;
   static const Duration _minUpdateInterval = Duration(seconds: 2);
   
+  // Sync state tracking to prevent interruption
+  bool _isSyncing = false;
+  
   // Blockchain info caching
   int? _currentBlockHeight;
   DateTime? _blockHeightLastFetch;
@@ -324,8 +327,15 @@ class BitcoinzRustService {
       // Start update timers (like BitcoinZ Blue)
       startTimers();
       
-      // Initial sync
-      await sync();
+      // Initial sync - don't await for genesis sync as it takes too long
+      // The sync will continue in background and UI will show progress
+      if (_birthday == 0) {
+        if (kDebugMode) print('🌍 Genesis sync - starting in background (not awaiting)...');
+        sync(); // Start without await - let it run in background
+      } else {
+        // For non-genesis, await the sync as it's quick
+        await sync();
+      }
       
       return true;
     } catch (e) {
@@ -454,8 +464,13 @@ class BitcoinzRustService {
     if (kDebugMode) print('🔄 Full refresh via Rust...');
     
     try {
-      // Sync with network
-      await sync();
+      // Skip sync if already syncing to prevent interruption
+      if (!_isSyncing) {
+        // Sync with network
+        await sync();
+      } else {
+        if (kDebugMode) print('⏭️ Skipping sync - already in progress');
+      }
       
       // Fetch all data in parallel for better performance  
       await Future.wait([
@@ -477,19 +492,40 @@ class BitcoinzRustService {
   Future<void> sync() async {
     if (!_initialized) return;
     
+    // Prevent concurrent syncs
+    if (_isSyncing) {
+      if (kDebugMode) print('⏭️ Sync already in progress, skipping...');
+      return;
+    }
+    
+    _isSyncing = true;
+    
     try {
       if (kDebugMode) print('🔄 Syncing with network via Rust...');
-      // Add timeout to prevent hanging indefinitely on Android
-      final result = await rust_api.execute(command: 'sync', args: '').timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          if (kDebugMode) print('⏱️ Sync command timed out after 15 seconds');
-          return '{"status": "timeout"}';
-        },
-      );
-      if (kDebugMode) print('Sync result: ${result.substring(0, math.min(100, result.length))}...');
+      // For full sync from genesis (birthday 0), we need much longer timeout
+      // Regular sync: 15 seconds, Genesis sync: no timeout (let it complete)
+      final isGenesisSync = _birthday == 0;
+      
+      if (isGenesisSync) {
+        // No timeout for genesis sync - let it complete fully
+        if (kDebugMode) print('🌍 Genesis sync detected - no timeout, this may take a while...');
+        final result = await rust_api.execute(command: 'sync', args: '');
+        if (kDebugMode) print('Sync result: ${result.substring(0, math.min(100, result.length))}...');
+      } else {
+        // Regular sync with timeout
+        final result = await rust_api.execute(command: 'sync', args: '').timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            if (kDebugMode) print('⏱️ Sync command timed out after 15 seconds');
+            return '{"status": "timeout"}';
+          },
+        );
+        if (kDebugMode) print('Sync result: ${result.substring(0, math.min(100, result.length))}...');
+      }
     } catch (e) {
       if (kDebugMode) print('❌ Sync failed: $e');
+    } finally {
+      _isSyncing = false;
     }
   }
   
@@ -1298,9 +1334,14 @@ class BitcoinzRustService {
         timeout,
         onTimeout: () {
           if (kDebugMode) print('⏱️ Syncstatus command timed out after ${timeout.inSeconds}s');
-          // Return a JSON string indicating sync is complete when timeout occurs
-          // This prevents the sync polling from continuing forever
-          return '{"sync_id": 1, "in_progress": false, "last_error": null}';
+          // When timeout occurs during active sync, assume sync is still in progress
+          // This is especially important for genesis sync which takes a long time
+          if (_isSyncing) {
+            return '{"sync_id": 1, "in_progress": true, "last_error": null}';
+          } else {
+            // Only return false if we know we're not syncing
+            return '{"sync_id": 1, "in_progress": false, "last_error": null}';
+          }
         },
       );
       

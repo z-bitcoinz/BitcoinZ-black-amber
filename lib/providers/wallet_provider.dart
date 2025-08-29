@@ -586,6 +586,7 @@ class WalletProvider with ChangeNotifier {
         serverUri: currentServerUrl,
         seedPhrase: seedPhrase,
         createNew: false,
+        birthdayHeight: birthdayHeight,
       );
       
       if (!rustInitialized) {
@@ -1308,6 +1309,12 @@ class WalletProvider with ChangeNotifier {
   /// Full sync wallet with blockchain
   /// Start sync status polling (like BitcoinZ Blue)
   void _startSyncStatusPolling() {
+    // Don't restart if already polling
+    if (_syncStatusTimer?.isActive == true) {
+      if (kDebugMode) print('🔄 Sync status polling already active, not restarting');
+      return;
+    }
+    
     _stopSyncStatusPolling();
     
     if (kDebugMode) print('🔄 Starting sync status polling...');
@@ -1315,13 +1322,17 @@ class WalletProvider with ChangeNotifier {
     
     // Track when polling started to prevent infinite loops
     final pollingStartTime = DateTime.now();
-    const maxPollingDuration = Duration(minutes: 5); // Maximum 5 minutes of polling
+    // For genesis sync (birthday 0), allow much longer polling time
+    final isGenesisSync = _wallet?.birthdayHeight == 0;
+    final maxPollingDuration = isGenesisSync 
+        ? const Duration(hours: 2)  // 2 hours for genesis sync
+        : const Duration(minutes: 5); // 5 minutes for regular sync
     
     // Poll every second for sync status
     _syncStatusTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       // Check if we've been polling too long
       if (DateTime.now().difference(pollingStartTime) > maxPollingDuration) {
-        if (kDebugMode) print('⏰ Sync polling timeout - stopping after 5 minutes');
+        if (kDebugMode) print('⏰ Sync polling timeout - stopping after ${isGenesisSync ? "2 hours" : "5 minutes"}');
         _stopSyncStatusPolling();
         _setSyncing(false);
         // Test real connection instead of assuming connected on timeout

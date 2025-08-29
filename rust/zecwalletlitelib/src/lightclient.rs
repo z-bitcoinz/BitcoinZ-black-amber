@@ -1406,12 +1406,22 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightClient<P> {
         let mut latest_block_batches = vec![];
         let mut prev = last_scanned_height;
         while latest_block_batches.is_empty() || prev != latest_blockid.height {
-            // BitcoinZ: Use smaller batch sizes for better sync progress display
-            // and to avoid scanning issues with current block height (~1,612,745)
-            let mut batch_size = if prev < 1_600_000 {
-                50_000  // Use larger batches for old blocks
+            // BitcoinZ: Gradual batch size reduction to prevent sync hanging
+            // Batch 4 gets stuck because of sudden drop from 50k to 1k blocks
+            let mut batch_size = if prev < 1_450_000 {
+                30_000  // Moderate batches for older blocks
+            } else if prev < 1_500_000 {
+                20_000  // Start gradual reduction
+            } else if prev < 1_550_000 {
+                15_000  // Continue reduction
+            } else if prev < 1_580_000 {
+                10_000  // Getting smaller
+            } else if prev < 1_600_000 {
+                5_000   // Near current blocks
+            } else if prev < 1_610_000 {
+                3_000   // Very close to current
             } else {
-                1_000   // Use smaller batches for recent blocks (better for BitcoinZ)
+                2_000   // Recent blocks: small for reliability
             };
 
             let batch = cmp::min(latest_blockid.height, prev + batch_size);
