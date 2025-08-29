@@ -631,9 +631,28 @@ class WalletProvider with ChangeNotifier {
         );
       }
       
+      // Immediately start sync progress polling and kick off a sync so UI shows progress
+      _setSyncing(true);
+      _startSyncStatusPolling();
+
+      // Trigger an immediate sync/update cycle
+      Future(() async {
+        try {
+          // First attempt to read current status (in case initialize already started sync)
+          await _updateSyncStatus();
+          // Then trigger a sync to ensure progress advances during restoration
+          await _rustService.sync();
+          // Update status again and refresh data
+          await _updateSyncStatus();
+          await _refreshWalletData();
+        } catch (e) {
+          if (kDebugMode) print('Initial restore sync error: $e');
+        }
+      });
+
       // Start auto-sync after wallet restoration
       startAutoSync();
-      
+
       notifyListeners();
     } catch (e) {
       _setError('Failed to restore wallet: $e');

@@ -1327,10 +1327,9 @@ class BitcoinzRustService {
           ? const Duration(seconds: 2) 
           : const Duration(seconds: 5);
       
-      final statusStr = await rust_api.execute(
-        command: 'syncstatus', 
-        args: ''
-      ).timeout(
+      // Use direct FRB binding instead of the generic 'execute' command to
+      // avoid SSE/codec issues and improve reliability during restoration
+      final statusStr = await Future<String>(() => rust_api.getSyncStatus()).timeout(
         timeout,
         onTimeout: () {
           if (kDebugMode) print('⏱️ Syncstatus command timed out after ${timeout.inSeconds}s');
