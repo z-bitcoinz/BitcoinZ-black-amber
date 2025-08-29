@@ -1519,10 +1519,15 @@ class WalletProvider with ChangeNotifier {
         _scheduleReconnectionAttempt();
       }
     } catch (e) {
-      if (e is TimeoutException) {
-        _setConnectionStatus(false, 'Connection timeout');
+      // Don't flip to disconnected while an active sync may be running
+      if (_isSyncing) {
+        if (kDebugMode) print('⚠️ Connection check failed during sync, ignoring: $e');
       } else {
-        _setConnectionStatus(false, 'Connection error');
+        if (e is TimeoutException) {
+          _setConnectionStatus(false, 'Connection timeout');
+        } else {
+          _setConnectionStatus(false, 'Connection error');
+        }
       }
       if (kDebugMode) print('❌ Connection check failed: $e');
     }
@@ -1548,8 +1553,17 @@ class WalletProvider with ChangeNotifier {
         print('📊 Sync status update: $status');
       }
       
-      final inProgress = status['in_progress'] ?? false;
-      
+      bool inProgress = status['in_progress'] ?? false;
+
+      // Heuristic: if synced_blocks == total_blocks and batch_num == batch_total, treat as complete
+      final int sb = status['synced_blocks'] ?? 0;
+      final int tb = status['total_blocks'] ?? 0;
+      final int bn = status['batch_num'] ?? 0;
+      final int bt = status['batch_total'] ?? 0;
+      if (tb > 0 && sb >= tb && bt > 0 && bn >= bt) {
+        inProgress = false;
+      }
+
       if (inProgress) {
         // Active sync detected - let periodic check handle connection status
         if (kDebugMode) print('📊 Sync in progress detected');
@@ -1616,33 +1630,16 @@ class WalletProvider with ChangeNotifier {
           }
         }
       } else {
-        // Sync completed - IMMEDIATELY stop showing as syncing
-        // Don't show 100% indefinitely
-        
-        // Stop polling immediately when sync is complete
+        // Treat as complete. Avoid disconnect flicker here and finish cleanly.
         _stopSyncStatusPolling();
-        
-        // Sync completed - let periodic check handle connection status
         if (kDebugMode) print('📊 Sync completed');
-        
-        // Clear sync progress to prevent stuck "100%" display
-        if (_syncProgress >= 100.0 || !inProgress) {
-          _syncProgress = 0.0; // Reset progress so it doesn't show 100%
-          _syncMessage = ''; // Clear message to prevent stuck "Syncing... 100.0% complete"
-        }
-        
+
+        // Clear sync progress
+        _syncProgress = 0.0;
+        _syncMessage = '';
         _lastSyncTime = DateTime.now();
-        
-        if (kDebugMode) {
-          print('✅ Sync complete');
-          if (_syncStartTime != null) {
-            final totalTime = DateTime.now().difference(_syncStartTime!);
-            print('   Total sync time: ${totalTime.inSeconds} seconds');
-          }
-          print('   Clearing sync UI to prevent stuck 100% display');
-        }
-        
-        // Reset all sync tracking immediately
+
+        // Reset all sync tracking
         _syncStartTime = null;
         _syncSpeed = 0.0;
         _estimatedTimeRemaining = null;
@@ -1650,16 +1647,13 @@ class WalletProvider with ChangeNotifier {
         _totalBlocks = 0;
         _batchNum = 0;
         _batchTotal = 0;
-        
-        // Data load completed - let periodic check handle connection status
-        if (kDebugMode) print('📊 Data load completed');
-        
+
         // Immediately clear syncing flag - don't delay
         _setSyncing(false);
-        
-        // Refresh wallet data after sync (unless it was a timeout)
+
+        // Refresh wallet data after sync
         if (!(status['timeout'] ?? false)) {
-          _refreshWalletData();
+          await _refreshWalletData();
         }
       }
       

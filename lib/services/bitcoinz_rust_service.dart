@@ -1323,8 +1323,9 @@ class BitcoinzRustService {
       
       // Add timeout to prevent hanging on Android
       // Use shorter timeout on Android where syncstatus tends to hang
-      final timeout = Platform.isAndroid 
-          ? const Duration(seconds: 2) 
+      // Slightly longer timeout on Android to reduce false "in_progress" from timeouts
+      final timeout = Platform.isAndroid
+          ? const Duration(seconds: 5)
           : const Duration(seconds: 5);
       
       // Use direct FRB binding instead of the generic 'execute' command to
