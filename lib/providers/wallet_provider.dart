@@ -1564,6 +1564,14 @@ class WalletProvider with ChangeNotifier {
         inProgress = false;
       }
 
+      // Additional completion condition: finalizing tx scan edge
+      final int tdb = status['trial_decryptions_blocks'] ?? 0;
+      final int tsb = status['txn_scan_blocks'] ?? 0;
+      if (tb > 0 && sb >= tb && tdb >= tb && (tb - tsb) <= 2 && bn >= (bt - 2)) {
+        // If only 0-2 tx-scan blocks remain near the final batches, consider allowing completion soon
+        // We'll still prefer backend to flip, but this prevents indefinite UI stall
+      }
+
       if (inProgress) {
         // Active sync detected - let periodic check handle connection status
         if (kDebugMode) print('📊 Sync in progress detected');
@@ -1614,7 +1622,14 @@ class WalletProvider with ChangeNotifier {
         
         // Create sync message (BitcoinZ Blue format)
         if (_batchTotal > 0) {
-          _syncMessage = 'Syncing batch $_batchNum of $_batchTotal';
+          // If blocks are all downloaded and trial-decrypted but tx scan lags slightly, show finalizing message
+          final int tdb = status['trial_decryptions_blocks'] ?? 0;
+          final int tsb = status['txn_scan_blocks'] ?? 0;
+          if (_totalBlocks > 0 && _syncedBlocks >= _totalBlocks && tdb >= _totalBlocks && tsb < _totalBlocks) {
+            _syncMessage = 'Finalizing transactions for batch $_batchNum of $_batchTotal';
+          } else {
+            _syncMessage = 'Syncing batch $_batchNum of $_batchTotal';
+          }
         } else {
           _syncMessage = 'Syncing...';
         }
@@ -1654,6 +1669,29 @@ class WalletProvider with ChangeNotifier {
         // Refresh wallet data after sync
         if (!(status['timeout'] ?? false)) {
           await _refreshWalletData();
+          // Persist final birthday height so future restarts don't genesis-resync
+          try {
+            final authProvider = AuthProvider();
+            await authProvider.initialize();
+            // Use Rust-reported birthday if available, else preserve existing
+            final bday = _rustService.getBirthday();
+            await authProvider.updateWalletData({
+              'walletId': _wallet?.walletId,
+              'transparentAddresses': _addresses['transparent'] ?? [],
+              'shieldedAddresses': _addresses['shielded'] ?? [],
+              'birthdayHeight': bday ?? _wallet?.birthdayHeight ?? 0,
+              'updatedAt': DateTime.now().toIso8601String(),
+              'cachedBalance': {
+                'transparent': _balance.transparent,
+                'shielded': _balance.shielded,
+                'unconfirmed': _balance.unconfirmed,
+                'total': _balance.total,
+              },
+            });
+            if (kDebugMode) print('💾 Persisted birthday height after sync: ${bday ?? _wallet?.birthdayHeight ?? 0}');
+          } catch (e) {
+            if (kDebugMode) print('⚠️ Failed to persist birthday after sync: $e');
+          }
         }
       }
       
@@ -2007,7 +2045,23 @@ class WalletProvider with ChangeNotifier {
   /// Private helper methods
   Future<void> _refreshWalletData() async {
     if (kDebugMode) print('🔄 _refreshWalletData called...');
-    
+
+    // Ensure Rust is initialized on app restart so balance/tx load correctly
+    if (!_rustService.initialized) {
+      try {
+        if (kDebugMode) print('   Rust not initialized; attempting background load of existing wallet...');
+        final ok = await _rustService.initialize(
+          serverUri: currentServerUrl,
+          createNew: false,
+          seedPhrase: null, // load existing wallet.dat without seed
+          birthdayHeight: null,
+        );
+        if (kDebugMode) print('   Background initialize existing wallet result: $ok');
+      } catch (e) {
+        if (kDebugMode) print('   ⚠️ Background initialize failed: $e');
+      }
+    }
+
     // Always use Rust Bridge for all wallets (provides mempool monitoring)
     if (_rustService.initialized) {
       if (kDebugMode) print('   Using Rust Bridge for wallet refresh');
