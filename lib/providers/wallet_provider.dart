@@ -64,6 +64,8 @@ class WalletProvider with ChangeNotifier {
 
   // Stuck detection / checkpointing
   DateTime? _lastStatusMovementAt;
+  DateTime? _finalizationStartTime;
+  DateTime? _lastFinalizationRefresh;
   int? _lastTxnScanBlocks;
   int? _lastBatchNum;
   int? _lastStartBlock;
@@ -1605,18 +1607,37 @@ class WalletProvider with ChangeNotifier {
 
       bool inProgress = status['in_progress'] ?? false;
 
-      // Heuristic: if synced_blocks == total_blocks and batch_num == batch_total, treat as complete
+      // Enhanced completion detection heuristic
       final int sb = status['synced_blocks'] ?? 0;
       final int tb = status['total_blocks'] ?? 0;
       final int bn = status['batch_num'] ?? 0;
       final int bt = status['batch_total'] ?? 0;
+      final int tsb = status['txn_scan_blocks'] ?? 0;
+      final int tdb = status['trial_decryptions_blocks'] ?? 0;
+      
+      // Primary completion: all blocks synced and batch complete
       if (tb > 0 && sb >= tb && bt > 0 && bn >= bt) {
         inProgress = false;
       }
+      // Secondary completion: near final batch with blocks fully synced and txn finalization nearly done
+      else if (tb > 0 && sb >= tb && bt > 0 && bn >= (bt - 3) && tsb >= (tb - 5)) {
+        if (kDebugMode) print('📊 Sync completion detected: near-final batch with finalization nearly complete');
+        inProgress = false;
+      }
+      // Tertiary completion: stuck in finalization too long (force completion)
+      else if (tb > 0 && sb >= tb && tdb >= tb && bt > 0 && bn > 0) {
+        _finalizationStartTime ??= DateTime.now();
+        if (DateTime.now().difference(_finalizationStartTime!).inSeconds > 90) {
+          if (kDebugMode) print('📊 Sync completion forced: stuck in finalization for >90 seconds');
+          inProgress = false;
+          _finalizationStartTime = null;
+        }
+      } else {
+        _finalizationStartTime = null; // Reset timer if not in finalization
+      }
 
       // Additional completion condition: finalizing tx scan edge
-      final int tdb = status['trial_decryptions_blocks'] ?? 0;
-      final int tsb = status['txn_scan_blocks'] ?? 0;
+      // (variables already declared above)
       if (tb > 0 && sb >= tb && tdb >= tb && (tb - tsb) <= 2 && bn >= (bt - 2)) {
         // If only 0-2 tx-scan blocks remain near the final batches, consider allowing completion soon
         // We'll still prefer backend to flip, but this prevents indefinite UI stall
@@ -1702,20 +1723,64 @@ class WalletProvider with ChangeNotifier {
           }
         }
 
-        // Calculate progress exactly like BitcoinZ Blue
+        // Enhanced progress calculation for final batches
         double batchProgress = 0.0;
         double totalProgress = 0.0;
-
+        
         if (_totalBlocks > 0) {
+          // Get additional finalization progress indicators
+          final int tdb = status['trial_decryptions_blocks'] ?? 0;
+          final int tsb = status['txn_scan_blocks'] ?? 0;
+          
+          // Base progress from synced blocks
           batchProgress = (_syncedBlocks * 100.0) / _totalBlocks;
+          
+          // Enhanced progress calculation for finalization phase
+          if (_syncedBlocks >= _totalBlocks) {
+            // During finalization, use trial decryption and txn scan progress
+            final double trialProgress = tdb >= _totalBlocks ? 100.0 : (tdb * 100.0) / _totalBlocks;
+            final double txnScanProgress = tsb >= _totalBlocks ? 100.0 : (tsb * 100.0) / _totalBlocks;
+            
+            // Weighted finalization progress (trial decryption is faster, txn scan takes longer)
+            final double finalizationProgress = (trialProgress * 0.3) + (txnScanProgress * 0.7);
+            
+            // Use the maximum of block sync progress and finalization progress
+            batchProgress = [batchProgress, finalizationProgress].reduce((a, b) => a > b ? a : b);
+            
+            // Cap at 99.5% during finalization to show activity
+            if (tsb < _totalBlocks && batchProgress >= 99.5) {
+              batchProgress = 99.5;
+            }
+          }
+          
           totalProgress = batchProgress;
         }
-
+        
         if (_batchTotal > 0 && _batchNum > 0) {
           final base = ((_batchNum - 1) * 100.0) / _batchTotal;
           totalProgress = base + (batchProgress / _batchTotal);
+          
+          // Enhanced calculation for final batches to show smooth progress
+          if (_batchNum >= (_batchTotal - 2)) {
+            // For the last 3 batches, show more granular progress
+            final int tdb = status['trial_decryptions_blocks'] ?? 0;
+            final int tsb = status['txn_scan_blocks'] ?? 0;
+            
+            if (_totalBlocks > 0 && _syncedBlocks >= _totalBlocks) {
+              // Calculate finalization sub-progress within the current batch
+              final double finalizationSubProgress = _totalBlocks > 0 
+                ? (tsb * 100.0) / _totalBlocks 
+                : 0.0;
+              
+              // Add fine-grained progress within the batch portion
+              final double batchContribution = 100.0 / _batchTotal;
+              final double fineBatchProgress = (finalizationSubProgress / 100.0) * batchContribution;
+              
+              totalProgress = base + fineBatchProgress;
+            }
+          }
         }
-
+        
         _syncProgress = totalProgress.clamp(0.0, 100.0);
 
         // Per-batch checkpoint when batch fully finalized (txn scan caught up)
@@ -1756,11 +1821,24 @@ class WalletProvider with ChangeNotifier {
           final int tsb = status['txn_scan_blocks'] ?? 0;
           if (_totalBlocks > 0 && _syncedBlocks >= _totalBlocks && tdb >= _totalBlocks && tsb < _totalBlocks) {
             _syncMessage = 'Finalizing transactions for batch $_batchNum of $_batchTotal';
+            
+            // Proactive balance refresh during finalization
+            _lastFinalizationRefresh ??= DateTime.now();
+            if (DateTime.now().difference(_lastFinalizationRefresh!).inSeconds > 15) {
+              if (kDebugMode) print('🔄 Proactive balance refresh during finalization');
+              // Schedule refresh without awaiting to avoid blocking sync status updates
+              _refreshWalletData().catchError((e) {
+                if (kDebugMode) print('⚠️ Finalization refresh failed: $e');
+              });
+              _lastFinalizationRefresh = DateTime.now();
+            }
           } else {
             _syncMessage = 'Syncing batch $_batchNum of $_batchTotal';
+            _lastFinalizationRefresh = null; // Reset when not finalizing
           }
         } else {
           _syncMessage = 'Syncing...';
+          _lastFinalizationRefresh = null;
         }
 
         if (kDebugMode) {
