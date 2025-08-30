@@ -91,6 +91,13 @@ class WalletProvider with ChangeNotifier {
   DateTime? _blockHeightCacheTime;
   static const Duration _blockHeightCacheDuration = Duration(seconds: 30);
 
+  // Real blockchain progress tracking
+  int? _blockchainTip;
+  int? _walletBirthday;
+  int? _syncStartBlock;
+  DateTime? _blockchainTipCacheTime;
+  static const Duration _blockchainTipCacheDuration = Duration(minutes: 2);
+
   // Memo notification state
   int _unreadMemoCount = 0;
   BuildContext? _notificationContext;
@@ -317,6 +324,66 @@ class WalletProvider with ChangeNotifier {
   DateTime? get syncStartTime => _syncStartTime;
   double get syncSpeed => _syncSpeed;
   Duration? get estimatedTimeRemaining => _estimatedTimeRemaining;
+
+  // Real blockchain progress getters
+  int? get blockchainTip => _blockchainTip;
+  int? get walletBirthday => _walletBirthday;
+  int? get syncStartBlock => _syncStartBlock;
+  
+  // Enhanced contextual information getters
+  double get realBlockchainProgress {
+    if (_blockchainTip != null && _walletBirthday != null && _walletBirthday! > 0) {
+      final int totalBlocksNeeded = _blockchainTip! - _walletBirthday!;
+      if (totalBlocksNeeded > 0) {
+        final int actualSyncedBlocks = (_syncStartBlock != null && _syncStartBlock! > 0) 
+          ? (_syncStartBlock! - (_syncStartBlock! - _syncedBlocks)).abs()
+          : _syncedBlocks;
+        return ((actualSyncedBlocks * 100.0) / totalBlocksNeeded).clamp(0.0, 100.0);
+      }
+    }
+    return 0.0;
+  }
+  
+  int get blocksRemaining {
+    if (_blockchainTip != null && _walletBirthday != null) {
+      final int totalBlocksNeeded = _blockchainTip! - _walletBirthday!;
+      final int actualSyncedBlocks = (_syncStartBlock != null && _syncStartBlock! > 0) 
+        ? (_syncStartBlock! - (_syncStartBlock! - _syncedBlocks)).abs()
+        : _syncedBlocks;
+      return (totalBlocksNeeded - actualSyncedBlocks).clamp(0, totalBlocksNeeded);
+    }
+    return 0;
+  }
+  
+  String get syncContextMessage {
+    if (_walletBirthday != null && _walletBirthday! > 0) {
+      if (_walletBirthday! > 1900000) { // Recent wallet (2024+)
+        return 'Syncing from wallet creation';
+      } else if (_walletBirthday! > 1000000) { // Older wallet
+        return 'Syncing from your wallet birthday';
+      } else { // Full sync from genesis
+        return 'Syncing entire blockchain';
+      }
+    }
+    return 'Syncing blockchain';
+  }
+  
+  String get technicalDetails {
+    final List<String> details = [];
+    if (_syncedBlocks > 0 && _totalBlocks > 0) {
+      details.add('Batch: $_batchNum/$_batchTotal');
+    }
+    if (_syncedBlocks > 0) {
+      details.add('Blocks: $_syncedBlocks');
+    }
+    if (_blockchainTip != null) {
+      details.add('Tip: $_blockchainTip');
+    }
+    if (_walletBirthday != null) {
+      details.add('Birthday: $_walletBirthday');
+    }
+    return details.join(' | ');
+  }
 
   // Network provider methods
   void setNetworkProvider(NetworkProvider networkProvider) {
@@ -1660,6 +1727,22 @@ class WalletProvider with ChangeNotifier {
         _batchNum = status['batch_num'] ?? 0;
         _batchTotal = status['batch_total'] ?? 0;
 
+        // Track real blockchain position for enhanced progress
+        _syncStartBlock ??= status['start_block'] ?? 0;
+        _walletBirthday ??= _wallet?.birthdayHeight ?? 0;
+        
+        // Get blockchain tip for real progress calculation
+        if (_blockchainTip == null) {
+          _getBlockchainTip().then((tip) {
+            if (tip != null && (_blockchainTip == null || tip > _blockchainTip!)) {
+              _blockchainTip = tip;
+              if (kDebugMode) print('🌐 Blockchain tip updated: $tip');
+            }
+          }).catchError((e) {
+            if (kDebugMode) print('⚠️ Failed to get blockchain tip: $e');
+          });
+        }
+
         // Track movement / detect staleness
         final int tdb = status['trial_decryptions_blocks'] ?? 0;
         final int tsb = status['txn_scan_blocks'] ?? 0;
@@ -1723,9 +1806,31 @@ class WalletProvider with ChangeNotifier {
           }
         }
 
-        // Enhanced progress calculation for final batches
+        // Enhanced progress calculation using real blockchain position
         double batchProgress = 0.0;
         double totalProgress = 0.0;
+        double realBlockchainProgress = 0.0;
+        
+        // Calculate real blockchain progress (from wallet birthday to current tip)
+        if (_blockchainTip != null && _walletBirthday != null && _walletBirthday! > 0) {
+          final int currentSyncedFromBirthday = _syncedBlocks;
+          final int totalBlocksFromBirthday = _blockchainTip! - _walletBirthday!;
+          
+          if (totalBlocksFromBirthday > 0) {
+            // Calculate how many blocks we've actually synced from our starting point
+            final int actualSyncedBlocks = (_syncStartBlock != null && _syncStartBlock! > 0) 
+              ? (_syncStartBlock! - (_syncStartBlock! - _syncedBlocks)).abs()
+              : currentSyncedFromBirthday;
+            
+            realBlockchainProgress = (actualSyncedBlocks * 100.0) / totalBlocksFromBirthday;
+            realBlockchainProgress = realBlockchainProgress.clamp(0.0, 100.0);
+            
+            if (kDebugMode) {
+              print('🌐 Real progress: ${realBlockchainProgress.toStringAsFixed(1)}% '
+                   '($actualSyncedBlocks / $totalBlocksFromBirthday blocks from birthday $_walletBirthday)');
+            }
+          }
+        }
         
         if (_totalBlocks > 0) {
           // Get additional finalization progress indicators
@@ -1781,7 +1886,10 @@ class WalletProvider with ChangeNotifier {
           }
         }
         
-        _syncProgress = totalProgress.clamp(0.0, 100.0);
+        // Use real blockchain progress when available, otherwise fall back to batch progress
+        _syncProgress = (realBlockchainProgress > 0.0 && realBlockchainProgress <= 100.0) 
+          ? realBlockchainProgress 
+          : totalProgress.clamp(0.0, 100.0);
 
         // Per-batch checkpoint when batch fully finalized (txn scan caught up)
         if (_totalBlocks > 0) {
@@ -1814,13 +1922,20 @@ class WalletProvider with ChangeNotifier {
           }
         }
 
-        // Create sync message (BitcoinZ Blue format)
-        if (_batchTotal > 0) {
+        // Create user-friendly sync message with real blockchain progress
+        if (_blockchainTip != null && _walletBirthday != null && realBlockchainProgress > 0) {
+          // Calculate blocks remaining
+          final int totalBlocksNeeded = _blockchainTip! - _walletBirthday!;
+          final int actualSyncedBlocks = (_syncStartBlock != null && _syncStartBlock! > 0) 
+            ? (_syncStartBlock! - (_syncStartBlock! - _syncedBlocks)).abs()
+            : _syncedBlocks;
+          final int blocksRemaining = totalBlocksNeeded - actualSyncedBlocks;
+          
           // If blocks are all downloaded and trial-decrypted but tx scan lags slightly, show finalizing message
           final int tdb = status['trial_decryptions_blocks'] ?? 0;
           final int tsb = status['txn_scan_blocks'] ?? 0;
           if (_totalBlocks > 0 && _syncedBlocks >= _totalBlocks && tdb >= _totalBlocks && tsb < _totalBlocks) {
-            _syncMessage = 'Finalizing transactions for batch $_batchNum of $_batchTotal';
+            _syncMessage = 'Finalizing transactions (${realBlockchainProgress.toStringAsFixed(1)}% complete)';
             
             // Proactive balance refresh during finalization
             _lastFinalizationRefresh ??= DateTime.now();
@@ -1833,17 +1948,50 @@ class WalletProvider with ChangeNotifier {
               _lastFinalizationRefresh = DateTime.now();
             }
           } else {
-            _syncMessage = 'Syncing batch $_batchNum of $_batchTotal';
+            // User-friendly progress message
+            final String progressPercent = realBlockchainProgress.toStringAsFixed(1);
+            
+            if (blocksRemaining > 0) {
+              final String remainingStr = blocksRemaining > 1000 
+                ? '${(blocksRemaining / 1000).toStringAsFixed(0)}k'
+                : '$blocksRemaining';
+              _syncMessage = 'Synced $progressPercent% to current day ($remainingStr blocks remaining)';
+            } else {
+              _syncMessage = 'Synced $progressPercent% to current day';
+            }
             _lastFinalizationRefresh = null; // Reset when not finalizing
           }
+        } else if (_batchTotal > 0) {
+          // Fallback to batch messages when blockchain progress not available
+          final int tdb = status['trial_decryptions_blocks'] ?? 0;
+          final int tsb = status['txn_scan_blocks'] ?? 0;
+          if (_totalBlocks > 0 && _syncedBlocks >= _totalBlocks && tdb >= _totalBlocks && tsb < _totalBlocks) {
+            _syncMessage = 'Finalizing transactions';
+            
+            // Proactive balance refresh during finalization
+            _lastFinalizationRefresh ??= DateTime.now();
+            if (DateTime.now().difference(_lastFinalizationRefresh!).inSeconds > 15) {
+              if (kDebugMode) print('🔄 Proactive balance refresh during finalization');
+              _refreshWalletData().catchError((e) {
+                if (kDebugMode) print('⚠️ Finalization refresh failed: $e');
+              });
+              _lastFinalizationRefresh = DateTime.now();
+            }
+          } else {
+            _syncMessage = 'Syncing blockchain...';
+            _lastFinalizationRefresh = null;
+          }
         } else {
-          _syncMessage = 'Syncing...';
+          _syncMessage = 'Starting sync...';
           _lastFinalizationRefresh = null;
         }
 
         if (kDebugMode) {
           print('📊 $_syncMessage');
-          print('   Batch Progress: ${batchProgress.toStringAsFixed(2)}%. Total progress: ${totalProgress.toStringAsFixed(2)}%.');
+          print('   Real Progress: ${realBlockchainProgress.toStringAsFixed(1)}% | Batch Progress: ${batchProgress.toStringAsFixed(1)}% | Total: ${totalProgress.toStringAsFixed(1)}%');
+          if (_blockchainTip != null && _walletBirthday != null) {
+            print('   Blockchain: Birthday=$_walletBirthday, Tip=$_blockchainTip, Start=$_syncStartBlock');
+          }
           if (_syncSpeed > 0) {
             print('   Sync speed: ${_syncSpeed.toStringAsFixed(1)} blocks/sec');
             if (_estimatedTimeRemaining != null) {
@@ -2609,6 +2757,35 @@ class WalletProvider with ChangeNotifier {
       if (kDebugMode) print('⚠️  Failed to fetch current block height: $e');
       return _cachedBlockHeight; // Return cached value if available
     }
+  }
+
+  /// Get blockchain tip with caching for real progress calculation
+  Future<int?> _getBlockchainTip() async {
+    final now = DateTime.now();
+
+    // Return cached value if still valid
+    if (_blockchainTip != null &&
+        _blockchainTipCacheTime != null &&
+        now.difference(_blockchainTipCacheTime!).compareTo(_blockchainTipCacheDuration) < 0) {
+      return _blockchainTip;
+    }
+
+    // Fetch new blockchain tip from server
+    try {
+      final tip = await _rustService.getCurrentBlockHeight();
+      if (tip > 0) {
+        _blockchainTip = tip;
+        _blockchainTipCacheTime = now;
+        
+        if (kDebugMode) print('📡 Updated blockchain tip: $_blockchainTip');
+        return _blockchainTip;
+      }
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to fetch blockchain tip: $e');
+      return _blockchainTip; // Return cached value if available
+    }
+
+    return _blockchainTip;
   }
 
   /// Calculate real confirmations based on block heights

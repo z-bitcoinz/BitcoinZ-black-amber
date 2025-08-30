@@ -61,9 +61,12 @@ class SyncProgressOverlay extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          provider.batchTotal > 0
-                              ? 'Syncing batch ${provider.batchNum}/${provider.batchTotal} - ${provider.syncProgress.toStringAsFixed(0)}%'
-                              : 'Syncing... ${provider.syncProgress.toStringAsFixed(0)}%',
+                          // Use enhanced sync message if available, otherwise fallback to batch message
+                          provider.syncMessage.isNotEmpty
+                              ? '${provider.syncMessage} - ${provider.syncProgress.toStringAsFixed(0)}%'
+                              : provider.batchTotal > 0
+                                  ? 'Syncing batch ${provider.batchNum}/${provider.batchTotal} - ${provider.syncProgress.toStringAsFixed(0)}%'
+                                  : 'Syncing... ${provider.syncProgress.toStringAsFixed(0)}%',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Colors.white70,
                             fontWeight: FontWeight.w500,

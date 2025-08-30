@@ -59,6 +59,12 @@ class _SyncStatusCardState extends State<SyncStatusCard>
     }
     
     if (provider.isSyncing) {
+      // Use enhanced sync message if available
+      if (provider.syncMessage.isNotEmpty) {
+        return provider.syncMessage;
+      }
+      
+      // Fallback to batch display if enhanced message not available
       if (provider.batchTotal > 0) {
         return 'Syncing batch ${provider.batchNum}/${provider.batchTotal}';
       }
@@ -204,6 +210,13 @@ class _SyncStatusCardState extends State<SyncStatusCard>
                                   'Blocks: ${provider.syncedBlocks}',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
+                                if (provider.batchTotal > 0)
+                                  Text(
+                                    'Batch: ${provider.batchNum}/${provider.batchTotal}',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                    ),
+                                  ),
                                 Text(
                                   'Total: ${provider.totalBlocks}',
                                   style: Theme.of(context).textTheme.bodySmall,
