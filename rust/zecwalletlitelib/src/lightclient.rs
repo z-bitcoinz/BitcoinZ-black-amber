@@ -509,8 +509,9 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightClient<P> {
     }
 
     pub async fn do_save(&self, grab_lock: bool) -> Result<(), String> {
-        // On mobile platforms, disable the save, because the saves will be handled by the native layer, and not in rust
-        if cfg!(all(not(target_os = "ios"), not(target_os = "android"))) {
+        // Enable saving on all platforms including mobile
+        // This is required for wallet persistence on Android/iOS
+        if true {
             // If the wallet is encrypted but unlocked, lock it again.
             {
                 if self.wallet.is_encrypted().await && self.wallet.is_unlocked_for_spending().await {
@@ -1358,6 +1359,11 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightClient<P> {
 
         // Mark the sync data as finished, which should clear everything
         self.bsync_data.read().await.finish().await;
+
+        // Save wallet after sync completes to persist state
+        if let Err(e) = self.do_save(true).await {
+            error!("Failed to save wallet after sync: {}", e);
+        }
 
         sync_result
     }

@@ -2233,6 +2233,14 @@ class WalletProvider with ChangeNotifier {
 
         if (kDebugMode) print('✅ Wallet data refresh complete');
 
+        // Save wallet state to disk for persistence
+        try {
+          await _rustService.save();
+          if (kDebugMode) print('💾 Wallet saved to disk');
+        } catch (saveError) {
+          if (kDebugMode) print('⚠️ Failed to save wallet: $saveError');
+        }
+
         // Rust operations succeeded - let the periodic connection check handle status
         if (kDebugMode) print('✅ Wallet data refresh successful');
         _updateLastSuccessfulOperation();

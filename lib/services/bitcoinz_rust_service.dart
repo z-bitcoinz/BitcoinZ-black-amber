@@ -542,6 +542,8 @@ class BitcoinzRustService {
       if (kDebugMode) print('❌ Sync failed: $e');
     } finally {
       _isSyncing = false;
+      // Save wallet after sync to persist state
+      await save();
     }
   }
   
