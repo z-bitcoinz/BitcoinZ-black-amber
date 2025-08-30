@@ -588,8 +588,8 @@ class AuthProvider with ChangeNotifier {
   }
   
   /// Get stored wallet data
+  /// Note: This data does not contain the seed phrase and is safe to read pre-auth for faster startup
   Future<Map<String, dynamic>?> getStoredWalletData() async {
-    if (!_isAuthenticated) return null;
     final dataString = await StorageService.read(key: _walletDataKey);
     if (dataString != null) {
       try {

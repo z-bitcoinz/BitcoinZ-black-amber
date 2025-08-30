@@ -464,24 +464,40 @@ class BitcoinzRustService {
     if (kDebugMode) print('🔄 Full refresh via Rust...');
     
     try {
-      // Skip sync if already syncing to prevent interruption
-      if (!_isSyncing) {
-        // Sync with network
-        await sync();
-      } else {
-        if (kDebugMode) print('⏭️ Skipping sync - already in progress');
+      // Decide if we actually need a sync before calling it
+      bool needsSync = false;
+      try {
+        final statusStr = await Future<String>(() => rust_api.getSyncStatus()).timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => '{}',
+        );
+        if (statusStr.isNotEmpty && statusStr != '{}') {
+          final data = jsonDecode(statusStr) as Map<String, dynamic>;
+          final inProgress = data['in_progress'] == true;
+          final total = (data['total_blocks'] ?? 0) as int;
+          final synced = (data['synced_blocks'] ?? 0) as int;
+          needsSync = inProgress || (total > 0 && synced < total);
+        }
+      } catch (_) {
+        // If status fails, be conservative and do not force sync immediately
       }
-      
-      // Fetch all data in parallel for better performance  
+
+      if (needsSync && !_isSyncing) {
+        await sync();
+      } else if (kDebugMode) {
+        print('⏭️ refresh(): No sync needed now (inProgress=$_isSyncing / needsSync=$needsSync)');
+      }
+
+      // Fetch all data in parallel for better performance
       await Future.wait([
         fetchBalance(),
-        fetchTransactions(), 
+        fetchTransactions(),
         fetchAddresses(),
       ]);
-      
+
       // Save wallet
       await save();
-      
+
       if (kDebugMode) print('✅ Full refresh complete');
     } catch (e) {
       if (kDebugMode) print('❌ Full refresh failed: $e');
