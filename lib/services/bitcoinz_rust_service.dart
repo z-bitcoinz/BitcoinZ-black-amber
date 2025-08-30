@@ -87,6 +87,13 @@ class BitcoinzRustService {
     int? birthdayHeight,
   }) async {
     try {
+      print('🔧 RUST_SERVICE DEBUG: initialize() called');
+      print('🔧 RUST_SERVICE DEBUG: serverUri: $serverUri');
+      print('🔧 RUST_SERVICE DEBUG: seedPhrase: ${seedPhrase != null ? "[EXISTS ${seedPhrase!.length} chars]" : "null"}');
+      print('🔧 RUST_SERVICE DEBUG: createNew: $createNew');
+      print('🔧 RUST_SERVICE DEBUG: birthdayHeight: $birthdayHeight');
+      print('🔧 RUST_SERVICE DEBUG: Platform: ${Platform.operatingSystem}');
+      
       if (kDebugMode) {
         print('🚀 Initializing Rust Bridge...');
         print('🎂 ANDROID BIRTHDAY FIX: Critical parameter analysis:');
@@ -246,14 +253,31 @@ class BitcoinzRustService {
             print('   🎯 ROOT CAUSE FIX: This was the missing birthday parameter!');
           }
           
-          // Use the full function with wallet directory
+          // Use the full function with wallet directory with timeout
+          print('🔧 RUST_SERVICE DEBUG: About to call rust_api.initializeFromPhrase');
+          print('🔧 RUST_SERVICE DEBUG: Parameters:');
+          print('   serverUri: $serverUri');
+          print('   seedPhrase length: ${seedPhrase.length}');
+          print('   birthday: ${BigInt.from(birthdayToUse)}');
+          print('   overwrite: true');
+          print('   walletDir: $walletDirPath');
+          
           result = await rust_api.initializeFromPhrase(
             serverUri: serverUri,
             seedPhrase: seedPhrase,
             birthday: BigInt.from(birthdayToUse), // Use provided birthday or 0
             overwrite: true, // Overwrite if exists
             walletDir: walletDirPath,
+          ).timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              if (kDebugMode) print('⏱️ Wallet restore timed out after 30 seconds');
+              print('🔧 RUST_SERVICE DEBUG: RUST FFI CALL TIMED OUT!');
+              return 'Error: Wallet restore timed out';
+            },
           );
+          
+          print('🔧 RUST_SERVICE DEBUG: rust_api.initializeFromPhrase returned: $result');
         } catch (e) {
           if (kDebugMode) print('⚠️ Restore with custom directory failed: $e');
           return false;
@@ -1373,6 +1397,8 @@ class BitcoinzRustService {
       try {
         final status = jsonDecode(statusStr);
         if (status is Map<String, dynamic>) {
+          // Check for stuck finalization and force save
+          await _checkForStuckFinalization(status);
           return status;
         }
       } catch (e) {
@@ -1454,6 +1480,63 @@ class BitcoinzRustService {
     }
   }
   
+  DateTime? _lastFinalizationTime;
+  int _stuckFinalizationCount = 0;
+  
+  /// Check if sync is stuck in finalization and force save
+  Future<void> _checkForStuckFinalization(Map<String, dynamic> syncData) async {
+    try {
+      final syncedBlocks = syncData['synced_blocks'] as int? ?? 0;
+      final totalBlocks = syncData['total_blocks'] as int? ?? 0;
+      final txnScanBlocks = syncData['txn_scan_blocks'] as int? ?? 0;
+      
+      // Check if we have a stuck finalization (blocks synced but txn scan incomplete)
+      final isStuckFinalization = syncedBlocks == totalBlocks && 
+                                  totalBlocks > 0 && 
+                                  txnScanBlocks < totalBlocks &&
+                                  (totalBlocks - txnScanBlocks) <= 5; // Within 5 transactions of completion
+      
+      if (isStuckFinalization) {
+        final now = DateTime.now();
+        if (_lastFinalizationTime == null) {
+          _lastFinalizationTime = now;
+          _stuckFinalizationCount = 1;
+          if (kDebugMode) print('🚨 Detected stuck finalization - starting timer');
+        } else {
+          final timeSinceStuck = now.difference(_lastFinalizationTime!).inSeconds;
+          _stuckFinalizationCount++;
+          
+          if (kDebugMode) print('🚨 Stuck finalization: ${timeSinceStuck}s, count: $_stuckFinalizationCount');
+          
+          // If stuck for more than 30 seconds, force save
+          if (timeSinceStuck > 30) {
+            if (kDebugMode) print('🔧 FORCING SAVE due to stuck finalization');
+            await _forceSave();
+            _lastFinalizationTime = null; // Reset timer
+            _stuckFinalizationCount = 0;
+          }
+        }
+      } else {
+        // Reset if not stuck
+        _lastFinalizationTime = null;
+        _stuckFinalizationCount = 0;
+      }
+    } catch (e) {
+      if (kDebugMode) print('❌ Error checking stuck finalization: $e');
+    }
+  }
+  
+  /// Force save wallet data
+  Future<void> _forceSave() async {
+    try {
+      if (kDebugMode) print('💾 Force saving wallet...');
+      final result = await rust_api.execute(command: 'save', args: '');
+      if (kDebugMode) print('💾 Force save result: $result');
+    } catch (e) {
+      if (kDebugMode) print('❌ Force save failed: $e');
+    }
+  }
+
   /// Dispose and cleanup
   Future<void> dispose() async {
     stopTimers();

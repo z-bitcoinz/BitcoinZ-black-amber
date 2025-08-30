@@ -585,26 +585,55 @@ class WalletProvider with ChangeNotifier {
 
   /// Restore wallet from seed phrase
   Future<void> restoreWallet(String seedPhrase, {int birthdayHeight = 0, AuthProvider? authProvider}) async {
+    print('📱 WALLET_PROVIDER DEBUG: restoreWallet called');
+    print('📱 WALLET_PROVIDER DEBUG: seedPhrase length: ${seedPhrase.length}');
+    print('📱 WALLET_PROVIDER DEBUG: birthdayHeight: $birthdayHeight');
+    print('📱 WALLET_PROVIDER DEBUG: currentServerUrl: $currentServerUrl');
+    
     _setLoading(true);
     _clearError();
 
     try {
-      // Restore wallet directly via Rust Bridge
+      // Restore wallet directly via Rust Bridge with timeout
       if (kDebugMode) print('🦀 Restoring wallet via Rust Bridge...');
+      print('📱 WALLET_PROVIDER DEBUG: About to call _rustService.initialize...');
+      
       final rustInitialized = await _rustService.initialize(
         serverUri: currentServerUrl,
         seedPhrase: seedPhrase,
         createNew: false,
         birthdayHeight: birthdayHeight,
+      ).timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          if (kDebugMode) print('⏱️ Wallet restore initialization timed out');
+          print('📱 WALLET_PROVIDER DEBUG: TIMEOUT after 45 seconds');
+          return false;
+        },
       );
+      
+      print('📱 WALLET_PROVIDER DEBUG: _rustService.initialize returned: $rustInitialized');
 
       if (!rustInitialized) {
         throw Exception('Failed to restore wallet via Rust Bridge');
       }
 
-      // Refresh wallet data from Rust to get real addresses
-      await _refreshWalletData();
-      await _checkConnection();
+      // Skip data refresh for new wallet restore to prevent hanging
+      // The wallet was just initialized, so we'll get minimal data without sync calls
+      print('📱 WALLET_PROVIDER DEBUG: Skipping _refreshWalletData() for restore to prevent hanging');
+      print('📱 WALLET_PROVIDER DEBUG: Getting basic addresses from Rust service...');
+      
+      try {
+        // Just get addresses without full data refresh to prevent hanging
+        await _rustService.fetchAddresses();
+        print('📱 WALLET_PROVIDER DEBUG: Basic address fetch completed');
+      } catch (e) {
+        print('📱 WALLET_PROVIDER DEBUG: Address fetch failed: $e');
+        // Continue anyway - we can still create the wallet
+      }
+      
+      // Skip connection check too - it's not critical for wallet creation
+      print('📱 WALLET_PROVIDER DEBUG: Skipping _checkConnection() for restore');
 
       // Create wallet model with real data from Rust
       final walletId = const Uuid().v4();
@@ -2195,11 +2224,14 @@ class WalletProvider with ChangeNotifier {
   /// Private helper methods
   Future<void> _refreshWalletData() async {
     if (kDebugMode) print('🔄 _refreshWalletData called...');
+    print('📱 WALLET_PROVIDER DEBUG: _refreshWalletData() entered');
+    print('📱 WALLET_PROVIDER DEBUG: _rustService.initialized = ${_rustService.initialized}');
 
     // Ensure Rust is initialized on app restart so balance/tx load correctly
     if (!_rustService.initialized) {
       try {
         if (kDebugMode) print('   Rust not initialized; attempting background load of existing wallet...');
+        print('📱 WALLET_PROVIDER DEBUG: Rust not initialized, calling initialize...');
         final ok = await _rustService.initialize(
           serverUri: currentServerUrl,
           createNew: false,
@@ -2207,9 +2239,13 @@ class WalletProvider with ChangeNotifier {
           birthdayHeight: null,
         );
         if (kDebugMode) print('   Background initialize existing wallet result: $ok');
+        print('📱 WALLET_PROVIDER DEBUG: Background initialize result: $ok');
       } catch (e) {
         if (kDebugMode) print('   ⚠️ Background initialize failed: $e');
+        print('📱 WALLET_PROVIDER DEBUG: Background initialize failed: $e');
       }
+    } else {
+      print('📱 WALLET_PROVIDER DEBUG: Rust already initialized, skipping');
     }
 
     // Always use Rust Bridge for all wallets (provides mempool monitoring)
@@ -2223,12 +2259,17 @@ class WalletProvider with ChangeNotifier {
         // The sync is hanging on Android, so we'll fetch data without syncing
 
         if (kDebugMode) print('   Fetching balance...');
+        print('📱 WALLET_PROVIDER DEBUG: About to call _rustService.fetchBalance()...');
         await _rustService.fetchBalance();
+        print('📱 WALLET_PROVIDER DEBUG: fetchBalance() completed');
 
         if (kDebugMode) print('   Fetching transactions...');
+        print('📱 WALLET_PROVIDER DEBUG: About to call _rustService.fetchTransactions()...');
         await _rustService.fetchTransactions();
+        print('📱 WALLET_PROVIDER DEBUG: fetchTransactions() completed');
 
         if (kDebugMode) print('   Fetching addresses...');
+        print('📱 WALLET_PROVIDER DEBUG: About to fetch addresses...');
         await _rustService.fetchAddresses();
 
         if (kDebugMode) print('✅ Wallet data refresh complete');

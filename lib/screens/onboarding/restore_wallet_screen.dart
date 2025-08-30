@@ -106,7 +106,10 @@ class _RestoreWalletScreenState extends State<RestoreWalletScreen>
     });
 
     try {
+      print('🚀 RESTORE DEBUG: Starting wallet restore process');
+      
       if (!_validateSeedPhrase()) {
+        print('❌ RESTORE DEBUG: Seed phrase validation failed');
         setState(() {
           _isRestoring = false;
         });
@@ -114,11 +117,17 @@ class _RestoreWalletScreenState extends State<RestoreWalletScreen>
       }
 
       final birthdayHeight = int.tryParse(_birthdayController.text) ?? 0;
+      print('🚀 RESTORE DEBUG: Birthday height: $birthdayHeight');
+      print('🚀 RESTORE DEBUG: Seed phrase length: ${_seedPhrase.split(' ').length} words');
       
       // Restore wallet with the seed phrase
+      print('🚀 RESTORE DEBUG: Getting providers...');
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      print('🚀 RESTORE DEBUG: Calling walletProvider.restoreWallet...');
       await walletProvider.restoreWallet(_seedPhrase, birthdayHeight: birthdayHeight, authProvider: authProvider);
+      print('🚀 RESTORE DEBUG: walletProvider.restoreWallet completed successfully');
 
       if (mounted) {
         // Show success dialog for a cohesive experience
@@ -148,10 +157,26 @@ class _RestoreWalletScreenState extends State<RestoreWalletScreen>
         );
       }
     } catch (e) {
+      print('❌ RESTORE DEBUG: Exception caught: $e');
+      print('❌ RESTORE DEBUG: Exception type: ${e.runtimeType}');
+      print('❌ RESTORE DEBUG: Stack trace: ${StackTrace.current}');
+      
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to restore wallet: $e';
+          // Provide more user-friendly error messages
+          String userMessage;
+          if (e.toString().contains('timeout') || e.toString().contains('timed out')) {
+            userMessage = 'Wallet restore timed out. Please check your internet connection and try again.';
+          } else if (e.toString().contains('Failed to restore wallet via Rust Bridge')) {
+            userMessage = 'Unable to restore wallet. Please check your seed phrase and try again.';
+          } else {
+            userMessage = 'Failed to restore wallet: ${e.toString().replaceAll('Exception: ', '')}';
+          }
+          _errorMessage = userMessage;
           _isRestoring = false;
+          
+          print('❌ RESTORE DEBUG: Set error message: $userMessage');
+          print('❌ RESTORE DEBUG: _isRestoring set to false');
         });
       }
     }
