@@ -2100,6 +2100,12 @@ class WalletProvider with ChangeNotifier {
         }
       }
 
+      // Enhanced notification debug for sync progress
+      if (kDebugMode && _isSyncing) {
+        print('🔔 Calling notifyListeners() - Progress: ${_syncProgress.toStringAsFixed(1)}%, Message: "$_syncMessage"');
+        print('   Syncing: $_isSyncing, Batch: $_batchNum/$_batchTotal');
+      }
+      
       notifyListeners();
     } catch (e) {
       if (kDebugMode) print('❌ Failed to update sync status: $e');

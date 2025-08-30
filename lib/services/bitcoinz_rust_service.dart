@@ -283,7 +283,38 @@ class BitcoinzRustService {
           return false;
         }
         
-        if (result != 'OK' && !result.contains('seed')) {
+        if (result.contains('Cannot create a new wallet from seed, because a wallet already exists')) {
+          if (kDebugMode) print('⚠️ Existing wallet detected, attempting to deinitialize and retry...');
+          
+          // Deinitialize existing wallet first
+          try {
+            final deinitResult = await rust_api.deinitialize();
+            if (kDebugMode) print('🔄 Deinitialize result: $deinitResult');
+          } catch (e) {
+            if (kDebugMode) print('⚠️ Deinitialize failed: $e');
+          }
+          
+          // Try restoration again
+          try {
+            result = await rust_api.initializeFromPhrase(
+              serverUri: serverUri,
+              seedPhrase: seedPhrase,
+              birthday: BigInt.from(birthdayHeight ?? 0),
+              overwrite: true,
+              walletDir: walletDirPath,
+            ).timeout(
+              const Duration(seconds: 30),
+              onTimeout: () => 'Error: Wallet restore timed out',
+            );
+            
+            if (kDebugMode) print('🔧 RUST_SERVICE DEBUG: Retry result: $result');
+          } catch (e) {
+            if (kDebugMode) print('❌ Retry restoration failed: $e');
+            return false;
+          }
+        }
+        
+        if (result != 'OK' && !result.contains('seed') && !result.contains('Cannot create')) {
           if (kDebugMode) print('❌ Failed to restore wallet: $result');
           return false;
         }
