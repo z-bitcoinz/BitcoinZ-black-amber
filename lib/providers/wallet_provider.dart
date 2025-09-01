@@ -18,10 +18,10 @@ import '../models/address_label.dart';
 import '../services/database_service.dart';
 import '../services/bitcoinz_rust_service.dart';
 import '../providers/auth_provider.dart';
+import '../src/rust/api.dart' as rust_api;
 import '../providers/network_provider.dart';
 import '../screens/wallet/paginated_transaction_history_screen.dart';
 import '../utils/constants.dart';
-import '../src/rust/api.dart' as rust_api;
 
 class WalletProvider with ChangeNotifier {
   WalletModel? _wallet;
@@ -742,6 +742,13 @@ class WalletProvider with ChangeNotifier {
       _setSyncing(true);
       _startSyncStatusPolling();
 
+      // Immediately show sync progress indication
+      _setSyncing(true);
+      _syncMessage = 'Initializing sync...';
+      _syncProgress = 0.1; // Show small initial progress
+      if (kDebugMode) print('🔔 IMMEDIATE: Setting initial sync progress display');
+      notifyListeners(); // Immediate UI update
+      
       // Trigger an immediate sync/update cycle
       Future(() async {
         try {
@@ -749,6 +756,16 @@ class WalletProvider with ChangeNotifier {
           await _updateSyncStatus();
           // Then trigger a sync to ensure progress advances during restoration
           await _rustService.sync();
+          
+          // Force sync progress display immediately after sync trigger
+          if (!_isSyncing) {
+            _setSyncing(true);
+            _syncMessage = 'Starting blockchain sync...';
+            _syncProgress = 0.2;
+            if (kDebugMode) print('🔔 FORCED: Setting sync progress after sync trigger');
+            notifyListeners();
+          }
+          
           // Update status again and refresh data
           await _updateSyncStatus();
           await _refreshWalletData();
@@ -847,9 +864,19 @@ class WalletProvider with ChangeNotifier {
         birthdayHeight: null, // Will be set later during full restoration
       );
 
-      if (result && kDebugMode) {
-        print('✅ Background initialization started successfully');
-        print('   Wallet will continue syncing while PIN is entered');
+      if (result) {
+        // Ensure the UI starts polling and shows progress while Rust is syncing
+        _setSyncing(true);
+        _syncMessage = 'Initializing sync...';
+        _syncProgress = 0.1; // small visible progress to indicate activity
+        _startSyncStatusPolling();
+        notifyListeners();
+
+        if (kDebugMode) {
+          print('✅ Background initialization started successfully');
+          print('   Wallet will continue syncing while PIN is entered');
+          print('🔄 Started sync status polling from background init path');
+        }
       }
 
     } catch (e) {
@@ -1014,6 +1041,15 @@ class WalletProvider with ChangeNotifier {
 
           // Notify UI immediately with cached data
           notifyListeners();
+
+          // IMMEDIATE SYNC PROGRESS: Add same immediate display as restoreWallet
+          // This fixes the 10-15 second delay when reopening the app during sync
+          _setSyncing(true);
+          _syncMessage = 'Initializing sync...';
+          _syncProgress = 0.1; // Show small initial progress
+          _syncStartTime = DateTime.now(); // Track app reopen time for sync progress persistence
+          if (kDebugMode) print('🔔 APP REOPEN: Setting immediate sync progress display');
+          notifyListeners(); // Immediate UI update
 
           // DEFENSIVE: Mark this wallet as "locked in" to prevent resets during Rust init
           _walletLocked = true;
@@ -1236,6 +1272,23 @@ class WalletProvider with ChangeNotifier {
 
         // Start auto-sync after restoration
         startAutoSync();
+
+        // FORCED SYNC PROGRESS: Add same immediate display as restoreWallet after sync trigger
+        // This ensures consistent behavior between wallet restoration and app reopen
+        Future(() async {
+          try {
+            // Force sync progress display immediately after sync trigger
+            if (!_isSyncing) {
+              _setSyncing(true);
+              _syncMessage = 'Starting blockchain sync...';
+              _syncProgress = 0.2;
+              if (kDebugMode) print('🔔 APP REOPEN FORCED: Setting sync progress after sync trigger');
+              notifyListeners();
+            }
+          } catch (e) {
+            if (kDebugMode) print('App reopen sync progress error: $e');
+          }
+        });
 
         // Don't call notifyListeners() here since we already called it after creating wallet model
 
@@ -1660,16 +1713,33 @@ class WalletProvider with ChangeNotifier {
     }
 
     try {
-      final status = await _rustService.getSyncStatus();
+      // FIXED: Use detailed sync status API instead of basic getSyncStatus()
+      // The basic API incorrectly returns in_progress: false while real sync is happening
+      Map<String, dynamic>? status;
+      
+      try {
+        // Get detailed sync status using the execute API which contains real progress data
+        final result = await rust_api.execute(command: 'syncstatus', args: '');
+        if (kDebugMode) print('📊 Raw detailed sync status: $result');
+
+        // Parse the detailed sync data. IMPORTANT: don't gate on substring 'error'
+        // because valid JSON contains "last_error": null which trips the check.
+        if (result.isNotEmpty) {
+          status = _parseDetailedSyncStatus(result);
+        }
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Detailed sync status failed, falling back to basic: $e');
+        // Fallback to basic status if detailed fails
+        status = await _rustService.getSyncStatus();
+      }
+      
       if (status == null) {
         if (kDebugMode) print('⚠️ No sync status available');
         return;
       }
 
-      // NOTE: Basic sync status can be cached, so we check for REAL activity below
-
       if (kDebugMode) {
-        print('📊 Sync status update: $status');
+        print('📊 Processed sync status: $status');
       }
 
       bool inProgress = status['in_progress'] ?? false;
@@ -2000,26 +2070,96 @@ class WalletProvider with ChangeNotifier {
           }
         }
       } else {
-        // Treat as complete. Avoid disconnect flicker here and finish cleanly.
-        _stopSyncStatusPolling();
-        if (kDebugMode) print('📊 Sync completed');
+        // Check if we have meaningful sync data even when in_progress=false
+        final int sb = status['synced_blocks'] ?? 0;
+        final int tb = status['total_blocks'] ?? 0;
+        final int bn = status['batch_num'] ?? 0;
+        final int bt = status['batch_total'] ?? 0;
+        final bool hasActiveSyncData = (sb > 0 || tb > 0 || bn > 0);
 
-        // Clear sync progress
-        _syncProgress = 0.0;
-        _syncMessage = '';
-        _lastSyncTime = DateTime.now();
+        // ENHANCED: Keep showing sync progress after app reopen only when there is active data
+        final bool recentlyReopened = (_syncStartTime != null &&
+            DateTime.now().difference(_syncStartTime!).inSeconds < 30);
 
-        // Reset all sync tracking
-        _syncStartTime = null;
-        _syncSpeed = 0.0;
-        _estimatedTimeRemaining = null;
-        _syncedBlocks = 0;
-        _totalBlocks = 0;
-        _batchNum = 0;
-        _batchTotal = 0;
+        // Treat as complete when in_progress=false and all blocks are synced (sb >= tb)
+        final bool isComplete = (sb >= tb);
+        if (hasActiveSyncData && !isComplete) {
+          if (kDebugMode) {
+            if (recentlyReopened) {
+              print('📊 APP REOPEN: Keeping sync progress visible for 30 seconds after reopen');
+            } else {
+              print('📊 Sync paused but has active data - continuing to show progress');
+            }
+          }
 
-        // Immediately clear syncing flag - don't delay
-        _setSyncing(false);
+          // Keep showing sync progress with current data
+          _setSyncing(true);
+          _syncedBlocks = sb;
+          _totalBlocks = tb;
+          _batchNum = bn;
+          _batchTotal = bt;
+
+          // Calculate and display progress like in active sync
+          double batchProgress = 0.0;
+          double totalProgress = 0.0;
+
+          if (tb > 0) {
+            batchProgress = (sb * 100.0) / tb;
+            batchProgress = batchProgress.clamp(0.0, 100.0);
+          }
+
+          totalProgress = batchProgress;
+          if (bt > 0 && bn > 0) {
+            final base = ((bn - 1) * 100.0) / bt;
+            totalProgress = base + (batchProgress / bt);
+          }
+
+          // Keep syncProgress in 0..100 scale (consistent across UI)
+          _syncProgress = totalProgress.clamp(0.0, 100.0);
+
+          // Enhanced message for app reopen vs active sync
+          if (recentlyReopened && (sb == 0 && tb == 0 && bn == 0 && bt == 0)) {
+            _syncMessage = 'Resuming sync...';
+          } else if (bt > 0) {
+            _syncMessage = 'Syncing batch $bn/$bt (${batchProgress.toStringAsFixed(1)}%)...';
+          } else {
+            _syncMessage = 'Syncing blockchain (${batchProgress.toStringAsFixed(1)}%)...';
+          }
+
+          if (kDebugMode) print('📊 APP REOPEN PROGRESS: ${_syncMessage} (${_syncProgress.toStringAsFixed(1)}%)');
+
+        } else {
+          // Truly complete - show brief completion message, then clear UI
+          _stopSyncStatusPolling();
+          if (kDebugMode) print('📊 Sync completed');
+
+          // Show a short "Sync completed" message on the card
+          _setSyncing(true); // keep card visible briefly
+          _syncMessage = 'Sync completed';
+          _syncProgress = 100.0; // hide top overlay during completion toast
+          _lastSyncTime = DateTime.now();
+          notifyListeners();
+
+          // Reset all sync tracking values immediately (safe)
+          _syncStartTime = null;
+          _syncSpeed = 0.0;
+          _estimatedTimeRemaining = null;
+          _syncedBlocks = 0;
+          _totalBlocks = 0;
+          _batchNum = 0;
+          _batchTotal = 0;
+
+          // After a short delay, clear the message and hide the card
+          Future.delayed(const Duration(milliseconds: 1200), () {
+            // Only clear if a new sync hasn't started in the meantime
+            if (_syncStatusTimer == null && _syncMessage == 'Sync completed') {
+              _syncProgress = 0.0;
+              _syncMessage = '';
+              _setSyncing(false);
+              notifyListeners();
+            }
+          });
+        }
 
         // Refresh wallet data after sync
         if (!(status['timeout'] ?? false)) {
@@ -2109,6 +2249,91 @@ class WalletProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       if (kDebugMode) print('❌ Failed to update sync status: $e');
+    }
+  }
+
+  /// Parse detailed sync status from Rust execute('syncstatus') command
+  /// Handles both JSON format: {"sync_id": 1, "in_progress": true, ...}
+  /// And text format: "id: 1, batch: 0/28, blocks: 8499/30000, decryptions: 8650, tx_scan: 0"
+  Map<String, dynamic> _parseDetailedSyncStatus(String rawStatus) {
+    try {
+      if (kDebugMode) print('🔍 Parsing detailed sync status: $rawStatus');
+      
+      // Try JSON format first (current format)
+      if (rawStatus.trim().startsWith('{')) {
+        final Map<String, dynamic> jsonData = jsonDecode(rawStatus);
+        
+        if (kDebugMode) {
+          print('🔍 Parsed JSON sync data: '
+               'batch=${jsonData['batch_num']}/${jsonData['batch_total']}, '
+               'blocks=${jsonData['synced_blocks']}/${jsonData['total_blocks']}, '
+               'in_progress=${jsonData['in_progress']}');
+        }
+        
+        // JSON already contains all the data we need
+        return jsonData;
+      }
+      
+      // Fallback: Parse text format (legacy format)
+      final Map<String, dynamic> parsed = {};
+      
+      // Parse batch information: "batch: 0/28"
+      final batchMatch = RegExp(r'batch:\s*(\d+)/(\d+)').firstMatch(rawStatus);
+      if (batchMatch != null) {
+        parsed['batch_num'] = int.parse(batchMatch.group(1)!);
+        parsed['batch_total'] = int.parse(batchMatch.group(2)!);
+      }
+      
+      // Parse blocks information: "blocks: 8499/30000"
+      final blocksMatch = RegExp(r'blocks:\s*(\d+)/(\d+)').firstMatch(rawStatus);
+      if (blocksMatch != null) {
+        parsed['synced_blocks'] = int.parse(blocksMatch.group(1)!);
+        parsed['total_blocks'] = int.parse(blocksMatch.group(2)!);
+      }
+      
+      // Parse decryptions: "decryptions: 8650"
+      final decryptionsMatch = RegExp(r'decryptions:\s*(\d+)').firstMatch(rawStatus);
+      if (decryptionsMatch != null) {
+        parsed['trial_decryptions_blocks'] = int.parse(decryptionsMatch.group(1)!);
+      }
+      
+      // Parse tx_scan: "tx_scan: 0"
+      final txScanMatch = RegExp(r'tx_scan:\s*(\d+)').firstMatch(rawStatus);
+      if (txScanMatch != null) {
+        parsed['txn_scan_blocks'] = int.parse(txScanMatch.group(1)!);
+      }
+      
+      // Parse sync ID: "id: 1"
+      final idMatch = RegExp(r'id:\s*(\d+)').firstMatch(rawStatus);
+      if (idMatch != null) {
+        parsed['sync_id'] = int.parse(idMatch.group(1)!);
+      }
+      
+      // Determine if sync is actually in progress based on real data
+      final int batchNum = parsed['batch_num'] ?? 0;
+      final int batchTotal = parsed['batch_total'] ?? 0;
+      final int syncedBlocks = parsed['synced_blocks'] ?? 0;
+      final int totalBlocks = parsed['total_blocks'] ?? 0;
+      
+      // Sync is in progress if:
+      // 1. We have valid batch/block data AND
+      // 2. Either batches are incomplete OR blocks are incomplete
+      final bool hasValidData = (batchTotal > 0 || totalBlocks > 0);
+      final bool batchesIncomplete = (batchTotal > 0 && batchNum < batchTotal);
+      final bool blocksIncomplete = (totalBlocks > 0 && syncedBlocks < totalBlocks);
+      
+      parsed['in_progress'] = hasValidData && (batchesIncomplete || blocksIncomplete);
+      
+      if (kDebugMode) {
+        print('🔍 Parsed text sync data: batch=$batchNum/$batchTotal, blocks=$syncedBlocks/$totalBlocks, in_progress=${parsed['in_progress']}');
+      }
+      
+      return parsed;
+      
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to parse detailed sync status: $e');
+      // Return empty map to trigger fallback to basic status
+      return {};
     }
   }
 

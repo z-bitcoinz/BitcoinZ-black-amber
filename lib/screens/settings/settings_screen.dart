@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
 import 'currency_settings_screen.dart';
 import 'change_pin_screen.dart';
 import 'backup_wallet_screen.dart';
@@ -13,6 +14,13 @@ import '../../providers/auth_provider.dart';
 import '../../providers/network_provider.dart';
 import '../../providers/contact_provider.dart';
 import '../../providers/interface_provider.dart';
+import '../../providers/wallet_provider.dart';
+
+import '../../services/bitcoinz_rust_service.dart';
+import '../../services/database_service.dart';
+import '../../services/storage_service.dart';
+import '../../services/wallet_storage_service.dart';
+import '../onboarding/welcome_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -95,9 +103,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Network settings
               Consumer<NetworkProvider>(
                 builder: (context, networkProvider, child) {
@@ -139,9 +147,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Security settings
               _buildSettingsSection(
                 title: 'Security',
@@ -167,13 +175,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         builder: (context, snapshot) {
                           final isAvailable = snapshot.data ?? false;
                           if (!isAvailable) return const SizedBox.shrink();
-                          
+
                           return _buildSettingsTile(
                             context: context,
                             icon: Icons.fingerprint,
                             title: 'Biometric Authentication',
-                            subtitle: authProvider.biometricsEnabled 
-                                ? 'Enabled' 
+                            subtitle: authProvider.biometricsEnabled
+                                ? 'Enabled'
                                 : 'Disabled',
                             trailing: Switch(
                               value: authProvider.biometricsEnabled,
@@ -204,9 +212,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Contacts section
               Consumer<ContactProvider>(
                 builder: (context, contactProvider, child) {
@@ -217,8 +225,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context: context,
                         icon: Icons.backup,
                         title: 'Backup & Restore Contacts',
-                        subtitle: contactProvider.hasContacts 
-                            ? '${contactProvider.contactsCount} contact${contactProvider.contactsCount == 1 ? '' : 's'}' 
+                        subtitle: contactProvider.hasContacts
+                            ? '${contactProvider.contactsCount} contact${contactProvider.contactsCount == 1 ? '' : 's'}'
                             : 'No contacts to backup',
                         onTap: () {
                           Navigator.push(
@@ -233,9 +241,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Help & Support section
               _buildSettingsSection(
                 title: 'Help & Support',
@@ -322,9 +330,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
+
+              _buildDangerZoneSection(context),
+
+              const SizedBox(height: 24),
+
               _buildSettingsSection(
                 title: 'About',
                 children: [
@@ -343,7 +355,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-  
+
   Widget _buildSettingsSection({
     required String title,
     required List<Widget> children,
@@ -379,7 +391,109 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ],
     );
   }
-  
+
+
+
+  Widget _buildDangerZoneSection(BuildContext context) {
+    return _buildSettingsSection(
+      title: 'Danger Zone',
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.delete_forever),
+            label: const Text('Wipe Wallet (Kill Switch)'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(44),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) {
+                      return AlertDialog(
+                        title: const Text('Wipe Wallet?'),
+                        content: const Text(
+                          'This will delete your seed phrase, wallet data, cached DB, and settings on this device. '
+                          'Make sure you have your seed backed up. This action cannot be undone.'
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: const Text('Wipe Wallet'),
+                          ),
+                        ],
+                      );
+                    },
+                  ) ??
+                  false;
+
+              if (!confirmed) return;
+
+              try {
+                // Stop rust timers and deinitialize
+                final rust = BitcoinzRustService.instance;
+                await rust.dispose();
+
+                // Clear database completely
+                await DatabaseService.forceReset();
+
+                // Clear secure/shared storage (seed, walletId, PIN, wallet_data)
+                await StorageService.deleteAll();
+
+                // Optionally remove wallet files directory (best-effort)
+                try {
+                  final dir = await WalletStorageService.getWalletDirectory();
+                  if (await dir.exists()) {
+                    await dir.delete(recursive: true);
+                  }
+                } catch (_) {}
+
+                // Clear wallet provider in-memory state
+                final wallet = Provider.of<WalletProvider>(context, listen: false);
+                wallet.clearWallet();
+
+                if (!mounted) return;
+
+                // Navigate to onboarding welcome screen
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                  (route) => false,
+                );
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(Platform.isIOS
+                        ? '✅ Wallet wiped. Force close app then reopen to start restore.'
+                        : '✅ Wallet wiped. Start restore to test sync UI.'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('❌ Wipe failed: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+
+
   Widget _buildSettingsTile({
     required BuildContext context,
     required IconData icon,
@@ -433,6 +547,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                     ],
+
+
                   ],
                 ),
               ),
