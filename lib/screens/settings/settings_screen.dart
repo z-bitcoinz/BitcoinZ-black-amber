@@ -448,11 +448,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Clear secure/shared storage (seed, walletId, PIN, wallet_data)
                 await StorageService.deleteAll();
 
-                // Optionally remove wallet files directory (best-effort)
+                // Remove only Black Amber app data directories (safe, scoped)
                 try {
-                  final dir = await WalletStorageService.getWalletDirectory();
-                  if (await dir.exists()) {
-                    await dir.delete(recursive: true);
+                  final walletDir = await WalletStorageService.getWalletDataDirectory();
+                  final cacheDir = await WalletStorageService.getCacheDirectory();
+                  final settingsDir = await WalletStorageService.getSettingsDirectory();
+
+                  // Safety guard: ensure paths contain our app subfolder
+                  bool isSafePath(String p) => p.contains(WalletStorageService.appDirName);
+
+                  if (isSafePath(walletDir.path) && await walletDir.exists()) {
+                    await walletDir.delete(recursive: true);
+                  }
+                  if (isSafePath(cacheDir.path) && await cacheDir.exists()) {
+                    await cacheDir.delete(recursive: true);
+                  }
+                  if (isSafePath(settingsDir.path) && await settingsDir.exists()) {
+                    await settingsDir.delete(recursive: true);
                   }
                 } catch (_) {}
 
