@@ -96,63 +96,17 @@ class SyncDetailsDialog extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   
-                  // Progress Bar
-                  if (walletProvider.syncProgress > 0) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: walletProvider.syncProgress / 100,
-                        minHeight: 8,
-                        backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          theme.colorScheme.primary,
-                        ),
+                  // Simple sync status
+                  Center(
+                    child: Text(
+                      walletProvider.isSyncing ? 'Syncing with blockchain...' : 'Sync complete',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: Colors.white70,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Center(
-                      child: Text(
-                        '${walletProvider.syncProgress.toStringAsFixed(1)}%',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  
-                  // Batch Info
-                  if (walletProvider.batchTotal > 0) ...[
-                    _buildDetailRow(
-                      context,
-                      icon: Icons.layers,
-                      label: 'Batch',
-                      value: '${walletProvider.batchNum} of ${walletProvider.batchTotal}',
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  
-                  // Blocks Info
-                  if (walletProvider.totalBlocks > 0) ...[
-                    _buildDetailRow(
-                      context,
-                      icon: Icons.grid_view,
-                      label: 'Blocks Synced',
-                      value: '${NumberFormat('#,###').format(walletProvider.syncedBlocks)} / ${NumberFormat('#,###').format(walletProvider.totalBlocks)}',
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  
-                  // Sync Message
-                  if (walletProvider.syncMessage.isNotEmpty) ...[
-                    _buildDetailRow(
-                      context,
-                      icon: Icons.info_outline,
-                      label: 'Message',
-                      value: walletProvider.syncMessage,
-                    ),
-                  ],
+                  ),
+                  const SizedBox(height: 16),
+
                 ],
                 
                 const SizedBox(height: 20),

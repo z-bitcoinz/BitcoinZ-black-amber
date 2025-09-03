@@ -57,24 +57,32 @@ class _SyncStatusCardState extends State<SyncStatusCard>
     if (!provider.isConnected) {
       return 'Disconnected';
     }
-    
+
     if (provider.isSyncing) {
-      // Use enhanced sync message if available
-      if (provider.syncMessage.isNotEmpty) {
-        return provider.syncMessage;
+      final progress = provider.syncProgress;
+      final currentBatch = provider.currentBatch;
+      final totalBatches = provider.totalBatches;
+      final eta = provider.syncETA;
+
+      if (progress > 0) {
+        String status = 'Syncing ${progress.toStringAsFixed(0)}%';
+
+        // Add batch info if available
+        if (totalBatches > 0) {
+          status += ' (Batch $currentBatch/$totalBatches)';
+        }
+
+        // Add ETA if available
+        if (eta.isNotEmpty && eta != 'Calculating...') {
+          status += ' • $eta';
+        }
+
+        return status;
+      } else {
+        return 'Starting sync...';
       }
-      
-      // Fallback to batch display if enhanced message not available
-      if (provider.batchTotal > 0) {
-        return 'Syncing batch ${provider.batchNum}/${provider.batchTotal}';
-      }
-      if (provider.syncedBlocks > 0 && provider.totalBlocks > 0) {
-        return 'Syncing ${provider.syncedBlocks}/${provider.totalBlocks} blocks';
-      }
-      return 'Syncing...';
     }
-    
-    // Don't show syncing status if not actually syncing
+
     return 'Ready';
   }
 
@@ -173,13 +181,92 @@ class _SyncStatusCardState extends State<SyncStatusCard>
                                     ),
                                   ),
                                   if (provider.isSyncing && provider.syncProgress > 0 && provider.syncProgress < 100) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${provider.syncProgress.toStringAsFixed(1)}% complete',
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                    const SizedBox(height: 4),
+
+                                    // Overall progress bar
+                                    Container(
+                                      height: 4.0,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[300],
+                                        borderRadius: BorderRadius.circular(2.0),
+                                      ),
+                                      child: FractionallySizedBox(
+                                        alignment: Alignment.centerLeft,
+                                        widthFactor: (provider.syncProgress / 100.0).clamp(0.0, 1.0),
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue,
+                                            borderRadius: BorderRadius.circular(2.0),
+                                          ),
+                                        ),
                                       ),
                                     ),
+
+                                    const SizedBox(height: 4),
+
+                                    // Progress details
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${provider.syncProgress.toStringAsFixed(1)}% complete',
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                          ),
+                                        ),
+                                        if (provider.syncETA.isNotEmpty && provider.syncETA != 'Calculating...')
+                                          Text(
+                                            provider.syncETA,
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+
+                                    // Batch progress if available
+                                    if (provider.totalBatches > 0) ...[
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'Batch ${provider.currentBatch}/${provider.totalBatches}',
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Container(
+                                              height: 2.0,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius: BorderRadius.circular(1.0),
+                                              ),
+                                              child: FractionallySizedBox(
+                                                alignment: Alignment.centerLeft,
+                                                widthFactor: (provider.batchProgress / 100.0).clamp(0.0, 1.0),
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.orange[400],
+                                                    borderRadius: BorderRadius.circular(1.0),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${provider.batchProgress.toStringAsFixed(0)}%',
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ],
                                 ],
                               ),
@@ -190,41 +277,7 @@ class _SyncStatusCardState extends State<SyncStatusCard>
                             ),
                           ],
                         ),
-                        if (provider.isSyncing && provider.syncProgress > 0) ...[
-                          const SizedBox(height: 12),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: provider.syncProgress / 100,
-                              minHeight: 6,
-                              backgroundColor: statusColor.withOpacity(0.1),
-                              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                            ),
-                          ),
-                          if (provider.syncedBlocks > 0 && provider.totalBlocks > 0) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Blocks: ${provider.syncedBlocks}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                if (provider.batchTotal > 0)
-                                  Text(
-                                    'Batch: ${provider.batchNum}/${provider.batchTotal}',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                                    ),
-                                  ),
-                                Text(
-                                  'Total: ${provider.totalBlocks}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
+
                       ],
                     ),
                   ),

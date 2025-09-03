@@ -13,8 +13,8 @@ class ConnectionStatusWidget extends StatelessWidget {
         final isConnected = provider.isConnected;
         final isSyncing = provider.isSyncing;
         final syncProgress = provider.syncProgress;
-        final batchNum = provider.batchNum;
-        final batchTotal = provider.batchTotal;
+        final currentBatch = provider.currentBatch;
+        final totalBatches = provider.totalBatches;
         
         // Determine what to show
         String statusText;
@@ -29,11 +29,7 @@ class ConnectionStatusWidget extends StatelessWidget {
           statusIcon = Icons.wifi_off;
         } else if (isSyncing) {
           // Show sync progress - BLUE (only when actively syncing)
-          if (batchTotal > 0) {
-            statusText = 'Batch ${batchNum}/${batchTotal}';
-          } else {
-            statusText = 'Syncing';
-          }
+          statusText = 'Syncing';
           statusColor = Colors.blue;
           statusIcon = Icons.sync;
           showSpinner = true;
@@ -85,16 +81,7 @@ class ConnectionStatusWidget extends StatelessWidget {
                   ),
                 ),
               ],
-              if (isSyncing && syncProgress > 0 && syncProgress < 100) ...[
-                const SizedBox(width: 4),
-                Text(
-                  '${syncProgress.toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: statusColor.withOpacity(0.8),
-                  ),
-                ),
-              ],
+
             ],
           ),
         );

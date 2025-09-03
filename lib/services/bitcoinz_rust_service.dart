@@ -1382,8 +1382,10 @@ class BitcoinzRustService {
   
   /// Get birthday block height
   int? getBirthday() => _birthday;
-  
-  
+
+  /// Get the actual sync state from the Rust service (more reliable than syncstatus command)
+  bool get isActuallySyncing => _isSyncing;
+
   /// Get sync status for progress display
   Future<Map<String, dynamic>?> getSyncStatus() async {
     if (!_initialized) {

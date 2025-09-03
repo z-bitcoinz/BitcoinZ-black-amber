@@ -45,32 +45,31 @@ class WalletProvider with ChangeNotifier {
   // Simple connection monitoring (single Rust anchor)
   Timer? _simpleConnectionTimer;
 
-  // Sync progress tracking (like BitcoinZ Blue)
-  int _syncedBlocks = 0;
-  int _totalBlocks = 0;
-  int _batchNum = 0;
-  int _batchTotal = 0;
-  double _syncProgress = 0.0;
-  String _syncMessage = '';
+  // Simple sync tracking (like BitcoinZ Blue)
   Timer? _syncStatusTimer;
   bool _autoSyncEnabled = true;
 
-  // Enhanced sync tracking
-  DateTime? _syncStartTime;
+  // Comprehensive sync tracking with batch info and ETA
   DateTime? _lastSyncTime;
-  int _lastSyncedBlocks = 0;
-  double _syncSpeed = 0.0; // blocks per second
-  Duration? _estimatedTimeRemaining;
+  String _syncMessage = '';
+  double _syncProgress = 0.0;
+  DateTime? _syncStartTime;
+  bool _isUpdatingSyncStatus = false; // Prevent race conditions
+  DateTime? _lastActiveSyncDetected; // Track when we last saw active sync
+  int _consecutiveInactivePolls = 0; // Count consecutive inactive polls
 
-  // Stuck detection / checkpointing
-  DateTime? _lastStatusMovementAt;
-  DateTime? _finalizationStartTime;
-  DateTime? _lastFinalizationRefresh;
-  int? _lastTxnScanBlocks;
-  int? _lastBatchNum;
-  int? _lastStartBlock;
-  int? _lastEndBlock;
-  int? _lastCheckpointBatch;
+  // Detailed batch and ETA tracking
+  int _currentBatch = 0;
+  int _totalBatches = 0;
+  int _syncedBlocks = 0;
+  int _totalBlocks = 0;
+  String _syncETA = '';
+  double _batchProgress = 0.0;
+
+  // Simple blockchain tip tracking
+  int? _blockchainTip;
+  DateTime? _blockchainTipCacheTime;
+  static const Duration _blockchainTipCacheDuration = Duration(minutes: 5);
 
 
   // Pagination state - optimized for performance
@@ -91,12 +90,7 @@ class WalletProvider with ChangeNotifier {
   DateTime? _blockHeightCacheTime;
   static const Duration _blockHeightCacheDuration = Duration(seconds: 30);
 
-  // Real blockchain progress tracking
-  int? _blockchainTip;
-  int? _walletBirthday;
-  int? _syncStartBlock;
-  DateTime? _blockchainTipCacheTime;
-  static const Duration _blockchainTipCacheDuration = Duration(minutes: 2);
+
 
   // Memo notification state
   int _unreadMemoCount = 0;
@@ -311,79 +305,25 @@ class WalletProvider with ChangeNotifier {
   DateTime? get lastConnectionCheck => _lastConnectionCheck;
   bool get autoSyncEnabled => _autoSyncEnabled;
 
-  // Sync progress getters (like BitcoinZ Blue)
-  int get syncedBlocks => _syncedBlocks;
-  int get totalBlocks => _totalBlocks;
-  int get batchNum => _batchNum;
-  int get batchTotal => _batchTotal;
-  double get syncProgress => _syncProgress;
-  String get syncMessage => _syncMessage;
+  // Simple sync getters (like BitcoinZ Blue)
 
   // Enhanced sync tracking getters
   DateTime? get lastSyncTime => _lastSyncTime;
-  DateTime? get syncStartTime => _syncStartTime;
-  double get syncSpeed => _syncSpeed;
-  Duration? get estimatedTimeRemaining => _estimatedTimeRemaining;
+  // Comprehensive sync getters with batch info and ETA
+  String get syncMessage => _syncMessage;
+  double get syncProgress => _syncProgress;
+  int get syncedBlocks => _syncedBlocks;
+  int get totalBlocks => _totalBlocks;
+  int get currentBatch => _currentBatch;
+  int get totalBatches => _totalBatches;
+  String get syncETA => _syncETA;
+  double get batchProgress => _batchProgress;
 
-  // Real blockchain progress getters
-  int? get blockchainTip => _blockchainTip;
-  int? get walletBirthday => _walletBirthday;
-  int? get syncStartBlock => _syncStartBlock;
+
   
-  // Enhanced contextual information getters
-  double get realBlockchainProgress {
-    if (_blockchainTip != null && _walletBirthday != null && _walletBirthday! > 0) {
-      final int totalBlocksNeeded = _blockchainTip! - _walletBirthday!;
-      if (totalBlocksNeeded > 0) {
-        final int actualSyncedBlocks = (_syncStartBlock != null && _syncStartBlock! > 0) 
-          ? (_syncStartBlock! - (_syncStartBlock! - _syncedBlocks)).abs()
-          : _syncedBlocks;
-        return ((actualSyncedBlocks * 100.0) / totalBlocksNeeded).clamp(0.0, 100.0);
-      }
-    }
-    return 0.0;
-  }
+
   
-  int get blocksRemaining {
-    if (_blockchainTip != null && _walletBirthday != null) {
-      final int totalBlocksNeeded = _blockchainTip! - _walletBirthday!;
-      final int actualSyncedBlocks = (_syncStartBlock != null && _syncStartBlock! > 0) 
-        ? (_syncStartBlock! - (_syncStartBlock! - _syncedBlocks)).abs()
-        : _syncedBlocks;
-      return (totalBlocksNeeded - actualSyncedBlocks).clamp(0, totalBlocksNeeded);
-    }
-    return 0;
-  }
-  
-  String get syncContextMessage {
-    if (_walletBirthday != null && _walletBirthday! > 0) {
-      if (_walletBirthday! > 1900000) { // Recent wallet (2024+)
-        return 'Syncing from wallet creation';
-      } else if (_walletBirthday! > 1000000) { // Older wallet
-        return 'Syncing from your wallet birthday';
-      } else { // Full sync from genesis
-        return 'Syncing entire blockchain';
-      }
-    }
-    return 'Syncing blockchain';
-  }
-  
-  String get technicalDetails {
-    final List<String> details = [];
-    if (_syncedBlocks > 0 && _totalBlocks > 0) {
-      details.add('Batch: $_batchNum/$_batchTotal');
-    }
-    if (_syncedBlocks > 0) {
-      details.add('Blocks: $_syncedBlocks');
-    }
-    if (_blockchainTip != null) {
-      details.add('Tip: $_blockchainTip');
-    }
-    if (_walletBirthday != null) {
-      details.add('Birthday: $_walletBirthday');
-    }
-    return details.join(' | ');
-  }
+
 
   // Network provider methods
   void setNetworkProvider(NetworkProvider networkProvider) {
@@ -1519,8 +1459,8 @@ class WalletProvider with ChangeNotifier {
         ? const Duration(hours: 2)  // 2 hours for genesis sync
         : const Duration(minutes: 5); // 5 minutes for regular sync
 
-    // Poll every second for sync status
-    _syncStatusTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+    // Poll every 3 seconds for sync status (like BitcoinZ Blue - less frequent to avoid race conditions)
+    _syncStatusTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       // Check if we've been polling too long
       if (DateTime.now().difference(pollingStartTime) > maxPollingDuration) {
         if (kDebugMode) print('⏰ Sync polling timeout - stopping after ${isGenesisSync ? "2 hours" : "5 minutes"}');
@@ -1705,550 +1645,192 @@ class WalletProvider with ChangeNotifier {
     }
   }
 
-  /// Update sync status from Rust Bridge
+  /// Simple sync status update (like BitcoinZ Blue) - using ACTUAL Rust service state
   Future<void> _updateSyncStatus() async {
     if (!_rustService.initialized) {
       if (kDebugMode) print('⚠️ Rust service not initialized, skipping sync status update');
       return;
     }
 
-    try {
-      // FIXED: Use detailed sync status API instead of basic getSyncStatus()
-      // The basic API incorrectly returns in_progress: false while real sync is happening
-      Map<String, dynamic>? status;
-      
-      try {
-        // Get detailed sync status using the execute API which contains real progress data
-        final result = await rust_api.execute(command: 'syncstatus', args: '');
-        if (kDebugMode) print('📊 Raw detailed sync status: $result');
+    // Prevent race conditions from multiple simultaneous calls
+    if (_isUpdatingSyncStatus) {
+      if (kDebugMode) print('⚠️ Sync status update already in progress, skipping');
+      return;
+    }
+    _isUpdatingSyncStatus = true;
 
-        // Parse the detailed sync data. IMPORTANT: don't gate on substring 'error'
-        // because valid JSON contains "last_error": null which trips the check.
-        if (result.isNotEmpty) {
-          status = _parseDetailedSyncStatus(result);
-        }
-      } catch (e) {
-        if (kDebugMode) print('⚠️ Detailed sync status failed, falling back to basic: $e');
-        // Fallback to basic status if detailed fails
-        status = await _rustService.getSyncStatus();
-      }
-      
-      if (status == null) {
-        if (kDebugMode) print('⚠️ No sync status available');
-        return;
-      }
+    try {
+      // Use the ACTUAL sync state from Rust service instead of unreliable syncstatus command
+      final bool actuallyInProgress = _rustService.isActuallySyncing;
 
       if (kDebugMode) {
-        print('📊 Processed sync status: $status');
+        print('🔍 ACTUAL Sync State: Rust service _isSyncing = $actuallyInProgress');
       }
 
-      bool inProgress = status['in_progress'] ?? false;
+      // If Rust service says it's syncing, try to get detailed progress
+      int syncedBlocks = 0;
+      int totalBlocks = 0;
 
-      // Enhanced completion detection heuristic
-      final int sb = status['synced_blocks'] ?? 0;
-      final int tb = status['total_blocks'] ?? 0;
-      final int bn = status['batch_num'] ?? 0;
-      final int bt = status['batch_total'] ?? 0;
-      final int tsb = status['txn_scan_blocks'] ?? 0;
-      final int tdb = status['trial_decryptions_blocks'] ?? 0;
-      
-      // Primary completion: all blocks synced and batch complete
-      if (tb > 0 && sb >= tb && bt > 0 && bn >= bt) {
-        inProgress = false;
-      }
-      // Secondary completion: near final batch with blocks fully synced and txn finalization nearly done
-      else if (tb > 0 && sb >= tb && bt > 0 && bn >= (bt - 3) && tsb >= (tb - 5)) {
-        if (kDebugMode) print('📊 Sync completion detected: near-final batch with finalization nearly complete');
-        inProgress = false;
-      }
-      // Tertiary completion: stuck in finalization too long (force completion)
-      else if (tb > 0 && sb >= tb && tdb >= tb && bt > 0 && bn > 0) {
-        _finalizationStartTime ??= DateTime.now();
-        if (DateTime.now().difference(_finalizationStartTime!).inSeconds > 90) {
-          if (kDebugMode) print('📊 Sync completion forced: stuck in finalization for >90 seconds');
-          inProgress = false;
-          _finalizationStartTime = null;
+      if (actuallyInProgress) {
+        // Try to get progress details, but don't rely on them for sync detection
+        try {
+          final status = await _rustService.getSyncStatus();
+          if (status != null) {
+            syncedBlocks = status['synced_blocks'] ?? 0;
+            totalBlocks = status['total_blocks'] ?? 0;
+            if (kDebugMode) {
+              print('🔍 Progress Details: $syncedBlocks/$totalBlocks blocks');
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) print('⚠️ Could not get progress details: $e');
         }
-      } else {
-        _finalizationStartTime = null; // Reset timer if not in finalization
       }
 
-      // Additional completion condition: finalizing tx scan edge
-      // (variables already declared above)
-      if (tb > 0 && sb >= tb && tdb >= tb && (tb - tsb) <= 2 && bn >= (bt - 2)) {
-        // If only 0-2 tx-scan blocks remain near the final batches, consider allowing completion soon
-        // We'll still prefer backend to flip, but this prevents indefinite UI stall
-      }
+      if (actuallyInProgress) {
+        // ACTUAL sync in progress - trust the Rust service!
+        _lastActiveSyncDetected = DateTime.now();
+        _consecutiveInactivePolls = 0;
 
-      if (inProgress) {
-        // Active sync detected - let periodic check handle connection status
-        if (kDebugMode) print('📊 Sync in progress detected');
+        _setSyncing(true);
+        _syncMessage = 'Syncing...';
 
-        _setSyncing(true);  // Ensure syncing flag is set
-
-        // Track sync start time
         if (_syncStartTime == null) {
           _syncStartTime = DateTime.now();
-          _lastSyncedBlocks = 0;
         }
 
-        _syncedBlocks = status['synced_blocks'] ?? 0;
-        _totalBlocks = status['total_blocks'] ?? 0;
-        _batchNum = status['batch_num'] ?? 0;
-        _batchTotal = status['batch_total'] ?? 0;
+        // Get detailed batch and progress information
+        if (totalBlocks > 0 && syncedBlocks > 0) {
+          try {
+            final status = await _rustService.getSyncStatus();
+            final int currentBatch = (status?['batch_num'] ?? 0) as int;
+            final int totalBatches = (status?['batch_total'] ?? 1) as int;
 
-        // Track real blockchain position for enhanced progress
-        _syncStartBlock ??= status['start_block'] ?? 0;
-        _walletBirthday ??= _wallet?.birthdayHeight ?? 0;
-        
-        // Get blockchain tip for real progress calculation
-        if (_blockchainTip == null) {
-          _getBlockchainTip().then((tip) {
-            if (tip != null && (_blockchainTip == null || tip > _blockchainTip!)) {
-              _blockchainTip = tip;
-              if (kDebugMode) print('🌐 Blockchain tip updated: $tip');
-            }
-          }).catchError((e) {
-            if (kDebugMode) print('⚠️ Failed to get blockchain tip: $e');
-          });
-        }
+            // Update detailed sync info
+            _currentBatch = currentBatch + 1; // Display as 1-based
+            _totalBatches = totalBatches;
+            _syncedBlocks = syncedBlocks;
+            _totalBlocks = totalBlocks;
 
-        // Track movement / detect staleness
-        final int tdb = status['trial_decryptions_blocks'] ?? 0;
-        final int tsb = status['txn_scan_blocks'] ?? 0;
-        final int sbStart = status['start_block'] ?? 0;
-        final int sbEnd = status['end_block'] ?? 0;
-        final bool progressed = (_lastTxnScanBlocks == null) || (tsb != _lastTxnScanBlocks) || (_batchNum != _lastBatchNum);
-        if (progressed) {
-          _lastStatusMovementAt = DateTime.now();
-          _lastTxnScanBlocks = tsb;
-          _lastBatchNum = _batchNum;
-          _lastStartBlock = sbStart;
-          _lastEndBlock = sbEnd;
-        } else {
-          // If stuck for > 75s with no movement in txn_scan or trial_decryptions, checkpoint resumeHeight and gently refresh
-          final stuckFor = _lastStatusMovementAt != null ? DateTime.now().difference(_lastStatusMovementAt!) : Duration.zero;
-          final noMovement = (_lastTxnScanBlocks != null && tsb == _lastTxnScanBlocks);
-          if (noMovement && stuckFor.inSeconds >= 75) {
-            final checkpoint = [sbStart, sbEnd].where((v) => v != null && v > 0).fold<int>(1 << 30, (a, b) => a < b ? a : b);
-            if (checkpoint != (1 << 30)) {
-              final safeBirthday = (checkpoint - 200) > 1 ? (checkpoint - 200) : 1;
-              try {
-                final authProvider = AuthProvider();
-                await authProvider.initialize();
-                // Do NOT update canonical birthday here. Store as resume checkpoint only.
-                final stored = await authProvider.getStoredWalletData() ?? {};
-                stored['walletId'] = _wallet?.walletId;
-                stored['transparentAddresses'] = _addresses['transparent'] ?? [];
-                stored['shieldedAddresses'] = _addresses['shielded'] ?? [];
-                stored['resumeHeight'] = safeBirthday;
-                stored['updatedAt'] = DateTime.now().toIso8601String();
-                await authProvider.updateWalletData(stored);
-                if (kDebugMode) print('💾 Checkpointed resume height due to staleness: $safeBirthday (batch $_batchNum/$_batchTotal, start=$sbStart end=$sbEnd)');
-              } catch (e) {
-                if (kDebugMode) print('⚠️ Failed to checkpoint resumeHeight: $e');
-              }
-            }
-            // Nudge rust to refresh status
-            try {
-              await _rustService.refresh();
-              if (kDebugMode) print('🔄 Nudged backend with refresh() after staleness');
-            } catch (e) {
-              if (kDebugMode) print('⚠️ Failed to refresh after staleness: $e');
-            }
-            // Reset the timer so we don’t spam
-            _lastStatusMovementAt = DateTime.now();
-          }
-        }
+            // Calculate batch progress (within current batch)
+            _batchProgress = (syncedBlocks * 100.0) / totalBlocks;
 
-        // Calculate sync speed and ETA
-        if (_syncStartTime != null && _syncedBlocks > _lastSyncedBlocks) {
-          final elapsed = DateTime.now().difference(_syncStartTime!);
-          if (elapsed.inSeconds > 0) {
-            final blocksProcessed = _syncedBlocks - _lastSyncedBlocks;
-            _syncSpeed = blocksProcessed / elapsed.inSeconds;
-
-            if (_syncSpeed > 0 && _totalBlocks > _syncedBlocks) {
-              final blocksRemaining = _totalBlocks - _syncedBlocks;
-              final secondsRemaining = blocksRemaining / _syncSpeed;
-              _estimatedTimeRemaining = Duration(seconds: secondsRemaining.round());
-            }
-          }
-        }
-
-        // Enhanced progress calculation using real blockchain position
-        double batchProgress = 0.0;
-        double totalProgress = 0.0;
-        double realBlockchainProgress = 0.0;
-        
-        // Calculate real blockchain progress (from wallet birthday to current tip)
-        if (_blockchainTip != null && _walletBirthday != null && _walletBirthday! > 0) {
-          final int currentSyncedFromBirthday = _syncedBlocks;
-          final int totalBlocksFromBirthday = _blockchainTip! - _walletBirthday!;
-          
-          if (totalBlocksFromBirthday > 0) {
-            // Calculate how many blocks we've actually synced from our starting point
-            final int actualSyncedBlocks = (_syncStartBlock != null && _syncStartBlock! > 0) 
-              ? (_syncStartBlock! - (_syncStartBlock! - _syncedBlocks)).abs()
-              : currentSyncedFromBirthday;
-            
-            realBlockchainProgress = (actualSyncedBlocks * 100.0) / totalBlocksFromBirthday;
-            realBlockchainProgress = realBlockchainProgress.clamp(0.0, 100.0);
-            
-            if (kDebugMode) {
-              print('🌐 Real progress: ${realBlockchainProgress.toStringAsFixed(1)}% '
-                   '($actualSyncedBlocks / $totalBlocksFromBirthday blocks from birthday $_walletBirthday)');
-            }
-          }
-        }
-        
-        if (_totalBlocks > 0) {
-          // Get additional finalization progress indicators
-          final int tdb = status['trial_decryptions_blocks'] ?? 0;
-          final int tsb = status['txn_scan_blocks'] ?? 0;
-          
-          // Base progress from synced blocks
-          batchProgress = (_syncedBlocks * 100.0) / _totalBlocks;
-          
-          // Enhanced progress calculation for finalization phase
-          if (_syncedBlocks >= _totalBlocks) {
-            // During finalization, use trial decryption and txn scan progress
-            final double trialProgress = tdb >= _totalBlocks ? 100.0 : (tdb * 100.0) / _totalBlocks;
-            final double txnScanProgress = tsb >= _totalBlocks ? 100.0 : (tsb * 100.0) / _totalBlocks;
-            
-            // Weighted finalization progress (trial decryption is faster, txn scan takes longer)
-            final double finalizationProgress = (trialProgress * 0.3) + (txnScanProgress * 0.7);
-            
-            // Use the maximum of block sync progress and finalization progress
-            batchProgress = [batchProgress, finalizationProgress].reduce((a, b) => a > b ? a : b);
-            
-            // Cap at 99.5% during finalization to show activity
-            if (tsb < _totalBlocks && batchProgress >= 99.5) {
-              batchProgress = 99.5;
-            }
-          }
-          
-          totalProgress = batchProgress;
-        }
-        
-        if (_batchTotal > 0 && _batchNum > 0) {
-          final base = ((_batchNum - 1) * 100.0) / _batchTotal;
-          totalProgress = base + (batchProgress / _batchTotal);
-          
-          // Enhanced calculation for final batches to show smooth progress
-          if (_batchNum >= (_batchTotal - 2)) {
-            // For the last 3 batches, show more granular progress
-            final int tdb = status['trial_decryptions_blocks'] ?? 0;
-            final int tsb = status['txn_scan_blocks'] ?? 0;
-            
-            if (_totalBlocks > 0 && _syncedBlocks >= _totalBlocks) {
-              // Calculate finalization sub-progress within the current batch
-              final double finalizationSubProgress = _totalBlocks > 0 
-                ? (tsb * 100.0) / _totalBlocks 
-                : 0.0;
-              
-              // Add fine-grained progress within the batch portion
-              final double batchContribution = 100.0 / _batchTotal;
-              final double fineBatchProgress = (finalizationSubProgress / 100.0) * batchContribution;
-              
-              totalProgress = base + fineBatchProgress;
-            }
-          }
-        }
-        
-        // Use real blockchain progress when available, otherwise fall back to batch progress
-        _syncProgress = (realBlockchainProgress > 0.0 && realBlockchainProgress <= 100.0) 
-          ? realBlockchainProgress 
-          : totalProgress.clamp(0.0, 100.0);
-
-        // Per-batch checkpoint when batch fully finalized (txn scan caught up)
-        if (_totalBlocks > 0) {
-          final int tdb2 = status['trial_decryptions_blocks'] ?? 0;
-          final int tsb2 = status['txn_scan_blocks'] ?? 0;
-          final int sbStart2 = status['start_block'] ?? 0;
-          final int sbEnd2 = status['end_block'] ?? 0;
-          final bool batchFinalized = (_syncedBlocks >= _totalBlocks && tdb2 >= _totalBlocks && tsb2 >= _totalBlocks);
-          if (batchFinalized && _batchNum > 0 && _lastCheckpointBatch != _batchNum) {
-            final checkpoint = [sbStart2, sbEnd2].where((v) => v != null && v > 0).fold<int>(1 << 30, (a, b) => a < b ? a : b);
-            if (checkpoint != (1 << 30)) {
-              final safeBirthday = (checkpoint - 200) > 1 ? (checkpoint - 200) : 1;
-              try {
-                final authProvider = AuthProvider();
-                await authProvider.initialize();
-                // Do NOT update canonical birthday here. Store as resume checkpoint only.
-                await authProvider.updateWalletData({
-                  'walletId': _wallet?.walletId,
-                  'transparentAddresses': _addresses['transparent'] ?? [],
-                  'shieldedAddresses': _addresses['shielded'] ?? [],
-                  'resumeHeight': safeBirthday,
-                  'updatedAt': DateTime.now().toIso8601String(),
-                });
-                _lastCheckpointBatch = _batchNum;
-                if (kDebugMode) print('💾 Checkpointed resume height at batch finalize: $safeBirthday (batch $_batchNum/$_batchTotal, start=$sbStart2 end=$sbEnd2)');
-              } catch (e) {
-                if (kDebugMode) print('⚠️ Failed to save batch checkpoint: $e');
-              }
-            }
-          }
-        }
-
-        // Create user-friendly sync message with real blockchain progress
-        if (_blockchainTip != null && _walletBirthday != null && realBlockchainProgress > 0) {
-          // Calculate blocks remaining
-          final int totalBlocksNeeded = _blockchainTip! - _walletBirthday!;
-          final int actualSyncedBlocks = (_syncStartBlock != null && _syncStartBlock! > 0) 
-            ? (_syncStartBlock! - (_syncStartBlock! - _syncedBlocks)).abs()
-            : _syncedBlocks;
-          final int blocksRemaining = totalBlocksNeeded - actualSyncedBlocks;
-          
-          // If blocks are all downloaded and trial-decrypted but tx scan lags slightly, show finalizing message
-          final int tdb = status['trial_decryptions_blocks'] ?? 0;
-          final int tsb = status['txn_scan_blocks'] ?? 0;
-          if (_totalBlocks > 0 && _syncedBlocks >= _totalBlocks && tdb >= _totalBlocks && tsb < _totalBlocks) {
-            _syncMessage = 'Finalizing transactions (${realBlockchainProgress.toStringAsFixed(1)}% complete)';
-            
-            // Proactive balance refresh during finalization
-            _lastFinalizationRefresh ??= DateTime.now();
-            if (DateTime.now().difference(_lastFinalizationRefresh!).inSeconds > 15) {
-              if (kDebugMode) print('🔄 Proactive balance refresh during finalization');
-              // Schedule refresh without awaiting to avoid blocking sync status updates
-              _refreshWalletData().catchError((e) {
-                if (kDebugMode) print('⚠️ Finalization refresh failed: $e');
-              });
-              _lastFinalizationRefresh = DateTime.now();
-            }
-          } else {
-            // User-friendly progress message
-            final String progressPercent = realBlockchainProgress.toStringAsFixed(1);
-            
-            if (blocksRemaining > 0) {
-              final String remainingStr = blocksRemaining > 1000 
-                ? '${(blocksRemaining / 1000).toStringAsFixed(0)}k'
-                : '$blocksRemaining';
-              _syncMessage = 'Synced $progressPercent% to current day ($remainingStr blocks remaining)';
+            // Calculate overall progress across all batches
+            if (totalBatches > 1) {
+              final double batchProgressDecimal = syncedBlocks.toDouble() / totalBlocks.toDouble();
+              final double overallProgress = ((currentBatch.toDouble() + batchProgressDecimal) / totalBatches.toDouble()) * 100.0;
+              _syncProgress = overallProgress.clamp(0.0, 99.0);
             } else {
-              _syncMessage = 'Synced $progressPercent% to current day';
+              _syncProgress = _batchProgress.clamp(0.0, 99.0);
             }
-            _lastFinalizationRefresh = null; // Reset when not finalizing
-          }
-        } else if (_batchTotal > 0) {
-          // Fallback to batch messages when blockchain progress not available
-          final int tdb = status['trial_decryptions_blocks'] ?? 0;
-          final int tsb = status['txn_scan_blocks'] ?? 0;
-          if (_totalBlocks > 0 && _syncedBlocks >= _totalBlocks && tdb >= _totalBlocks && tsb < _totalBlocks) {
-            _syncMessage = 'Finalizing transactions';
-            
-            // Proactive balance refresh during finalization
-            _lastFinalizationRefresh ??= DateTime.now();
-            if (DateTime.now().difference(_lastFinalizationRefresh!).inSeconds > 15) {
-              if (kDebugMode) print('🔄 Proactive balance refresh during finalization');
-              _refreshWalletData().catchError((e) {
-                if (kDebugMode) print('⚠️ Finalization refresh failed: $e');
-              });
-              _lastFinalizationRefresh = DateTime.now();
+
+            // Calculate ETA for complete sync
+            _calculateSyncETA();
+
+            if (kDebugMode) {
+              print('📊 COMPREHENSIVE sync progress: ${_syncProgress.toStringAsFixed(1)}% overall');
+              print('   📦 Batch $_currentBatch/$_totalBatches (${_batchProgress.toStringAsFixed(1)}% within batch)');
+              print('   🧮 Blocks: $syncedBlocks/$totalBlocks in current batch');
+              print('   ⏱️ ETA: $_syncETA');
             }
-          } else {
-            _syncMessage = 'Syncing blockchain...';
-            _lastFinalizationRefresh = null;
+          } catch (e) {
+            // Fallback to simple progress
+            _syncProgress = (syncedBlocks * 100.0 / totalBlocks).clamp(0.0, 99.0);
+            _syncETA = 'Calculating...';
+
+            if (kDebugMode) {
+              print('📊 Fallback sync progress: ${_syncProgress.toStringAsFixed(1)}%');
+            }
           }
         } else {
-          _syncMessage = 'Starting sync...';
-          _lastFinalizationRefresh = null;
-        }
+          // No detailed progress available - use time-based estimation
+          final elapsed = DateTime.now().difference(_syncStartTime!).inMinutes;
+          _syncProgress = (5.0 + (elapsed * 1.5)).clamp(5.0, 95.0);
+          _syncETA = 'Calculating...';
 
-        if (kDebugMode) {
-          print('📊 $_syncMessage');
-          print('   Real Progress: ${realBlockchainProgress.toStringAsFixed(1)}% | Batch Progress: ${batchProgress.toStringAsFixed(1)}% | Total: ${totalProgress.toStringAsFixed(1)}%');
-          if (_blockchainTip != null && _walletBirthday != null) {
-            print('   Blockchain: Birthday=$_walletBirthday, Tip=$_blockchainTip, Start=$_syncStartBlock');
-          }
-          if (_syncSpeed > 0) {
-            print('   Sync speed: ${_syncSpeed.toStringAsFixed(1)} blocks/sec');
-            if (_estimatedTimeRemaining != null) {
-              print('   ETA: ${_estimatedTimeRemaining!.inSeconds} seconds');
-            }
+          if (kDebugMode) {
+            print('📊 Time-based sync progress: ${_syncProgress.toStringAsFixed(1)}% (${elapsed} min elapsed)');
           }
         }
       } else {
-        // Check if we have meaningful sync data even when in_progress=false
-        final int sb = status['synced_blocks'] ?? 0;
-        final int tb = status['total_blocks'] ?? 0;
-        final int bn = status['batch_num'] ?? 0;
-        final int bt = status['batch_total'] ?? 0;
-        final bool hasActiveSyncData = (sb > 0 || tb > 0 || bn > 0);
+        // Rust service says NOT syncing - sync is complete
+        if (kDebugMode) print('📊 ACTUAL sync completed - Rust service _isSyncing = false');
+        _setSyncing(false);
+        _syncProgress = 100.0;
+        _syncMessage = '';
+        _lastSyncTime = DateTime.now();
+        _syncStartTime = null; // Reset sync timer for next sync
+        _consecutiveInactivePolls = 0;
 
-        // ENHANCED: Keep showing sync progress after app reopen only when there is active data
-        final bool recentlyReopened = (_syncStartTime != null &&
-            DateTime.now().difference(_syncStartTime!).inSeconds < 30);
+        // Reset detailed sync info
+        _currentBatch = 0;
+        _totalBatches = 0;
+        _syncedBlocks = 0;
+        _totalBlocks = 0;
+        _syncETA = '';
+        _batchProgress = 0.0;
 
-        // Treat as complete when in_progress=false and all blocks are synced (sb >= tb)
-        final bool isComplete = (sb >= tb);
-        if (hasActiveSyncData && !isComplete) {
-          if (kDebugMode) {
-            if (recentlyReopened) {
-              print('📊 APP REOPEN: Keeping sync progress visible for 30 seconds after reopen');
-            } else {
-              print('📊 Sync paused but has active data - continuing to show progress');
-            }
-          }
-
-          // Keep showing sync progress with current data
-          _setSyncing(true);
-          _syncedBlocks = sb;
-          _totalBlocks = tb;
-          _batchNum = bn;
-          _batchTotal = bt;
-
-          // Calculate and display progress like in active sync
-          double batchProgress = 0.0;
-          double totalProgress = 0.0;
-
-          if (tb > 0) {
-            batchProgress = (sb * 100.0) / tb;
-            batchProgress = batchProgress.clamp(0.0, 100.0);
-          }
-
-          totalProgress = batchProgress;
-          if (bt > 0 && bn > 0) {
-            final base = ((bn - 1) * 100.0) / bt;
-            totalProgress = base + (batchProgress / bt);
-          }
-
-          // Keep syncProgress in 0..100 scale (consistent across UI)
-          _syncProgress = totalProgress.clamp(0.0, 100.0);
-
-          // Enhanced message for app reopen vs active sync
-          if (recentlyReopened && (sb == 0 && tb == 0 && bn == 0 && bt == 0)) {
-            _syncMessage = 'Resuming sync...';
-          } else if (bt > 0) {
-            _syncMessage = 'Syncing batch $bn/$bt (${batchProgress.toStringAsFixed(1)}%)...';
-          } else {
-            _syncMessage = 'Syncing blockchain (${batchProgress.toStringAsFixed(1)}%)...';
-          }
-
-          if (kDebugMode) print('📊 APP REOPEN PROGRESS: ${_syncMessage} (${_syncProgress.toStringAsFixed(1)}%)');
-
-        } else {
-          // Truly complete - show brief completion message, then clear UI
-          _stopSyncStatusPolling();
-          if (kDebugMode) print('📊 Sync completed');
-
-          // Show a short "Sync completed" message on the card
-          _setSyncing(true); // keep card visible briefly
-          _syncMessage = 'Sync completed';
-          _syncProgress = 100.0; // hide top overlay during completion toast
-          _lastSyncTime = DateTime.now();
-          notifyListeners();
-
-          // Reset all sync tracking values immediately (safe)
-          _syncStartTime = null;
-          _syncSpeed = 0.0;
-          _estimatedTimeRemaining = null;
-          _syncedBlocks = 0;
-          _totalBlocks = 0;
-          _batchNum = 0;
-          _batchTotal = 0;
-
-          // After a short delay, clear the message and hide the card
-          Future.delayed(const Duration(milliseconds: 1200), () {
-            // Only clear if a new sync hasn't started in the meantime
-            if (_syncStatusTimer == null && _syncMessage == 'Sync completed') {
-              _syncProgress = 0.0;
-              _syncMessage = '';
-              _setSyncing(false);
-              notifyListeners();
-            }
+        // Refresh wallet data after sync completion
+        if (hasWallet) {
+          _refreshWalletData().catchError((e) {
+            if (kDebugMode) print('⚠️ Failed to refresh wallet data after sync: $e');
           });
         }
-
-        // Refresh wallet data after sync
-        if (!(status['timeout'] ?? false)) {
-          await _refreshWalletData();
-          // Persist final birthday height so future restarts don't genesis-resync
-          try {
-            final authProvider = AuthProvider();
-            await authProvider.initialize();
-
-            // Derive a reliable non-zero birthday
-            int? finalBirthday = _rustService.getBirthday();
-
-            // If Rust didn't provide a useful birthday (e.g., restored with 0), try to infer one
-            if (finalBirthday == null || finalBirthday == 0) {
-              // 1) Try reading latest sync status and use the lower bound of the last scanned range
-              final lastStatus = await _rustService.getSyncStatus();
-              if (lastStatus != null) {
-                final int sb = lastStatus['start_block'] ?? 0;
-                final int eb = lastStatus['end_block'] ?? 0;
-                if (sb > 0 || eb > 0) {
-                  // Choose the smaller of the two as a conservative birthday floor
-                  finalBirthday = [sb, eb].where((v) => v > 0).fold<int>(1 << 30, (a, b) => a < b ? a : b);
-                }
-              }
-              // 2) As a last resort, use current tip minus a small safety buffer
-              if (finalBirthday == null || finalBirthday == 0 || finalBirthday == (1 << 30)) {
-                try {
-                  final tip = await _rustService.getCurrentBlockHeight();
-                  // Keep a buffer so re-scan covers recent history just in case
-                  finalBirthday = (tip - 200);
-                  if (finalBirthday! < 1) finalBirthday = 1;
-                } catch (_) {
-                  finalBirthday = _wallet?.birthdayHeight ?? 1;
-                }
-              }
-            }
-
-            // Update in-memory model too
-            if (_wallet != null) {
-              // Only lower the canonical birthday (more conservative) or set if missing
-              final currentBday = _wallet!.birthdayHeight ?? 0;
-              if (currentBday == 0 || (finalBirthday != null && finalBirthday < currentBday)) {
-                _wallet = _wallet!.copyWith(birthdayHeight: finalBirthday);
-              }
-            }
-
-            // Write wallet_data: set canonical birthday only if initializing or lowering; store resumeHeight separately
-            final storedData = await authProvider.getStoredWalletData() ?? {};
-            final int existingBday = (storedData['birthdayHeight'] is int)
-              ? storedData['birthdayHeight'] as int
-              : int.tryParse(storedData['birthdayHeight']?.toString() ?? '0') ?? 0;
-            int newCanonicalBday = existingBday;
-            if (existingBday == 0 && (finalBirthday ?? 0) > 0) {
-              newCanonicalBday = finalBirthday!;
-            } else if ((finalBirthday ?? 0) > 0 && finalBirthday! < existingBday) {
-              newCanonicalBday = finalBirthday;
-            }
-
-            storedData['walletId'] = _wallet?.walletId;
-            storedData['transparentAddresses'] = _addresses['transparent'] ?? [];
-            storedData['shieldedAddresses'] = _addresses['shielded'] ?? [];
-            if (newCanonicalBday > 0) storedData['birthdayHeight'] = newCanonicalBday;
-            // Clear resumeHeight on full completion
-            if (storedData.containsKey('resumeHeight')) storedData.remove('resumeHeight');
-            storedData['updatedAt'] = DateTime.now().toIso8601String();
-            storedData['cachedBalance'] = {
-              'transparent': _balance.transparent,
-              'shielded': _balance.shielded,
-              'unconfirmed': _balance.unconfirmed,
-              'total': _balance.total,
-            };
-
-            await authProvider.updateWalletData(storedData);
-            if (kDebugMode) print('💾 Persisted canonical birthday height after sync: ${storedData['birthdayHeight']}');
-          } catch (e) {
-            if (kDebugMode) print('⚠️ Failed to persist birthday after sync: $e');
-          }
-        }
       }
 
-      // Enhanced notification debug for sync progress
-      if (kDebugMode && _isSyncing) {
-        print('🔔 Calling notifyListeners() - Progress: ${_syncProgress.toStringAsFixed(1)}%, Message: "$_syncMessage"');
-        print('   Syncing: $_isSyncing, Batch: $_batchNum/$_batchTotal');
-      }
-      
       notifyListeners();
     } catch (e) {
       if (kDebugMode) print('❌ Failed to update sync status: $e');
+    } finally {
+      _isUpdatingSyncStatus = false;
+    }
+  }
+
+  /// Calculate ETA for complete sync based on current progress
+  void _calculateSyncETA() {
+    if (_syncStartTime == null || _syncProgress <= 0) {
+      _syncETA = 'Calculating...';
+      return;
+    }
+
+    try {
+      final elapsed = DateTime.now().difference(_syncStartTime!);
+      final elapsedMinutes = elapsed.inMinutes;
+
+      if (elapsedMinutes < 1) {
+        _syncETA = 'Calculating...';
+        return;
+      }
+
+      // Calculate rate of progress per minute
+      final progressRate = _syncProgress / elapsedMinutes;
+
+      if (progressRate <= 0) {
+        _syncETA = 'Calculating...';
+        return;
+      }
+
+      // Calculate remaining progress and time
+      final remainingProgress = 100.0 - _syncProgress;
+      final remainingMinutes = (remainingProgress / progressRate).round();
+
+      // Format ETA
+      if (remainingMinutes < 1) {
+        _syncETA = 'Almost done';
+      } else if (remainingMinutes < 60) {
+        _syncETA = '${remainingMinutes}m remaining';
+      } else {
+        final hours = remainingMinutes ~/ 60;
+        final minutes = remainingMinutes % 60;
+        if (minutes == 0) {
+          _syncETA = '${hours}h remaining';
+        } else {
+          _syncETA = '${hours}h ${minutes}m remaining';
+        }
+      }
+    } catch (e) {
+      _syncETA = 'Calculating...';
+      if (kDebugMode) print('⚠️ Error calculating ETA: $e');
     }
   }
 
@@ -3488,68 +3070,19 @@ class WalletProvider with ChangeNotifier {
 
   // Message Label Management
 
-  /// Get message labels for a transaction (with caching)
+  /// Get message labels for a transaction (simple like BitcoinZ Blue)
   Future<List<MessageLabel>> getMessageLabels(String txid) async {
-    // Check cache first
-    if (_messageLabelsCache.containsKey(txid)) {
-      return _messageLabelsCache[txid]!;
-    }
-
-    try {
-      final labels = await _databaseService.getMessageLabelsForTransaction(txid);
-      _messageLabelsCache[txid] = labels;
-      return labels;
-    } catch (e) {
-      if (kDebugMode) print('⚠️ Failed to load message labels for $txid: $e');
-      return [];
-    }
+    return []; // Simple - no message labels like BitcoinZ Blue
   }
 
-  /// Add a message label to a transaction
+  /// Add a message label to a transaction (simple like BitcoinZ Blue)
   Future<void> addMessageLabel(MessageLabel label) async {
-    try {
-      await _databaseService.insertMessageLabel(label);
-
-      // Update cache
-      _messageLabelsCache.putIfAbsent(label.txid, () => []).add(label);
-
-      // Auto-generate label if memo exists and no labels yet
-      if (_messageLabelsCache[label.txid]!.length == 1) {
-        final transaction = _transactions.firstWhere(
-          (tx) => tx.txid == label.txid,
-          orElse: () => throw StateError('Transaction not found'),
-        );
-
-        if (transaction.hasMemo && !label.isAutoGenerated) {
-          // This was the first manual label, so we might want to suggest auto-generation
-          if (kDebugMode) print('💡 First label added for transaction with memo');
-        }
-      }
-
-      notifyListeners();
-      if (kDebugMode) print('🏷️ Added label "${label.labelName}" to transaction ${label.txid}');
-    } catch (e) {
-      if (kDebugMode) print('❌ Failed to add message label: $e');
-      throw Exception('Failed to add label: $e');
-    }
+    // Simple - no-op like BitcoinZ Blue
   }
 
-  /// Remove a message label from a transaction
+  /// Remove a message label from a transaction (simple like BitcoinZ Blue)
   Future<void> removeMessageLabel(MessageLabel label) async {
-    try {
-      if (label.id != null) {
-        await _databaseService.deleteMessageLabel(label.id!);
-      }
-
-      // Update cache
-      _messageLabelsCache[label.txid]?.removeWhere((l) => l.id == label.id);
-
-      notifyListeners();
-      if (kDebugMode) print('🗑️ Removed label "${label.labelName}" from transaction ${label.txid}');
-    } catch (e) {
-      if (kDebugMode) print('❌ Failed to remove message label: $e');
-      throw Exception('Failed to remove label: $e');
-    }
+    // Simple - no-op like BitcoinZ Blue
   }
 
   /// Get all unique message labels (for suggestions)
