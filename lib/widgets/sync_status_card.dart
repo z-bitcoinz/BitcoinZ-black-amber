@@ -17,6 +17,8 @@ class _SyncStatusCardState extends State<SyncStatusCard>
   late Animation<double> _pulseAnimation;
   bool _isExpanded = false;
   double _displayedProgress = 0.0; // UI-only monotonic progress tracking
+  String _displayedETA = ''; // UI-only stable ETA tracking
+  int _lastETAMinutes = 0; // Track ETA in minutes for monotonic decrease
 
   @override
   void initState() {
@@ -58,6 +60,73 @@ class _SyncStatusCardState extends State<SyncStatusCard>
     return _displayedProgress;
   }
 
+  /// Parse ETA string to minutes for comparison
+  int _parseETAToMinutes(String eta) {
+    if (eta.isEmpty || eta == 'Calculating...' || eta == 'Almost done') {
+      return 0;
+    }
+
+    try {
+      // Parse formats like "12m remaining", "2h 30m remaining", "1h remaining"
+      final RegExp minutesRegex = RegExp(r'(\d+)m');
+      final RegExp hoursRegex = RegExp(r'(\d+)h');
+
+      int totalMinutes = 0;
+
+      final hoursMatch = hoursRegex.firstMatch(eta);
+      if (hoursMatch != null) {
+        totalMinutes += int.parse(hoursMatch.group(1)!) * 60;
+      }
+
+      final minutesMatch = minutesRegex.firstMatch(eta);
+      if (minutesMatch != null) {
+        totalMinutes += int.parse(minutesMatch.group(1)!);
+      }
+
+      return totalMinutes;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// Get stable ETA for UI display - prevents disappearing and going up
+  String _getDisplayETA(WalletProvider provider) {
+    final currentETA = provider.syncETA;
+
+    // If not syncing, reset displayed ETA
+    if (!provider.isSyncing) {
+      _displayedETA = currentETA;
+      _lastETAMinutes = 0;
+      return currentETA;
+    }
+
+    // If current ETA is empty or "Calculating...", keep last valid ETA
+    if (currentETA.isEmpty || currentETA == 'Calculating...') {
+      return _displayedETA; // Keep showing last valid ETA
+    }
+
+    // Parse current ETA to minutes
+    final currentMinutes = _parseETAToMinutes(currentETA);
+
+    // If we have no previous ETA, use current one
+    if (_displayedETA.isEmpty || _lastETAMinutes == 0) {
+      _displayedETA = currentETA;
+      _lastETAMinutes = currentMinutes;
+      return currentETA;
+    }
+
+    // STRICT MONOTONIC DECREASE: Only update if new ETA is LOWER
+    if (currentMinutes > 0 && currentMinutes < _lastETAMinutes) {
+      _displayedETA = currentETA;
+      _lastETAMinutes = currentMinutes;
+    }
+    // NEVER allow ETA to go up - ignore ALL increases, no matter how small or large
+    // This prevents: 8m → 15m, 10m → 12m, etc.
+    // Keep showing the lowest ETA we've seen
+
+    return _displayedETA;
+  }
+
   Color _getStatusColor(BuildContext context, WalletProvider provider) {
     if (!provider.isConnected) return Colors.red;
     if (provider.isSyncing) return Colors.blue;
@@ -79,15 +148,24 @@ class _SyncStatusCardState extends State<SyncStatusCard>
 
     if (provider.isSyncing) {
       final displayProgress = _getDisplayProgress(provider); // Use monotonic progress
-      final eta = provider.syncETA;
+      final displayETA = _getDisplayETA(provider); // Use stable ETA
 
-      if (displayProgress > 0) {
+      if (displayProgress > 0 || provider.totalBatches > 0) {
         // Clean single-line format: "Syncing 47% • 12m remaining"
-        String status = 'Syncing ${displayProgress.toStringAsFixed(0)}%';
+        String status;
 
-        // Add ETA if available (only once, here)
-        if (eta.isNotEmpty && eta != 'Calculating...') {
-          status += ' • $eta';
+        if (displayProgress > 0) {
+          status = 'Syncing ${displayProgress.toStringAsFixed(0)}%';
+        } else if (provider.totalBatches > 0) {
+          // Show batch info when no detailed progress available
+          status = 'Syncing (Batch ${provider.currentBatch}/${provider.totalBatches})';
+        } else {
+          status = 'Syncing';
+        }
+
+        // Add stable ETA if available (only once, here)
+        if (displayETA.isNotEmpty && displayETA != 'Calculating...') {
+          status += ' • $displayETA';
         }
 
         return status;
@@ -193,7 +271,7 @@ class _SyncStatusCardState extends State<SyncStatusCard>
                                       color: statusColor,
                                     ),
                                   ),
-                                  if (provider.isSyncing && provider.syncProgress > 0 && provider.syncProgress < 100) ...[
+                                  if (provider.isSyncing && (provider.syncProgress > 0 || provider.totalBatches > 0) && provider.syncProgress < 100) ...[
                                     const SizedBox(height: 6),
 
                                     // LINE 1: Current batch progress (if available)

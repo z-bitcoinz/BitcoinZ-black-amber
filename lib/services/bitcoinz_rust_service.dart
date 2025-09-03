@@ -1512,7 +1512,19 @@ class BitcoinzRustService {
       };
     }
   }
-  
+
+  /// Get raw sync status string - may contain text format with real-time data
+  Future<String?> getRawSyncStatus() async {
+    try {
+      // Try to get the raw status string directly
+      final statusStr = await rust_api.getSyncStatus();
+      return statusStr;
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to get raw sync status: $e');
+      return null;
+    }
+  }
+
   DateTime? _lastFinalizationTime;
   int _stuckFinalizationCount = 0;
   

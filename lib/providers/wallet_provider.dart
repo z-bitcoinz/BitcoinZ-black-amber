@@ -57,6 +57,7 @@ class WalletProvider with ChangeNotifier {
   bool _isUpdatingSyncStatus = false; // Prevent race conditions
   DateTime? _lastActiveSyncDetected; // Track when we last saw active sync
   int _consecutiveInactivePolls = 0; // Count consecutive inactive polls
+  DateTime? _lastSyncUIHideTime; // Track when we should hide sync UI (with grace period)
 
   // Detailed batch and ETA tracking
   int _currentBatch = 0;
@@ -1671,15 +1672,50 @@ class WalletProvider with ChangeNotifier {
       int syncedBlocks = 0;
       int totalBlocks = 0;
 
+      // Always try to get progress details when sync is active
+      int currentBatch = 0;
+      int totalBatches = 0;
+
       if (actuallyInProgress) {
-        // Try to get progress details, but don't rely on them for sync detection
         try {
           final status = await _rustService.getSyncStatus();
           if (status != null) {
             syncedBlocks = status['synced_blocks'] ?? 0;
             totalBlocks = status['total_blocks'] ?? 0;
+            currentBatch = status['batch_num'] ?? 0;
+            totalBatches = status['batch_total'] ?? 0;
+
             if (kDebugMode) {
               print('🔍 Progress Details: $syncedBlocks/$totalBlocks blocks');
+              print('🔍 Batch Details: $currentBatch/$totalBatches batches');
+            }
+
+            // WORKAROUND: If we get stale data (all zeros) but sync is actually active,
+            // try to get the raw status string and parse it manually
+            if (syncedBlocks == 0 && totalBlocks == 0 && currentBatch == 0 && totalBatches == 0) {
+              if (kDebugMode) print('🔧 WORKAROUND: Got stale sync data, attempting manual parsing...');
+
+              try {
+                // Try to get the raw status string that might contain the text format
+                final rawStatus = await _rustService.getRawSyncStatus();
+                if (rawStatus != null && rawStatus.contains('batch:') && rawStatus.contains('blocks:')) {
+                  final parsed = _parseTextSyncStatus(rawStatus);
+                  if (parsed != null) {
+                    syncedBlocks = parsed['synced_blocks'] ?? 0;
+                    totalBlocks = parsed['total_blocks'] ?? 0;
+                    currentBatch = parsed['batch_num'] ?? 0;
+                    totalBatches = parsed['batch_total'] ?? 0;
+
+                    if (kDebugMode) {
+                      print('🔧 WORKAROUND SUCCESS: Parsed text format');
+                      print('   Progress: $syncedBlocks/$totalBlocks blocks');
+                      print('   Batch: $currentBatch/$totalBatches');
+                    }
+                  }
+                }
+              } catch (e) {
+                if (kDebugMode) print('🔧 WORKAROUND FAILED: $e');
+              }
             }
           }
         } catch (e) {
@@ -1691,6 +1727,7 @@ class WalletProvider with ChangeNotifier {
         // ACTUAL sync in progress - trust the Rust service!
         _lastActiveSyncDetected = DateTime.now();
         _consecutiveInactivePolls = 0;
+        _lastSyncUIHideTime = null; // Reset grace period when sync is active
 
         _setSyncing(true);
         _syncMessage = 'Syncing...';
@@ -1699,82 +1736,107 @@ class WalletProvider with ChangeNotifier {
           _syncStartTime = DateTime.now();
         }
 
-        // Get detailed batch and progress information
+        // Calculate sync progress based on available data
         if (totalBlocks > 0 && syncedBlocks > 0) {
-          try {
-            final status = await _rustService.getSyncStatus();
-            final int currentBatch = (status?['batch_num'] ?? 0) as int;
-            final int totalBatches = (status?['batch_total'] ?? 1) as int;
+          // We have detailed block progress - use it for accurate calculation
+          _syncedBlocks = syncedBlocks;
+          _totalBlocks = totalBlocks;
+          _currentBatch = currentBatch + 1; // Display as 1-based
+          _totalBatches = totalBatches;
 
-            // Update detailed sync info
-            _currentBatch = currentBatch + 1; // Display as 1-based
-            _totalBatches = totalBatches;
-            _syncedBlocks = syncedBlocks;
-            _totalBlocks = totalBlocks;
+          // Calculate batch progress (within current batch)
+          _batchProgress = (syncedBlocks * 100.0) / totalBlocks;
 
-            // Calculate batch progress (within current batch)
-            _batchProgress = (syncedBlocks * 100.0) / totalBlocks;
+          // Calculate overall progress across all batches
+          if (totalBatches > 1) {
+            final double batchProgressDecimal = syncedBlocks.toDouble() / totalBlocks.toDouble();
+            final double overallProgress = ((currentBatch.toDouble() + batchProgressDecimal) / totalBatches.toDouble()) * 100.0;
+            _syncProgress = overallProgress.clamp(0.0, 99.0);
+          } else {
+            _syncProgress = _batchProgress.clamp(0.0, 99.0);
+          }
 
-            // Calculate overall progress across all batches
-            if (totalBatches > 1) {
-              final double batchProgressDecimal = syncedBlocks.toDouble() / totalBlocks.toDouble();
-              final double overallProgress = ((currentBatch.toDouble() + batchProgressDecimal) / totalBatches.toDouble()) * 100.0;
-              _syncProgress = overallProgress.clamp(0.0, 99.0);
-            } else {
-              _syncProgress = _batchProgress.clamp(0.0, 99.0);
-            }
+          // Calculate ETA for complete sync
+          _calculateSyncETA();
 
-            // Calculate ETA for complete sync
-            _calculateSyncETA();
+          if (kDebugMode) {
+            print('📊 COMPREHENSIVE sync progress: ${_syncProgress.toStringAsFixed(1)}% overall');
+            print('   📦 Batch $_currentBatch/$_totalBatches (${_batchProgress.toStringAsFixed(1)}% within batch)');
+            print('   🧮 Blocks: $syncedBlocks/$totalBlocks in current batch');
+            print('   ⏱️ ETA: $_syncETA');
+          }
+        } else if (totalBatches > 0) {
+          // We have batch info but no detailed block progress - use batch-based progress
+          _currentBatch = currentBatch + 1; // Display as 1-based
+          _totalBatches = totalBatches;
 
-            if (kDebugMode) {
-              print('📊 COMPREHENSIVE sync progress: ${_syncProgress.toStringAsFixed(1)}% overall');
-              print('   📦 Batch $_currentBatch/$_totalBatches (${_batchProgress.toStringAsFixed(1)}% within batch)');
-              print('   🧮 Blocks: $syncedBlocks/$totalBlocks in current batch');
-              print('   ⏱️ ETA: $_syncETA');
-            }
-          } catch (e) {
-            // Fallback to simple progress
-            _syncProgress = (syncedBlocks * 100.0 / totalBlocks).clamp(0.0, 99.0);
-            _syncETA = 'Calculating...';
+          final double batchBasedProgress = (currentBatch.toDouble() / totalBatches.toDouble()) * 100.0;
+          _syncProgress = batchBasedProgress.clamp(0.0, 99.0);
+          _syncETA = 'Calculating...';
 
-            if (kDebugMode) {
-              print('📊 Fallback sync progress: ${_syncProgress.toStringAsFixed(1)}%');
-            }
+          if (kDebugMode) {
+            print('📊 Batch-based sync progress: ${_syncProgress.toStringAsFixed(1)}% (Batch $_currentBatch/$_totalBatches)');
           }
         } else {
-          // No detailed progress available - use time-based estimation
+          // No detailed progress available - use time-based estimation starting from 0%
           final elapsed = DateTime.now().difference(_syncStartTime!).inMinutes;
-          _syncProgress = (5.0 + (elapsed * 1.5)).clamp(5.0, 95.0);
+          _syncProgress = (elapsed * 1.0).clamp(0.0, 99.0); // Start at 0%, increase 1% per minute
           _syncETA = 'Calculating...';
 
           if (kDebugMode) {
             print('📊 Time-based sync progress: ${_syncProgress.toStringAsFixed(1)}% (${elapsed} min elapsed)');
           }
         }
+
+        // FORCE UI UPDATE: Even if we get inconsistent data, ensure UI updates
+        if (kDebugMode) print('🔔 FORCING UI update after sync status processing');
+        notifyListeners();
       } else {
-        // Rust service says NOT syncing - sync is complete
-        if (kDebugMode) print('📊 ACTUAL sync completed - Rust service _isSyncing = false');
-        _setSyncing(false);
-        _syncProgress = 100.0;
-        _syncMessage = '';
-        _lastSyncTime = DateTime.now();
-        _syncStartTime = null; // Reset sync timer for next sync
-        _consecutiveInactivePolls = 0;
+        // Rust service says NOT syncing - but use grace period to prevent UI flicker
+        _consecutiveInactivePolls++;
 
-        // Reset detailed sync info
-        _currentBatch = 0;
-        _totalBatches = 0;
-        _syncedBlocks = 0;
-        _totalBlocks = 0;
-        _syncETA = '';
-        _batchProgress = 0.0;
+        // If we were previously syncing, start grace period before hiding UI
+        if (_isSyncing && _lastSyncUIHideTime == null) {
+          _lastSyncUIHideTime = DateTime.now().add(const Duration(seconds: 10));
+          if (kDebugMode) print('🕐 Sync UI grace period started - will hide in 10 seconds if still inactive');
+        }
 
-        // Refresh wallet data after sync completion
-        if (hasWallet) {
-          _refreshWalletData().catchError((e) {
-            if (kDebugMode) print('⚠️ Failed to refresh wallet data after sync: $e');
-          });
+        // Check if grace period has expired
+        final now = DateTime.now();
+        final shouldHideUI = _lastSyncUIHideTime != null && now.isAfter(_lastSyncUIHideTime!);
+
+        if (shouldHideUI || _consecutiveInactivePolls >= 5) {
+          // Grace period expired or multiple consecutive inactive polls - sync is truly complete
+          if (kDebugMode) print('📊 ACTUAL sync completed - Rust service _isSyncing = false (after grace period)');
+          _setSyncing(false);
+          _syncProgress = 100.0;
+          _syncMessage = '';
+          _lastSyncTime = DateTime.now();
+          _syncStartTime = null; // Reset sync timer for next sync
+          _consecutiveInactivePolls = 0;
+          _lastSyncUIHideTime = null; // Reset grace period
+
+          // Reset detailed sync info
+          _currentBatch = 0;
+          _totalBatches = 0;
+          _syncedBlocks = 0;
+          _totalBlocks = 0;
+          _syncETA = '';
+          _batchProgress = 0.0;
+
+          // Refresh wallet data after sync completion
+          if (hasWallet) {
+            _refreshWalletData().catchError((e) {
+              if (kDebugMode) print('⚠️ Failed to refresh wallet data after sync: $e');
+            });
+          }
+        } else {
+          // Still in grace period - keep showing sync UI
+          if (kDebugMode) print('🕐 Sync UI grace period active - keeping sync UI visible (${_consecutiveInactivePolls} inactive polls)');
+
+          // FORCE UI UPDATE during grace period to ensure UI stays responsive
+          if (kDebugMode) print('🔔 FORCING UI update during grace period');
+          notifyListeners();
         }
       }
 
@@ -1916,6 +1978,53 @@ class WalletProvider with ChangeNotifier {
       if (kDebugMode) print('❌ Failed to parse detailed sync status: $e');
       // Return empty map to trigger fallback to basic status
       return {};
+    }
+  }
+
+  /// Parse text format sync status: "id: 1, batch: 0/28, blocks: 8499/30000, decryptions: 9000, tx_scan: 0"
+  Map<String, dynamic>? _parseTextSyncStatus(String rawStatus) {
+    try {
+      if (kDebugMode) print('🔧 Parsing text sync status: "$rawStatus"');
+
+      final Map<String, dynamic> parsed = {};
+
+      // Parse batch information: "batch: 0/28"
+      final batchMatch = RegExp(r'batch:\s*(\d+)/(\d+)').firstMatch(rawStatus);
+      if (batchMatch != null) {
+        parsed['batch_num'] = int.parse(batchMatch.group(1)!);
+        parsed['batch_total'] = int.parse(batchMatch.group(2)!);
+      }
+
+      // Parse blocks information: "blocks: 8499/30000"
+      final blocksMatch = RegExp(r'blocks:\s*(\d+)/(\d+)').firstMatch(rawStatus);
+      if (blocksMatch != null) {
+        parsed['synced_blocks'] = int.parse(blocksMatch.group(1)!);
+        parsed['total_blocks'] = int.parse(blocksMatch.group(2)!);
+      }
+
+      // Parse sync_id: "id: 1"
+      final idMatch = RegExp(r'id:\s*(\d+)').firstMatch(rawStatus);
+      if (idMatch != null) {
+        parsed['sync_id'] = int.parse(idMatch.group(1)!);
+      }
+
+      // Determine if in progress based on parsed data
+      final batchTotal = parsed['batch_total'] as int?;
+      final totalBlocks = parsed['total_blocks'] as int?;
+
+      final inProgress = (batchTotal != null && batchTotal > 0) ||
+                        (totalBlocks != null && totalBlocks > 0);
+
+      parsed['in_progress'] = inProgress;
+
+      if (kDebugMode) {
+        print('🔧 Parsed result: $parsed');
+      }
+
+      return parsed.isNotEmpty ? parsed : null;
+    } catch (e) {
+      if (kDebugMode) print('🔧 Failed to parse text sync status: $e');
+      return null;
     }
   }
 
