@@ -16,6 +16,7 @@ class _SyncStatusCardState extends State<SyncStatusCard>
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
   bool _isExpanded = false;
+  double _displayedProgress = 0.0; // UI-only monotonic progress tracking
 
   @override
   void initState() {
@@ -39,6 +40,24 @@ class _SyncStatusCardState extends State<SyncStatusCard>
     super.dispose();
   }
 
+  /// Get monotonic progress for UI display - prevents backwards jumps
+  double _getDisplayProgress(WalletProvider provider) {
+    final currentProgress = provider.syncProgress;
+
+    // If not syncing, reset displayed progress
+    if (!provider.isSyncing) {
+      _displayedProgress = currentProgress;
+      return currentProgress;
+    }
+
+    // Only update displayed progress if it's higher (monotonic)
+    if (currentProgress > _displayedProgress) {
+      _displayedProgress = currentProgress;
+    }
+
+    return _displayedProgress;
+  }
+
   Color _getStatusColor(BuildContext context, WalletProvider provider) {
     if (!provider.isConnected) return Colors.red;
     if (provider.isSyncing) return Colors.blue;
@@ -59,12 +78,12 @@ class _SyncStatusCardState extends State<SyncStatusCard>
     }
 
     if (provider.isSyncing) {
-      final progress = provider.syncProgress;
+      final displayProgress = _getDisplayProgress(provider); // Use monotonic progress
       final eta = provider.syncETA;
 
-      if (progress > 0) {
+      if (displayProgress > 0) {
         // Clean single-line format: "Syncing 47% • 12m remaining"
-        String status = 'Syncing ${progress.toStringAsFixed(0)}%';
+        String status = 'Syncing ${displayProgress.toStringAsFixed(0)}%';
 
         // Add ETA if available (only once, here)
         if (eta.isNotEmpty && eta != 'Calculating...') {
@@ -203,7 +222,7 @@ class _SyncStatusCardState extends State<SyncStatusCard>
 
                                       const SizedBox(height: 3),
 
-                                      // Batch progress bar (orange)
+                                      // Batch progress bar (orange) - uses raw batch progress
                                       Container(
                                         height: 3.0,
                                         decoration: BoxDecoration(
@@ -239,7 +258,7 @@ class _SyncStatusCardState extends State<SyncStatusCard>
                                           ),
                                         ),
                                         Text(
-                                          '${provider.syncProgress.toStringAsFixed(0)}%',
+                                          '${_getDisplayProgress(provider).toStringAsFixed(0)}%', // Use monotonic progress
                                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
                                             fontSize: 12,
@@ -251,7 +270,7 @@ class _SyncStatusCardState extends State<SyncStatusCard>
 
                                     const SizedBox(height: 3),
 
-                                    // Overall progress bar (blue, more prominent)
+                                    // Overall progress bar (blue, more prominent) - uses monotonic progress
                                     Container(
                                       height: 4.0,
                                       decoration: BoxDecoration(
@@ -260,7 +279,7 @@ class _SyncStatusCardState extends State<SyncStatusCard>
                                       ),
                                       child: FractionallySizedBox(
                                         alignment: Alignment.centerLeft,
-                                        widthFactor: (provider.syncProgress / 100.0).clamp(0.0, 1.0),
+                                        widthFactor: (_getDisplayProgress(provider) / 100.0).clamp(0.0, 1.0),
                                         child: Container(
                                           decoration: BoxDecoration(
                                             color: Colors.blue,

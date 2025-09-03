@@ -3,8 +3,33 @@ import 'package:provider/provider.dart';
 import '../providers/wallet_provider.dart';
 
 /// Widget to show connection and sync status
-class ConnectionStatusWidget extends StatelessWidget {
+class ConnectionStatusWidget extends StatefulWidget {
   const ConnectionStatusWidget({super.key});
+
+  @override
+  State<ConnectionStatusWidget> createState() => _ConnectionStatusWidgetState();
+}
+
+class _ConnectionStatusWidgetState extends State<ConnectionStatusWidget> {
+  double _displayedProgress = 0.0; // UI-only monotonic progress tracking
+
+  /// Get monotonic progress for UI display - prevents backwards jumps
+  double _getDisplayProgress(WalletProvider provider) {
+    final currentProgress = provider.syncProgress;
+
+    // If not syncing, reset displayed progress
+    if (!provider.isSyncing) {
+      _displayedProgress = currentProgress;
+      return currentProgress;
+    }
+
+    // Only update displayed progress if it's higher (monotonic)
+    if (currentProgress > _displayedProgress) {
+      _displayedProgress = currentProgress;
+    }
+
+    return _displayedProgress;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +37,7 @@ class ConnectionStatusWidget extends StatelessWidget {
       builder: (context, provider, child) {
         final isConnected = provider.isConnected;
         final isSyncing = provider.isSyncing;
-        final syncProgress = provider.syncProgress;
+        final displayProgress = _getDisplayProgress(provider); // Use monotonic progress
         final currentBatch = provider.currentBatch;
         final totalBatches = provider.totalBatches;
         
@@ -28,8 +53,12 @@ class ConnectionStatusWidget extends StatelessWidget {
           statusColor = Colors.red;
           statusIcon = Icons.wifi_off;
         } else if (isSyncing) {
-          // Show sync progress - BLUE (only when actively syncing)
-          statusText = 'Syncing';
+          // Show sync progress - BLUE (only when actively syncing) with monotonic progress
+          if (totalBatches > 0) {
+            statusText = 'Syncing ${displayProgress.toStringAsFixed(0)}% (Batch $currentBatch/$totalBatches)';
+          } else {
+            statusText = 'Syncing ${displayProgress.toStringAsFixed(0)}%';
+          }
           statusColor = Colors.blue;
           statusIcon = Icons.sync;
           showSpinner = true;
