@@ -57,6 +57,7 @@ class WalletProvider with ChangeNotifier {
   bool _isUpdatingSyncStatus = false; // Prevent race conditions
   DateTime? _lastActiveSyncDetected; // Track when we last saw active sync
   int _consecutiveInactivePolls = 0; // Count consecutive inactive polls
+  int _consecutiveCompletePolls = 0; // Count consecutive polls showing completion evidence
   DateTime? _lastSyncUIHideTime; // Track when we should hide sync UI (with grace period)
 
   // Detailed batch and ETA tracking
@@ -1452,6 +1453,21 @@ class WalletProvider with ChangeNotifier {
     if (kDebugMode) print('🔄 Starting sync status polling...');
     if (kDebugMode) print('   Rust service initialized: ${_rustService.initialized}');
 
+    // 🚀 SMART GRACE PERIOD: Handle already-synced wallets vs fresh syncs
+    if (_lastSyncUIHideTime == null) {
+      final walletHasData = _balance.total > 0 && _transactions.isNotEmpty;
+
+      if (walletHasData) {
+        // ⚡ INSTANT HIDE: Wallet already synced, no need to show sync UI
+        _lastSyncUIHideTime = DateTime.now().subtract(const Duration(seconds: 1));
+        if (kDebugMode) print('⚡ INSTANT HIDE: Wallet already synced, hiding sync UI immediately');
+      } else {
+        // 🕐 NORMAL GRACE: Fresh sync, show for 30 seconds
+        _lastSyncUIHideTime = DateTime.now().add(const Duration(seconds: 30));
+        if (kDebugMode) print('🕐 NORMAL grace period set - fresh sync, hiding in 30s');
+      }
+    }
+
     // Track when polling started to prevent infinite loops
     final pollingStartTime = DateTime.now();
     // For genesis sync (birthday 0), allow much longer polling time
@@ -1727,6 +1743,7 @@ class WalletProvider with ChangeNotifier {
         // ACTUAL sync in progress - trust the Rust service!
         _lastActiveSyncDetected = DateTime.now();
         _consecutiveInactivePolls = 0;
+        _consecutiveCompletePolls = 0; // Reset completion evidence counter
         _lastSyncUIHideTime = null; // Reset grace period when sync is active
 
         _setSyncing(true);
@@ -1797,23 +1814,92 @@ class WalletProvider with ChangeNotifier {
 
         // If we were previously syncing, start grace period before hiding UI
         if (_isSyncing && _lastSyncUIHideTime == null) {
-          _lastSyncUIHideTime = DateTime.now().add(const Duration(seconds: 10));
-          if (kDebugMode) print('🕐 Sync UI grace period started - will hide in 10 seconds if still inactive');
+          // Use shorter grace period for wallets that already have data
+          final walletHasData = _balance.total > 0 && _transactions.isNotEmpty;
+          final gracePeriodSeconds = walletHasData ? 10 : 30;
+
+          _lastSyncUIHideTime = DateTime.now().add(Duration(seconds: gracePeriodSeconds));
+          if (kDebugMode) {
+            if (walletHasData) {
+              print('⚡ SHORT Sync UI grace period started - will hide in ${gracePeriodSeconds}s (wallet has data)');
+            } else {
+              print('🕐 EXTENDED Sync UI grace period started - will hide in ${gracePeriodSeconds}s (fresh sync)');
+            }
+          }
         }
 
         // Check if grace period has expired
         final now = DateTime.now();
         final shouldHideUI = _lastSyncUIHideTime != null && now.isAfter(_lastSyncUIHideTime!);
 
-        if (shouldHideUI || _consecutiveInactivePolls >= 5) {
-          // Grace period expired or multiple consecutive inactive polls - sync is truly complete
-          if (kDebugMode) print('📊 ACTUAL sync completed - Rust service _isSyncing = false (after grace period)');
+        // 🎯 BULLETPROOF HIDING CONDITIONS: Only hide UI when we're 100% CERTAIN sync is truly complete
+        final bool hasCompletionEvidence = _checkSyncCompletionEvidence(
+          syncedBlocks, totalBlocks, currentBatch, totalBatches
+        );
+
+        if (hasCompletionEvidence) {
+          _consecutiveCompletePolls++;
+
+          // 🚀 SMART GRACE PERIOD: If we detect wallet has data, hide immediately
+          final walletHasData = _balance.total > 0 && _transactions.isNotEmpty;
+          if (kDebugMode) {
+            print('🔍 SMART GRACE PERIOD CHECK:');
+            print('   walletHasData: $walletHasData (balance=${_balance.total}, txs=${_transactions.length})');
+            print('   _lastSyncUIHideTime: $_lastSyncUIHideTime');
+          }
+
+          if (walletHasData) {
+            if (_lastSyncUIHideTime == null) {
+              // ⚡ INSTANT HIDE: Set grace period for already-synced wallet
+              _lastSyncUIHideTime = now.subtract(const Duration(seconds: 1));
+              if (kDebugMode) print('⚡ INSTANT HIDE: Wallet has data, setting immediate hide time');
+            } else {
+              final timeUntilHide = _lastSyncUIHideTime!.difference(now).inSeconds;
+              if (kDebugMode) print('   timeUntilHide: ${timeUntilHide}s');
+
+              if (timeUntilHide > 0) {
+                // ⚡ INSTANT HIDE: Wallet already synced, hide immediately
+                _lastSyncUIHideTime = now.subtract(const Duration(seconds: 1));
+                if (kDebugMode) print('⚡ INSTANT HIDE: Wallet has data, updating to immediate hide');
+              }
+            }
+          }
+        } else {
+          _consecutiveCompletePolls = 0; // Reset if evidence is weak
+        }
+
+        // 🛡️ BULLETPROOF CONDITIONS: ALL must be true to hide UI
+        final hasMultipleCompletePolls = _consecutiveCompletePolls >= 3;
+        final hasExtendedInactivity = _consecutiveInactivePolls >= 10; // Increased from 5 to 10
+
+        // ⚡ INSTANT HIDE BYPASS: If wallet has data and grace period is in the past, bypass bulletproof conditions
+        final walletHasData = _balance.total > 0 && _transactions.isNotEmpty;
+        final isInstantHide = walletHasData && shouldHideUI && hasCompletionEvidence;
+
+        if (shouldHideUI && hasCompletionEvidence && (isInstantHide || (hasMultipleCompletePolls && hasExtendedInactivity))) {
+          // ALL conditions met - sync is truly complete
+          if (kDebugMode) {
+            if (isInstantHide) {
+              print('⚡ HIDING sync UI - INSTANT HIDE for already-synced wallet:');
+              print('   ✅ Grace period expired: $shouldHideUI');
+              print('   ✅ Completion evidence: $hasCompletionEvidence');
+              print('   ✅ Wallet has data: $walletHasData (bypassing poll requirements)');
+            } else {
+              print('🎯 HIDING sync UI - ALL bulletproof conditions met:');
+              print('   ✅ Grace period expired: $shouldHideUI');
+              print('   ✅ Completion evidence: $hasCompletionEvidence');
+              print('   ✅ Multiple complete polls: $hasMultipleCompletePolls ($_consecutiveCompletePolls)');
+              print('   ✅ Extended inactivity: $hasExtendedInactivity ($_consecutiveInactivePolls)');
+            }
+          }
+
           _setSyncing(false);
           _syncProgress = 100.0;
           _syncMessage = '';
           _lastSyncTime = DateTime.now();
           _syncStartTime = null; // Reset sync timer for next sync
           _consecutiveInactivePolls = 0;
+          _consecutiveCompletePolls = 0;
           _lastSyncUIHideTime = null; // Reset grace period
 
           // Reset detailed sync info
@@ -1831,11 +1917,15 @@ class WalletProvider with ChangeNotifier {
             });
           }
         } else {
-          // Still in grace period - keep showing sync UI
-          if (kDebugMode) print('🕐 Sync UI grace period active - keeping sync UI visible (${_consecutiveInactivePolls} inactive polls)');
+          // 🛡️ KEEPING sync UI visible - bulletproof conditions not met
+          if (kDebugMode) {
+            print('🛡️ KEEPING sync UI visible - bulletproof conditions not met:');
+            print('   Grace expired: $shouldHideUI, Evidence: $hasCompletionEvidence');
+            print('   Complete polls: $hasMultipleCompletePolls ($_consecutiveCompletePolls), Extended inactive: $hasExtendedInactivity ($_consecutiveInactivePolls)');
+          }
 
           // FORCE UI UPDATE during grace period to ensure UI stays responsive
-          if (kDebugMode) print('🔔 FORCING UI update during grace period');
+          if (kDebugMode) print('🔔 FORCING UI update during extended grace period');
           notifyListeners();
         }
       }
@@ -2025,6 +2115,56 @@ class WalletProvider with ChangeNotifier {
     } catch (e) {
       if (kDebugMode) print('🔧 Failed to parse text sync status: $e');
       return null;
+    }
+  }
+
+  /// Check if we have strong evidence that sync is truly complete
+  /// This is used for bulletproof sync UI hiding logic
+  bool _checkSyncCompletionEvidence(int syncedBlocks, int totalBlocks, int currentBatch, int totalBatches) {
+    try {
+      // Evidence 1: We have block progress and it's at 100%
+      if (totalBlocks > 0 && syncedBlocks >= totalBlocks) {
+        if (kDebugMode) print('🎯 Completion evidence: Blocks complete ($syncedBlocks/$totalBlocks)');
+        return true;
+      }
+
+      // Evidence 2: We have batch progress and all batches are complete
+      if (totalBatches > 0 && currentBatch >= totalBatches) {
+        if (kDebugMode) print('🎯 Completion evidence: Batches complete ($currentBatch/$totalBatches)');
+        return true;
+      }
+
+      // Evidence 3: Sync progress is at or near 100%
+      if (_syncProgress >= 99.5) {
+        if (kDebugMode) print('🎯 Completion evidence: Progress at ${_syncProgress.toStringAsFixed(1)}%');
+        return true;
+      }
+
+      // Evidence 4: Wallet has balance and transactions (indicating successful sync)
+      // AND Rust service says sync is not active
+      if (!_rustService.isActuallySyncing && _balance.total > 0 && _transactions.isNotEmpty) {
+        if (kDebugMode) print('🎯 Completion evidence: Wallet has data (balance=${_balance.total.toStringAsFixed(6)}, txs=${_transactions.length}) and Rust inactive');
+        return true;
+      }
+
+      // Evidence 5: Wallet is fully loaded with data but no active sync
+      // This handles the case where sync completed but we don't have progress data
+      if (!_rustService.isActuallySyncing && hasWallet && _wallet != null &&
+          (_balance.total > 0 || _transactions.isNotEmpty)) {
+        if (kDebugMode) print('🎯 Completion evidence: Wallet loaded with data and no active sync');
+        return true;
+      }
+
+      // No strong evidence of completion
+      if (kDebugMode) {
+        print('🔍 No completion evidence: blocks=$syncedBlocks/$totalBlocks, batches=$currentBatch/$totalBatches, progress=${_syncProgress.toStringAsFixed(1)}%');
+        print('   Rust active: ${_rustService.isActuallySyncing}, Balance: ${_balance.total}, Txs: ${_transactions.length}');
+      }
+      return false;
+
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Error checking completion evidence: $e');
+      return false; // Be conservative - no evidence if error
     }
   }
 
