@@ -5014,8 +5014,7 @@ class WalletProvider with ChangeNotifier {
     final shieldedChange = newBalance.shielded - oldBalance.shielded;
     final unconfirmedChange = newBalance.unconfirmed - oldBalance.unconfirmed;
 
-    // Check if there's a significant change (above minimum threshold)
-    final minChange = _notificationProvider!.settings.minimumBalanceChange;
+    // Notify for any balance change (no minimum threshold)
 
     // Check if this balance change is caused by a transaction with memo
     // If so, skip balance notification since message notification will be sent
@@ -5027,7 +5026,7 @@ class WalletProvider with ChangeNotifier {
     }
 
     // Detect incoming funds (positive change in total balance)
-    if (totalChange > minChange) {
+    if (totalChange > 0.00000001) {
       if (kDebugMode) {
         print('🔔 Balance increase detected: +${totalChange.toStringAsFixed(8)} BTCZ');
         print('   ⏳ Debouncing balance notification to allow memo processing...');
@@ -5051,21 +5050,9 @@ class WalletProvider with ChangeNotifier {
         isIncoming: true,
       );
     }
-    // Detect outgoing funds (negative change, but only if it's not just unconfirmed change)
-    else if (totalChange < -minChange && unconfirmedChange >= 0) {
-      if (kDebugMode) {
-        print('🔔 Balance decrease detected: ${totalChange.toStringAsFixed(8)} BTCZ');
-      }
-
-      await NotificationService.instance.showBalanceChangeNotification(
-        previousBalance: oldBalance.total,
-        newBalance: newBalance.total,
-        changeAmount: totalChange.abs(),
-        isIncoming: false,
-      );
-    }
+    // Outgoing funds (negative change) - no notification needed for sends
     // Detect unconfirmed incoming funds
-    else if (unconfirmedChange > minChange) {
+    else if (unconfirmedChange > 0.00000001) {
       if (kDebugMode) {
         print('🔔 Unconfirmed funds detected: +${unconfirmedChange.toStringAsFixed(8)} BTCZ');
       }

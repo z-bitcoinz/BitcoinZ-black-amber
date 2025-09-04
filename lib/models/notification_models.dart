@@ -6,18 +6,12 @@ part 'notification_models.g.dart';
 enum NotificationType {
   balanceChange,
   messageReceived,
-  transactionConfirmed,
-  syncComplete,
-  syncError,
-  securityAlert,
 }
 
 /// Categories for organizing notifications
 enum NotificationCategory {
   financial,
   messages,
-  system,
-  security,
 }
 
 /// Priority levels for notifications
@@ -45,9 +39,6 @@ class NotificationSettings {
   final bool enabled;
   final bool balanceChangeEnabled;
   final bool messageNotificationsEnabled;
-  final bool transactionConfirmationEnabled;
-  final bool syncNotificationsEnabled;
-  final bool securityAlertsEnabled;
   final bool soundEnabled;
   final NotificationSound soundType;
   final bool vibrationEnabled;
@@ -56,15 +47,11 @@ class NotificationSettings {
   final int quietHoursStart; // Hour in 24h format (e.g., 22 for 10 PM)
   final int quietHoursEnd;   // Hour in 24h format (e.g., 7 for 7 AM)
   final bool quietHoursEnabled;
-  final double minimumBalanceChange; // Minimum BTCZ amount to trigger notification
 
   const NotificationSettings({
     this.enabled = true,
     this.balanceChangeEnabled = true,
     this.messageNotificationsEnabled = true,
-    this.transactionConfirmationEnabled = true,
-    this.syncNotificationsEnabled = false,
-    this.securityAlertsEnabled = true,
     this.soundEnabled = true,
     this.soundType = NotificationSound.defaultSound,
     this.vibrationEnabled = true,
@@ -73,7 +60,6 @@ class NotificationSettings {
     this.quietHoursStart = 22,
     this.quietHoursEnd = 7,
     this.quietHoursEnabled = false,
-    this.minimumBalanceChange = 0.001,
   });
 
   factory NotificationSettings.fromJson(Map<String, dynamic> json) =>
@@ -85,9 +71,6 @@ class NotificationSettings {
     bool? enabled,
     bool? balanceChangeEnabled,
     bool? messageNotificationsEnabled,
-    bool? transactionConfirmationEnabled,
-    bool? syncNotificationsEnabled,
-    bool? securityAlertsEnabled,
     bool? soundEnabled,
     NotificationSound? soundType,
     bool? vibrationEnabled,
@@ -96,15 +79,11 @@ class NotificationSettings {
     int? quietHoursStart,
     int? quietHoursEnd,
     bool? quietHoursEnabled,
-    double? minimumBalanceChange,
   }) {
     return NotificationSettings(
       enabled: enabled ?? this.enabled,
       balanceChangeEnabled: balanceChangeEnabled ?? this.balanceChangeEnabled,
       messageNotificationsEnabled: messageNotificationsEnabled ?? this.messageNotificationsEnabled,
-      transactionConfirmationEnabled: transactionConfirmationEnabled ?? this.transactionConfirmationEnabled,
-      syncNotificationsEnabled: syncNotificationsEnabled ?? this.syncNotificationsEnabled,
-      securityAlertsEnabled: securityAlertsEnabled ?? this.securityAlertsEnabled,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       soundType: soundType ?? this.soundType,
       vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
@@ -113,7 +92,6 @@ class NotificationSettings {
       quietHoursStart: quietHoursStart ?? this.quietHoursStart,
       quietHoursEnd: quietHoursEnd ?? this.quietHoursEnd,
       quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
-      minimumBalanceChange: minimumBalanceChange ?? this.minimumBalanceChange,
     );
   }
 

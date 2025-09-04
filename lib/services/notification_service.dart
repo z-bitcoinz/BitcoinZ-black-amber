@@ -351,10 +351,6 @@ class NotificationService with WidgetsBindingObserver {
         return 'financial_notifications';
       case NotificationCategory.messages:
         return 'message_notifications';
-      case NotificationCategory.system:
-        return 'system_notifications';
-      case NotificationCategory.security:
-        return 'security_notifications';
     }
   }
 
@@ -365,10 +361,6 @@ class NotificationService with WidgetsBindingObserver {
         return 'Financial Notifications';
       case NotificationCategory.messages:
         return 'Message Notifications';
-      case NotificationCategory.system:
-        return 'System Notifications';
-      case NotificationCategory.security:
-        return 'Security Notifications';
     }
   }
 
@@ -379,10 +371,6 @@ class NotificationService with WidgetsBindingObserver {
         return 'Balance changes and transaction notifications';
       case NotificationCategory.messages:
         return 'Transaction messages and memos';
-      case NotificationCategory.system:
-        return 'Sync status and system alerts';
-      case NotificationCategory.security:
-        return 'Security alerts and warnings';
     }
   }
 
@@ -421,13 +409,6 @@ class NotificationService with WidgetsBindingObserver {
         return _settings.balanceChangeEnabled;
       case NotificationType.messageReceived:
         return _settings.messageNotificationsEnabled;
-      case NotificationType.transactionConfirmed:
-        return _settings.transactionConfirmationEnabled;
-      case NotificationType.syncComplete:
-      case NotificationType.syncError:
-        return _settings.syncNotificationsEnabled;
-      case NotificationType.securityAlert:
-        return _settings.securityAlertsEnabled;
     }
   }
 
@@ -625,8 +606,7 @@ class NotificationService with WidgetsBindingObserver {
     String? transactionId,
     required bool isIncoming,
   }) async {
-    // Check minimum change amount
-    if (changeAmount.abs() < _settings.minimumBalanceChange) return;
+    // No minimum threshold - notify for all changes
 
     final String title = isIncoming ? 'Funds Received' : 'Funds Sent';
     final String sign = isIncoming ? '+' : '-';

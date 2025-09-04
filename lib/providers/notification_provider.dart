@@ -67,9 +67,6 @@ class NotificationProvider extends ChangeNotifier {
           enabled: settingsMap['enabled'] ?? true,
           balanceChangeEnabled: settingsMap['balanceChangeEnabled'] ?? true,
           messageNotificationsEnabled: settingsMap['messageNotificationsEnabled'] ?? true,
-          transactionConfirmationEnabled: settingsMap['transactionConfirmationEnabled'] ?? true,
-          syncNotificationsEnabled: settingsMap['syncNotificationsEnabled'] ?? false,
-          securityAlertsEnabled: settingsMap['securityAlertsEnabled'] ?? true,
           soundEnabled: settingsMap['soundEnabled'] ?? true,
           soundType: NotificationSound.values.firstWhere(
             (e) => e.name == settingsMap['soundType'],
@@ -81,7 +78,6 @@ class NotificationProvider extends ChangeNotifier {
           quietHoursStart: settingsMap['quietHoursStart'] ?? 22,
           quietHoursEnd: settingsMap['quietHoursEnd'] ?? 7,
           quietHoursEnabled: settingsMap['quietHoursEnabled'] ?? false,
-          minimumBalanceChange: settingsMap['minimumBalanceChange'] ?? 0.001,
         );
       }
     } catch (e) {
@@ -97,9 +93,6 @@ class NotificationProvider extends ChangeNotifier {
         'enabled': _settings.enabled,
         'balanceChangeEnabled': _settings.balanceChangeEnabled,
         'messageNotificationsEnabled': _settings.messageNotificationsEnabled,
-        'transactionConfirmationEnabled': _settings.transactionConfirmationEnabled,
-        'syncNotificationsEnabled': _settings.syncNotificationsEnabled,
-        'securityAlertsEnabled': _settings.securityAlertsEnabled,
         'soundEnabled': _settings.soundEnabled,
         'soundType': _settings.soundType.name,
         'vibrationEnabled': _settings.vibrationEnabled,
@@ -108,7 +101,6 @@ class NotificationProvider extends ChangeNotifier {
         'quietHoursStart': _settings.quietHoursStart,
         'quietHoursEnd': _settings.quietHoursEnd,
         'quietHoursEnabled': _settings.quietHoursEnabled,
-        'minimumBalanceChange': _settings.minimumBalanceChange,
       };
 
       await StorageService.write(key: _settingsKey, value: json.encode(settingsMap));
@@ -210,20 +202,6 @@ class NotificationProvider extends ChangeNotifier {
     await updateSettings(_settings.copyWith(messageNotificationsEnabled: enabled));
   }
 
-  /// Toggle transaction confirmation notifications
-  Future<void> toggleTransactionConfirmationNotifications(bool enabled) async {
-    await updateSettings(_settings.copyWith(transactionConfirmationEnabled: enabled));
-  }
-
-  /// Toggle sync notifications
-  Future<void> toggleSyncNotifications(bool enabled) async {
-    await updateSettings(_settings.copyWith(syncNotificationsEnabled: enabled));
-  }
-
-  /// Toggle security alerts
-  Future<void> toggleSecurityAlerts(bool enabled) async {
-    await updateSettings(_settings.copyWith(securityAlertsEnabled: enabled));
-  }
 
   /// Toggle sound
   Future<void> toggleSound(bool enabled) async {
@@ -253,10 +231,6 @@ class NotificationProvider extends ChangeNotifier {
     ));
   }
 
-  /// Update minimum balance change
-  Future<void> updateMinimumBalanceChange(double amount) async {
-    await updateSettings(_settings.copyWith(minimumBalanceChange: amount));
-  }
 
   /// Handle new notification received
   void _onNotificationReceived(NotificationData notification) {

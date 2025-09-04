@@ -121,28 +121,8 @@ class NotificationTestService {
   /// Test transaction confirmation notification
   Future<bool> testTransactionConfirmationNotification() async {
     try {
-      if (kDebugMode) print('🧪 Testing transaction confirmation notification...');
-      
-      final notificationData = NotificationData(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: NotificationType.transactionConfirmed,
-        category: NotificationCategory.financial,
-        priority: NotificationPriority.normal,
-        title: 'Transaction Confirmed',
-        body: 'Your transaction has been confirmed on the blockchain',
-        timestamp: DateTime.now(),
-        actionUrl: '/wallet/transactions',
-        payload: {
-          'type': 'transaction_confirmed',
-          'transaction_id': 'test_confirm_${DateTime.now().millisecondsSinceEpoch}',
-          'confirmations': 6,
-        },
-      );
-      
-      await NotificationService.instance.showNotification(notificationData);
-      
-      if (kDebugMode) print('✅ Transaction confirmation notification test completed');
-      return true;
+      if (kDebugMode) print('🧪 Transaction confirmation notifications disabled');
+      return true; // Skip test - feature disabled
     } catch (e) {
       if (kDebugMode) print('❌ Transaction confirmation notification test failed: $e');
       return false;
@@ -152,28 +132,8 @@ class NotificationTestService {
   /// Test sync notification
   Future<bool> testSyncNotification() async {
     try {
-      if (kDebugMode) print('🧪 Testing sync notification...');
-      
-      final notificationData = NotificationData(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: NotificationType.syncComplete,
-        category: NotificationCategory.system,
-        priority: NotificationPriority.normal,
-        title: 'Wallet Synchronized',
-        body: 'Your wallet is now fully synchronized with the blockchain',
-        timestamp: DateTime.now(),
-        actionUrl: '/wallet/dashboard',
-        payload: {
-          'type': 'sync_complete',
-          'blocks_synced': 1234567,
-          'sync_time': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      
-      await NotificationService.instance.showNotification(notificationData);
-      
-      if (kDebugMode) print('✅ Sync notification test completed');
-      return true;
+      if (kDebugMode) print('🧪 Sync notifications disabled');
+      return true; // Skip test - feature disabled
     } catch (e) {
       if (kDebugMode) print('❌ Sync notification test failed: $e');
       return false;
@@ -183,28 +143,8 @@ class NotificationTestService {
   /// Test security alert notification
   Future<bool> testSecurityAlertNotification() async {
     try {
-      if (kDebugMode) print('🧪 Testing security alert notification...');
-      
-      final notificationData = NotificationData(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: NotificationType.securityAlert,
-        category: NotificationCategory.security,
-        priority: NotificationPriority.urgent,
-        title: 'Security Alert',
-        body: 'Unusual wallet activity detected. Please verify your recent transactions.',
-        timestamp: DateTime.now(),
-        actionUrl: '/wallet/security',
-        payload: {
-          'type': 'security_alert',
-          'alert_type': 'unusual_activity',
-          'severity': 'high',
-        },
-      );
-      
-      await NotificationService.instance.showNotification(notificationData);
-      
-      if (kDebugMode) print('✅ Security alert notification test completed');
-      return true;
+      if (kDebugMode) print('🧪 Security alert notifications disabled');
+      return true; // Skip test - feature disabled
     } catch (e) {
       if (kDebugMode) print('❌ Security alert notification test failed: $e');
       return false;

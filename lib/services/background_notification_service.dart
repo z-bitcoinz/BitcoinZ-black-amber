@@ -122,56 +122,9 @@ class BackgroundNotificationService {
   
   /// Handle sync update in background
   static Future<void> _handleSyncUpdateInBackground(Map<String, dynamic> data) async {
-    try {
-      // Only show sync notifications if enabled
-      final settings = NotificationService.instance.settings;
-      if (!settings.syncNotificationsEnabled) return;
-      
-      // Initialize notification service in background
-      await NotificationService.instance.initialize();
-      
-      final String status = data['status'] as String;
-      final int? progress = data['progress'] as int?;
-      
-      String title = 'Wallet Sync';
-      String body = '';
-      
-      switch (status) {
-        case 'started':
-          title = 'Sync Started';
-          body = 'Wallet synchronization has started';
-          break;
-        case 'progress':
-          title = 'Syncing...';
-          body = 'Sync progress: ${progress ?? 0}%';
-          break;
-        case 'completed':
-          title = 'Sync Complete';
-          body = 'Wallet is now fully synchronized';
-          break;
-        case 'error':
-          title = 'Sync Error';
-          body = 'Failed to synchronize wallet';
-          break;
-      }
-      
-      final notificationData = NotificationData(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: status == 'error' ? NotificationType.syncError : NotificationType.syncComplete,
-        category: NotificationCategory.system,
-        priority: status == 'error' ? NotificationPriority.high : NotificationPriority.normal,
-        title: title,
-        body: body,
-        timestamp: DateTime.now(),
-        actionUrl: '/wallet/dashboard',
-      );
-      
-      await NotificationService.instance.showNotification(notificationData);
-      
-      if (kDebugMode) print('🔔 Background sync notification sent: $status');
-    } catch (e) {
-      if (kDebugMode) print('❌ Failed to handle background sync update: $e');
-    }
+    // Sync notifications are disabled - skip all sync notification functionality
+    if (kDebugMode) print('🔔 Sync notifications disabled - skipping');
+    return;
   }
   
   /// Send message to background isolate

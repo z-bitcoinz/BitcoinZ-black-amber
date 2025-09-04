@@ -65,7 +65,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   context, notificationProvider,
                   icon: Icons.account_balance_wallet,
                   title: 'Balance Changes',
-                  subtitle: 'Get notified when you receive or send funds',
+                  subtitle: 'Get notified when you receive funds',
                   value: settings.balanceChangeEnabled,
                   onChanged: notificationProvider.toggleBalanceChangeNotifications,
                 ),
@@ -77,33 +77,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   subtitle: 'Get notified when you receive transaction messages',
                   value: settings.messageNotificationsEnabled,
                   onChanged: notificationProvider.toggleMessageNotifications,
-                ),
-                
-                _buildNotificationTypeCard(
-                  context, notificationProvider,
-                  icon: Icons.check_circle,
-                  title: 'Transaction Confirmations',
-                  subtitle: 'Get notified when transactions are confirmed',
-                  value: settings.transactionConfirmationEnabled,
-                  onChanged: notificationProvider.toggleTransactionConfirmationNotifications,
-                ),
-                
-                _buildNotificationTypeCard(
-                  context, notificationProvider,
-                  icon: Icons.sync,
-                  title: 'Sync Status',
-                  subtitle: 'Get notified about wallet sync progress',
-                  value: settings.syncNotificationsEnabled,
-                  onChanged: notificationProvider.toggleSyncNotifications,
-                ),
-                
-                _buildNotificationTypeCard(
-                  context, notificationProvider,
-                  icon: Icons.security,
-                  title: 'Security Alerts',
-                  subtitle: 'Get notified about security-related events',
-                  value: settings.securityAlertsEnabled,
-                  onChanged: notificationProvider.toggleSecurityAlerts,
                 ),
                 
                 const SizedBox(height: 24),
@@ -166,13 +139,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                           value: settings.quietHoursEnabled,
                           onChanged: notificationProvider.toggleQuietHours,
                         ),
-                      ),
-                      
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: Icon(Icons.monetization_on, color: Theme.of(context).colorScheme.primary),
-                        title: const Text('Minimum Balance Change'),
-                        subtitle: Text('${settings.minimumBalanceChange.toStringAsFixed(8)} BTCZ'),
                       ),
                     ],
                   ),

@@ -13,11 +13,6 @@ NotificationSettings _$NotificationSettingsFromJson(
       balanceChangeEnabled: json['balanceChangeEnabled'] as bool? ?? true,
       messageNotificationsEnabled:
           json['messageNotificationsEnabled'] as bool? ?? true,
-      transactionConfirmationEnabled:
-          json['transactionConfirmationEnabled'] as bool? ?? true,
-      syncNotificationsEnabled:
-          json['syncNotificationsEnabled'] as bool? ?? false,
-      securityAlertsEnabled: json['securityAlertsEnabled'] as bool? ?? true,
       soundEnabled: json['soundEnabled'] as bool? ?? true,
       soundType:
           $enumDecodeNullable(_$NotificationSoundEnumMap, json['soundType']) ??
@@ -28,8 +23,6 @@ NotificationSettings _$NotificationSettingsFromJson(
       quietHoursStart: (json['quietHoursStart'] as num?)?.toInt() ?? 22,
       quietHoursEnd: (json['quietHoursEnd'] as num?)?.toInt() ?? 7,
       quietHoursEnabled: json['quietHoursEnabled'] as bool? ?? false,
-      minimumBalanceChange:
-          (json['minimumBalanceChange'] as num?)?.toDouble() ?? 0.001,
     );
 
 Map<String, dynamic> _$NotificationSettingsToJson(
@@ -38,9 +31,6 @@ Map<String, dynamic> _$NotificationSettingsToJson(
       'enabled': instance.enabled,
       'balanceChangeEnabled': instance.balanceChangeEnabled,
       'messageNotificationsEnabled': instance.messageNotificationsEnabled,
-      'transactionConfirmationEnabled': instance.transactionConfirmationEnabled,
-      'syncNotificationsEnabled': instance.syncNotificationsEnabled,
-      'securityAlertsEnabled': instance.securityAlertsEnabled,
       'soundEnabled': instance.soundEnabled,
       'soundType': _$NotificationSoundEnumMap[instance.soundType]!,
       'vibrationEnabled': instance.vibrationEnabled,
@@ -49,7 +39,6 @@ Map<String, dynamic> _$NotificationSettingsToJson(
       'quietHoursStart': instance.quietHoursStart,
       'quietHoursEnd': instance.quietHoursEnd,
       'quietHoursEnabled': instance.quietHoursEnabled,
-      'minimumBalanceChange': instance.minimumBalanceChange,
     };
 
 const _$NotificationSoundEnumMap = {
@@ -101,17 +90,11 @@ Map<String, dynamic> _$NotificationDataToJson(NotificationData instance) =>
 const _$NotificationTypeEnumMap = {
   NotificationType.balanceChange: 'balanceChange',
   NotificationType.messageReceived: 'messageReceived',
-  NotificationType.transactionConfirmed: 'transactionConfirmed',
-  NotificationType.syncComplete: 'syncComplete',
-  NotificationType.syncError: 'syncError',
-  NotificationType.securityAlert: 'securityAlert',
 };
 
 const _$NotificationCategoryEnumMap = {
   NotificationCategory.financial: 'financial',
   NotificationCategory.messages: 'messages',
-  NotificationCategory.system: 'system',
-  NotificationCategory.security: 'security',
 };
 
 const _$NotificationPriorityEnumMap = {
