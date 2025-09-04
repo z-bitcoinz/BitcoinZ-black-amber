@@ -32,5 +32,17 @@
 	<string>This app needs access to photo library to select contact photos.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs access to camera to take contact photos.</string>
+
+	<!-- Notification permissions -->
+	<key>NSUserNotificationAlertStyle</key>
+	<string>alert</string>
+
+	<!-- Background modes for notifications -->
+	<key>LSUIElement</key>
+	<false/>
+
+	<!-- App category -->
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.finance</string>
 </dict>
 </plist>

@@ -7,6 +7,7 @@ import 'backup_wallet_screen.dart';
 import 'help_screen.dart';
 import 'analytics_help_screen.dart';
 import 'network_settings_screen.dart';
+import 'notification_settings_screen.dart';
 import '../analytics/financial_analytics_screen.dart';
 import 'contacts_backup_screen.dart';
 import '../../providers/currency_provider.dart';
@@ -15,12 +16,15 @@ import '../../providers/network_provider.dart';
 import '../../providers/contact_provider.dart';
 import '../../providers/interface_provider.dart';
 import '../../providers/wallet_provider.dart';
+import '../../providers/notification_provider.dart';
 
 import '../../services/bitcoinz_rust_service.dart';
 import '../../services/database_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/wallet_storage_service.dart';
 import '../onboarding/welcome_screen.dart';
+import '../debug/notification_debug_screen.dart';
+import 'package:flutter/foundation.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -143,6 +147,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           );
                         },
                       ),
+                    ],
+                  );
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              // Notification settings
+              Consumer<NotificationProvider>(
+                builder: (context, notificationProvider, child) {
+                  return _buildSettingsSection(
+                    title: 'Notifications',
+                    children: [
+                      _buildSettingsTile(
+                        context: context,
+                        icon: Icons.notifications,
+                        title: 'Notification Settings',
+                        subtitle: notificationProvider.settings.enabled
+                            ? 'Enabled (${notificationProvider.totalUnreadCount} unread)'
+                            : 'Disabled',
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (notificationProvider.hasAnyUnread)
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationSettingsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      if (kDebugMode) ...[
+                        _buildSettingsTile(
+                          context: context,
+                          icon: Icons.bug_report,
+                          title: 'Notification Debug',
+                          subtitle: 'Test and validate notification functionality',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const NotificationDebugScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ],
                   );
                 },

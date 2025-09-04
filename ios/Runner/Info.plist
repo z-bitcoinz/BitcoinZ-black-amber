@@ -45,5 +45,67 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- Notification permissions and configuration -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>background-processing</string>
+		<string>background-fetch</string>
+		<string>remote-notification</string>
+	</array>
+
+	<!-- App Transport Security -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+
+	<!-- Camera permission for QR code scanning -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to camera to scan QR codes for wallet addresses and transactions.</string>
+
+	<!-- Face ID / Touch ID permission -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>This app uses Face ID for secure wallet authentication.</string>
+
+	<!-- Local notification permission -->
+	<key>NSUserNotificationAlertStyle</key>
+	<string>alert</string>
+
+	<!-- Notification categories for rich notifications -->
+	<key>UNNotificationCategories</key>
+	<array>
+		<dict>
+			<key>identifier</key>
+			<string>FINANCIAL_CATEGORY</string>
+			<key>actions</key>
+			<array>
+				<dict>
+					<key>identifier</key>
+					<string>VIEW_BALANCE</string>
+					<key>title</key>
+					<string>View Balance</string>
+					<key>options</key>
+					<integer>1</integer>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>identifier</key>
+			<string>MESSAGE_CATEGORY</string>
+			<key>actions</key>
+			<array>
+				<dict>
+					<key>identifier</key>
+					<string>VIEW_MESSAGE</string>
+					<key>title</key>
+					<string>View Message</string>
+					<key>options</key>
+					<integer>1</integer>
+				</dict>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

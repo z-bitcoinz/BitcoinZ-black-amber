@@ -20,12 +20,15 @@ import '../services/bitcoinz_rust_service.dart';
 import '../providers/auth_provider.dart';
 import '../src/rust/api.dart' as rust_api;
 import '../providers/network_provider.dart';
+import '../providers/notification_provider.dart';
 import '../screens/wallet/paginated_transaction_history_screen.dart';
+import '../services/notification_service.dart';
 import '../utils/constants.dart';
 
 class WalletProvider with ChangeNotifier {
   WalletModel? _wallet;
   BalanceModel _balance = BalanceModel.empty();
+  BalanceModel? _previousBalance; // For balance change detection
   List<TransactionModel> _transactions = [];
   bool _isLoading = false;
   bool _isSyncing = false;
@@ -41,6 +44,9 @@ class WalletProvider with ChangeNotifier {
 
   // Network provider reference
   NetworkProvider? _networkProvider;
+
+  // Notification provider reference
+  NotificationProvider? _notificationProvider;
 
   // Simple connection monitoring (single Rust anchor)
   Timer? _simpleConnectionTimer;
@@ -136,6 +142,11 @@ class WalletProvider with ChangeNotifier {
     _rustService = BitcoinzRustService.instance;
     _rustService.fnSetTotalBalance = (balance) async {
       if (kDebugMode) print('🦀 Rust Bridge updated balance: ${balance.formattedTotal} BTCZ (unconfirmed: ${balance.unconfirmed})');
+
+      // Detect balance changes for notifications
+      await _handleBalanceChange(_balance, balance);
+
+      _previousBalance = _balance;
       _balance = balance;
 
       // NOTE: Balance updates can come from cached data, so we don't override connection status here
@@ -330,6 +341,11 @@ class WalletProvider with ChangeNotifier {
   // Network provider methods
   void setNetworkProvider(NetworkProvider networkProvider) {
     _networkProvider = networkProvider;
+  }
+
+  // Notification provider methods
+  void setNotificationProvider(NotificationProvider notificationProvider) {
+    _notificationProvider = notificationProvider;
   }
 
   String get currentServerUrl {
@@ -4275,6 +4291,8 @@ class WalletProvider with ChangeNotifier {
 
   /// Update the count of unread memos
   Future<void> updateUnreadMemoCount() async {
+    final previousCount = _unreadMemoCount;
+
     // Always use the same method as the transaction list for consistency
     // Don't use database since we're storing memo status in SharedPreferences
     _unreadMemoCount = _transactions.where((tx) {
@@ -4285,6 +4303,12 @@ class WalletProvider with ChangeNotifier {
     }).length;
 
     if (kDebugMode) print('📊 Unread memo count: $_unreadMemoCount (from ${_transactions.where((tx) => tx.hasMemo).length} total memos)');
+
+    // Update notification provider with new memo count
+    if (_notificationProvider != null && _unreadMemoCount != previousCount) {
+      _notificationProvider!.updateUnreadMemoCount(_unreadMemoCount);
+    }
+
     notifyListeners();
   }
 
@@ -4304,8 +4328,14 @@ class WalletProvider with ChangeNotifier {
   }
 
   /// Show notification for new memo transactions
-  void _notifyNewMemoTransactions(List<TransactionModel> newMemoTransactions) {
-    if (_notificationContext == null || !_notificationContext!.mounted) return;
+  Future<void> _notifyNewMemoTransactions(List<TransactionModel> newMemoTransactions) async {
+    // Skip if notification provider is not set
+    if (_notificationProvider == null) return;
+
+    // Check if message notifications are enabled
+    if (!_notificationProvider!.settings.enabled || !_notificationProvider!.settings.messageNotificationsEnabled) {
+      return;
+    }
 
     for (final tx in newMemoTransactions) {
       final String amount = tx.isReceived
@@ -4316,64 +4346,74 @@ class WalletProvider with ChangeNotifier {
           ? '${tx.memo!.substring(0, 30)}...'
           : tx.memo ?? '';
 
-      // Show snackbar notification
-      ScaffoldMessenger.of(_notificationContext!).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.message,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'New message received!',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$amount${memoSnippet.isNotEmpty ? ' • $memoSnippet' : ''}',
-                      style: const TextStyle(fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Theme.of(_notificationContext!).colorScheme.primary,
-          duration: const Duration(seconds: 5),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          action: SnackBarAction(
-            label: 'VIEW',
-            textColor: Colors.white,
-            onPressed: () {
-              // Navigate to transaction details
-              _showTransactionDetails(tx);
-            },
-          ),
-        ),
+      // Show proper local notification
+      await NotificationService.instance.showMessageNotification(
+        transactionId: tx.txid,
+        message: tx.memo ?? '',
+        amount: tx.amount,
+        fromAddress: tx.fromAddress,
       );
+
+      // Also show in-app snackbar if context is available (for immediate feedback)
+      if (_notificationContext != null && _notificationContext!.mounted) {
+        ScaffoldMessenger.of(_notificationContext!).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.message,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'New message received!',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$amount${memoSnippet.isNotEmpty ? ' • $memoSnippet' : ''}',
+                        style: const TextStyle(fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Theme.of(_notificationContext!).colorScheme.primary,
+            duration: const Duration(seconds: 3), // Shorter duration since we have local notification
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            action: SnackBarAction(
+              label: 'VIEW',
+              textColor: Colors.white,
+              onPressed: () {
+                // Navigate to transaction details
+                _showTransactionDetails(tx);
+              },
+            ),
+          ),
+        );
+      }
 
       // Log for debugging
       if (kDebugMode) {
@@ -4647,5 +4687,67 @@ class WalletProvider with ChangeNotifier {
           ? _analyticsCacheTimestamps.values.reduce((a, b) => a.isAfter(b) ? a : b)
           : null,
     };
+  }
+
+  /// Handle balance changes and trigger notifications
+  Future<void> _handleBalanceChange(BalanceModel oldBalance, BalanceModel newBalance) async {
+    // Skip if notification provider is not set or if this is the first balance update
+    if (_notificationProvider == null || _previousBalance == null) {
+      return;
+    }
+
+    // Check if notification settings are enabled
+    if (!_notificationProvider!.settings.enabled || !_notificationProvider!.settings.balanceChangeEnabled) {
+      return;
+    }
+
+    // Calculate balance changes
+    final totalChange = newBalance.total - oldBalance.total;
+    final transparentChange = newBalance.transparent - oldBalance.transparent;
+    final shieldedChange = newBalance.shielded - oldBalance.shielded;
+    final unconfirmedChange = newBalance.unconfirmed - oldBalance.unconfirmed;
+
+    // Check if there's a significant change (above minimum threshold)
+    final minChange = _notificationProvider!.settings.minimumBalanceChange;
+
+    // Detect incoming funds (positive change in total balance)
+    if (totalChange > minChange) {
+      if (kDebugMode) {
+        print('🔔 Balance increase detected: +${totalChange.toStringAsFixed(8)} BTCZ');
+      }
+
+      await NotificationService.instance.showBalanceChangeNotification(
+        previousBalance: oldBalance.total,
+        newBalance: newBalance.total,
+        changeAmount: totalChange,
+        isIncoming: true,
+      );
+    }
+    // Detect outgoing funds (negative change, but only if it's not just unconfirmed change)
+    else if (totalChange < -minChange && unconfirmedChange >= 0) {
+      if (kDebugMode) {
+        print('🔔 Balance decrease detected: ${totalChange.toStringAsFixed(8)} BTCZ');
+      }
+
+      await NotificationService.instance.showBalanceChangeNotification(
+        previousBalance: oldBalance.total,
+        newBalance: newBalance.total,
+        changeAmount: totalChange.abs(),
+        isIncoming: false,
+      );
+    }
+    // Detect unconfirmed incoming funds
+    else if (unconfirmedChange > minChange) {
+      if (kDebugMode) {
+        print('🔔 Unconfirmed funds detected: +${unconfirmedChange.toStringAsFixed(8)} BTCZ');
+      }
+
+      await NotificationService.instance.showBalanceChangeNotification(
+        previousBalance: oldBalance.total,
+        newBalance: newBalance.total,
+        changeAmount: unconfirmedChange,
+        isIncoming: true,
+      );
+    }
   }
 }

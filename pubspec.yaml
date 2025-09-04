@@ -71,6 +71,8 @@ dependencies:
 
   # Charts and analytics
   fl_chart: ^0.68.0
+  flutter_local_notifications: ^19.4.1
+  app_badge_plus: ^1.2.3
 
 dev_dependencies:
   flutter_test:

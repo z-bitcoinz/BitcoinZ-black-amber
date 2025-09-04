@@ -11,6 +11,8 @@ import 'providers/currency_provider.dart';
 import 'providers/network_provider.dart';
 import 'providers/contact_provider.dart';
 import 'providers/interface_provider.dart';
+import 'providers/notification_provider.dart';
+import 'services/background_notification_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_screen.dart';
 import 'utils/constants.dart';
@@ -78,6 +80,10 @@ void main() async {
     // Initialize BitcoinZ service
     await BitcoinZService.instance.initialize();
     logger.i('BitcoinZ service initialized successfully');
+
+    // Initialize background notification service
+    await BackgroundNotificationService.initialize();
+    logger.i('Background notification service initialized');
   } catch (e) {
     logger.e('Failed to initialize services: $e');
   }
@@ -116,10 +122,19 @@ class BitcoinZWalletApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => NetworkProvider()),
         ChangeNotifierProvider(
+          create: (_) {
+            final notificationProvider = NotificationProvider();
+            notificationProvider.initialize(); // Initialize notifications
+            return notificationProvider;
+          },
+        ),
+        ChangeNotifierProvider(
           create: (context) {
             final walletProvider = WalletProvider();
             final networkProvider = Provider.of<NetworkProvider>(context, listen: false);
+            final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
             walletProvider.setNetworkProvider(networkProvider);
+            walletProvider.setNotificationProvider(notificationProvider);
             return walletProvider;
           },
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/wallet_provider.dart';
@@ -12,7 +13,9 @@ import 'analytics/financial_analytics_screen.dart';
 import 'settings/settings_screen.dart';
 import 'contacts/contacts_screen.dart';
 import '../providers/contact_provider.dart';
+import '../providers/notification_provider.dart';
 import '../services/send_prefill_bus.dart';
+import '../widgets/notification_badge.dart';
 // import '../demo/cli_demo_page.dart'; // Removed - CLI demo no longer used
 
 class MainScreen extends StatefulWidget {
@@ -40,6 +43,16 @@ class MainScreen extends StatefulWidget {
       _currentInstance!.navigateToSendWithContact(address, contactName, photo);
     } else {
       print('🎯 MainScreen: No current instance found!');
+    }
+  }
+
+  // Global method to navigate to specific tab (for notifications)
+  static void navigateToTab(int tabIndex) {
+    if (kDebugMode) print('🔔 MainScreen.navigateToTab called with index: $tabIndex');
+    if (_currentInstance != null) {
+      _currentInstance!._navigateToTabFromNotification(tabIndex);
+    } else {
+      if (kDebugMode) print('🔔 MainScreen: No current instance found for tab navigation');
     }
   }
 }
@@ -101,9 +114,15 @@ class _MainScreenState extends State<MainScreen>
         activeIcon: Icon(Icons.qr_code),
         label: 'Receive',
       ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.history),
-        activeIcon: Icon(Icons.history),
+      BottomNavigationBarItem(
+        icon: NotificationBadge(
+          showOnlyMemos: true, // Only show memo count on history tab
+          child: const Icon(Icons.history),
+        ),
+        activeIcon: NotificationBadge(
+          showOnlyMemos: true,
+          child: const Icon(Icons.history),
+        ),
         label: 'History',
       ),
     ];
@@ -327,6 +346,45 @@ class _MainScreenState extends State<MainScreen>
       _prefilledAddress = null;
       _contactName = null;
     });
+  }
+
+  // Method to navigate to tab from notification
+  void _navigateToTabFromNotification(int tabIndex) {
+    if (kDebugMode) print('🔔 Navigating to tab from notification: $tabIndex');
+
+    // Get the interface provider to check if analytics tab is visible
+    final interfaceProvider = Provider.of<InterfaceProvider>(context, listen: false);
+    final showAnalytics = interfaceProvider.analyticsTabVisible;
+    final maxTabIndex = showAnalytics ? 5 : 4; // 0-4 without analytics, 0-5 with analytics
+
+    // Validate tab index
+    if (tabIndex < 0 || tabIndex > maxTabIndex) {
+      if (kDebugMode) print('⚠️ Invalid tab index: $tabIndex (max: $maxTabIndex)');
+      tabIndex = 0; // Default to dashboard
+    }
+
+    // Adjust tab index if analytics is hidden and we're trying to navigate to contacts
+    if (!showAnalytics && tabIndex == 5) {
+      tabIndex = 4; // Contacts becomes index 4 when analytics is hidden
+    }
+
+    // Clear contact data when navigating away from send tab
+    if (_currentIndex == 1 && tabIndex != 1) {
+      clearContactData();
+    }
+
+    setState(() {
+      _currentIndex = tabIndex;
+    });
+
+    // Animate to the new page
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        tabIndex,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   @override

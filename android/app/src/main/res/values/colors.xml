@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification colors -->
+    <color name="notification_color">#FF6B35</color>
+    <color name="notification_accent">#2196F3</color>
+    
+    <!-- BitcoinZ brand colors -->
+    <color name="bitcoinz_orange">#FF6B35</color>
+    <color name="bitcoinz_blue">#2196F3</color>
+    <color name="bitcoinz_dark">#1A1A1A</color>
+    <color name="bitcoinz_light">#F5F5F5</color>
+</resources>
