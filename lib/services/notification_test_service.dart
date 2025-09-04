@@ -107,6 +107,7 @@ class NotificationTestService {
         message: message,
         amount: amount,
         fromAddress: 't1TestAddress${_random.nextInt(1000)}',
+        isIncoming: true, // Test incoming message
       );
       
       if (kDebugMode) print('✅ Message notification test completed');

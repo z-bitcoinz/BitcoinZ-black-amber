@@ -587,7 +587,7 @@ class NotificationService with WidgetsBindingObserver {
 
     final String title = isIncoming ? 'Funds Received' : 'Funds Sent';
     final String sign = isIncoming ? '+' : '-';
-    final String body = '$sign${changeAmount.toStringAsFixed(8)} BTCZ\nNew balance: ${newBalance.toStringAsFixed(8)} BTCZ';
+    final String body = '$sign${changeAmount.toStringAsFixed(8)} BTCZ';
 
     final notificationData = NotificationData(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -611,39 +611,63 @@ class NotificationService with WidgetsBindingObserver {
     await showNotification(notificationData);
   }
 
-  /// Show message received notification
+  /// Show message notification for transactions with memos
   Future<void> showMessageNotification({
     required String transactionId,
     required String message,
     required double amount,
     String? fromAddress,
+    bool isIncoming = true,
   }) async {
-    final String title = 'Message Received';
-    final String body = message.length > 50
-        ? '${message.substring(0, 50)}...'
-        : message;
-    final String subtitle = '+${amount.toStringAsFixed(8)} BTCZ';
+    if (!_isInitialized) {
+      if (kDebugMode) print('⚠️ NotificationService not initialized');
+      return;
+    }
 
-    final notificationData = NotificationData(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      type: NotificationType.messageReceived,
-      category: NotificationCategory.messages,
-      priority: NotificationPriority.high,
-      title: title,
-      body: body,
-      subtitle: subtitle,
-      timestamp: DateTime.now(),
-      actionUrl: '/transactions',
-      payload: {
-        'type': 'message_received',
-        'transaction_id': transactionId,
-        'message': message,
-        'amount': amount,
-        'from_address': fromAddress,
-      },
-    );
+    // Check if message notifications are enabled
+    if (!_settings.messageNotificationsEnabled) return;
 
-    await showNotification(notificationData);
+    try {
+      // Format amount with proper sign (messenger style)
+      final String sign = isIncoming ? '+' : '-';
+      final String amountStr = '$sign${amount.toStringAsFixed(8)} BTCZ';
+
+      // Truncate message for preview (messenger style - shorter for better readability)
+      final String messagePreview = message.length > 35
+          ? '${message.substring(0, 35)}...'
+          : message;
+
+      // Create messenger-style notification
+      final String title = isIncoming ? 'Message with Payment' : 'Message Sent';
+      final String body = '$amountStr\n"$messagePreview"';
+
+      final notificationData = NotificationData(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: NotificationType.messageReceived,
+        category: NotificationCategory.messages,
+        priority: NotificationPriority.high,
+        title: title,
+        body: body,
+        timestamp: DateTime.now(),
+        actionUrl: '/transactions',
+        payload: {
+          'type': 'message_received',
+          'transaction_id': transactionId,
+          'message': message,
+          'amount': amount,
+          'from_address': fromAddress,
+          'is_incoming': isIncoming,
+        },
+      );
+
+      await showNotification(notificationData);
+
+      if (kDebugMode) {
+        print('🔔 Message notification sent: ${isIncoming ? 'received' : 'sent'} ${amount.toStringAsFixed(8)} BTCZ with message');
+      }
+    } catch (e) {
+      if (kDebugMode) print('❌ Failed to show message notification: $e');
+    }
   }
 
   /// Handle app lifecycle state changes

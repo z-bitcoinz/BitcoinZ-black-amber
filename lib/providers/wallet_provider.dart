@@ -207,6 +207,12 @@ class WalletProvider with ChangeNotifier {
         } else if (tx.hasMemo && !existingTxIds.contains(tx.txid)) {
           // This is a new transaction with a memo
           newMemoTransactions.add(tx);
+          if (kDebugMode) {
+            print('🔔 New memo transaction detected: ${tx.txid.substring(0, 8)}...');
+            print('   Memo: "${tx.memo}"');
+            print('   Amount: ${tx.amount} BTCZ');
+            print('   Type: ${tx.type}');
+          }
         }
         return tx;
       }).toList();
@@ -4338,20 +4344,19 @@ class WalletProvider with ChangeNotifier {
     }
 
     for (final tx in newMemoTransactions) {
-      final String amount = tx.isReceived
-          ? '+${tx.amount.toStringAsFixed(8)} BTCZ'
-          : '-${tx.amount.toStringAsFixed(8)} BTCZ';
+      if (kDebugMode) {
+        print('🔔 Showing message notification for tx: ${tx.txid.substring(0, 8)}...');
+        print('   Amount: ${tx.amount} BTCZ, Memo: "${tx.memo}"');
+        print('   Is received: ${tx.isReceived}, Has memo: ${tx.hasMemo}');
+      }
 
-      final String memoSnippet = tx.memo != null && tx.memo!.length > 30
-          ? '${tx.memo!.substring(0, 30)}...'
-          : tx.memo ?? '';
-
-      // Show proper local notification
+      // Show proper local notification with absolute amount and direction
       await NotificationService.instance.showMessageNotification(
         transactionId: tx.txid,
         message: tx.memo ?? '',
-        amount: tx.amount,
+        amount: tx.amount.abs(), // Use absolute amount, notification service will add the sign
         fromAddress: tx.fromAddress,
+        isIncoming: tx.isReceived, // Pass the transaction direction
       );
 
       // Also show in-app snackbar if context is available (for immediate feedback)
@@ -4387,7 +4392,7 @@ class WalletProvider with ChangeNotifier {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$amount${memoSnippet.isNotEmpty ? ' • $memoSnippet' : ''}',
+                        '${tx.isReceived ? '+' : '-'}${tx.amount.toStringAsFixed(8)} BTCZ${tx.memo != null && tx.memo!.isNotEmpty ? ' • ${tx.memo!.length > 20 ? '${tx.memo!.substring(0, 20)}...' : tx.memo!}' : ''}',
                         style: const TextStyle(fontSize: 12),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -4417,8 +4422,8 @@ class WalletProvider with ChangeNotifier {
 
       // Log for debugging
       if (kDebugMode) {
-        print('📬 NEW MEMO TRANSACTION: ${tx.txid.substring(0, 8)}... - $amount');
-        print('   Memo: $memoSnippet');
+        print('📬 NEW MEMO TRANSACTION: ${tx.txid.substring(0, 8)}... - ${tx.isReceived ? '+' : '-'}${tx.amount.toStringAsFixed(8)} BTCZ');
+        print('   Memo: ${tx.memo ?? ''}');
       }
     }
   }
