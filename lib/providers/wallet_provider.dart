@@ -48,6 +48,9 @@ class WalletProvider with ChangeNotifier {
   // Notification provider reference
   NotificationProvider? _notificationProvider;
 
+  // Simple timestamp-based new transaction detection (bulletproof approach)
+  DateTime? _lastNotificationCheck;
+
   // Simple connection monitoring (single Rust anchor)
   Timer? _simpleConnectionTimer;
 
@@ -199,30 +202,66 @@ class WalletProvider with ChangeNotifier {
       final Set<String> existingTxIds = _transactions.map((tx) => tx.txid).toSet();
       final List<TransactionModel> newMemoTransactions = [];
 
-      // Update transactions with preserved read status
-      final updatedTransactions = transactions.map((tx) {
+      // Initialize notification timestamp on first run
+      if (_lastNotificationCheck == null) {
+        _lastNotificationCheck = DateTime.now();
+      }
+
+      if (kDebugMode) {
+        print('🔍 TRANSACTION PROCESSING:');
+        print('   New transactions: ${transactions.length}');
+        print('   Transactions with memos: ${transactions.where((tx) => tx.hasMemo).length}');
+        print('   Last notification check: $_lastNotificationCheck');
+      }
+
+      // Update transactions with preserved read status and check for notifications
+      final updatedTransactions = <TransactionModel>[];
+      for (int i = 0; i < transactions.length; i++) {
+        final tx = transactions[i];
+
+        TransactionModel updatedTx = tx;
+
         // Use memo read status from our merged sources
         if (tx.hasMemo && memoReadStatus.containsKey(tx.txid)) {
-          tx = tx.copyWith(memoRead: memoReadStatus[tx.txid]);
-        } else if (tx.hasMemo && !existingTxIds.contains(tx.txid)) {
-          // This is a new transaction with a memo
-          newMemoTransactions.add(tx);
+          updatedTx = tx.copyWith(memoRead: memoReadStatus[tx.txid]);
+        }
+
+        // Check if this transaction needs notification using bulletproof logic
+        if (_shouldNotifyAboutMemo(updatedTx)) {
+          newMemoTransactions.add(updatedTx);
           if (kDebugMode) {
-            print('🔔 New memo transaction detected: ${tx.txid.substring(0, 8)}...');
+            print('🔔 MEMO NOTIFICATION NEEDED: ${tx.txid.substring(0, 8)}... - ${tx.isReceived ? '+' : '-'}${tx.amount} BTCZ');
             print('   Memo: "${tx.memo}"');
-            print('   Amount: ${tx.amount} BTCZ');
-            print('   Type: ${tx.type}');
           }
         }
-        return tx;
-      }).toList();
+
+        updatedTransactions.add(updatedTx);
+      }
 
       _transactions = updatedTransactions;
 
+      // Initialization moved to earlier in the method
+
       // Show notification for new memo transactions
-      if (newMemoTransactions.isNotEmpty) {
-        _notifyNewMemoTransactions(newMemoTransactions);
+      if (kDebugMode) {
+        print('🔔 About to check for memo notifications:');
+        print('   New memo transactions count: ${newMemoTransactions.length}');
+        for (final tx in newMemoTransactions) {
+          print('   - ${tx.txid.substring(0, 8)}... memo: "${tx.memo}"');
+        }
       }
+
+      if (newMemoTransactions.isNotEmpty) {
+        if (kDebugMode) {
+          print('🔔 Calling _notifyNewMemoTransactions with ${newMemoTransactions.length} transactions');
+        }
+        _notifyNewMemoTransactions(newMemoTransactions);
+      } else if (kDebugMode) {
+        print('🔔 No new memo transactions to notify about');
+      }
+
+      // Update notification timestamp after processing
+      _lastNotificationCheck = DateTime.now();
 
       // Update unread memo count when transactions are updated
       await updateUnreadMemoCount();
@@ -992,6 +1031,15 @@ class WalletProvider with ChangeNotifier {
               final cachedTxList = walletData['cachedTransactions'] as List;
               _transactions = cachedTxList.map((tx) => TransactionModel.fromJson(tx as Map<String, dynamic>)).toList();
               if (kDebugMode) print('📋 Loaded ${_transactions.length} cached transactions');
+
+
+
+
+
+              // Initialize notification timestamp for cached transactions
+              if (_lastNotificationCheck == null) {
+                _lastNotificationCheck = DateTime.now();
+              }
             } catch (e) {
               if (kDebugMode) print('⚠️ Failed to load cached transactions: $e');
               _transactions = [];
@@ -4255,6 +4303,9 @@ class WalletProvider with ChangeNotifier {
         _transactions[index] = _transactions[index].copyWith(memoRead: true);
       }
 
+      // Mark corresponding notification as read to clear badge
+      await _markNotificationAsReadByTransactionId(txid);
+
       // Update unread count
       await updateUnreadMemoCount();
 
@@ -4335,11 +4386,28 @@ class WalletProvider with ChangeNotifier {
 
   /// Show notification for new memo transactions
   Future<void> _notifyNewMemoTransactions(List<TransactionModel> newMemoTransactions) async {
+    if (kDebugMode) {
+      print('🔔 _notifyNewMemoTransactions called with ${newMemoTransactions.length} transactions');
+      print('   Notification provider set: ${_notificationProvider != null}');
+      if (_notificationProvider != null) {
+        print('   Notifications enabled: ${_notificationProvider!.settings.enabled}');
+        print('   Message notifications enabled: ${_notificationProvider!.settings.messageNotificationsEnabled}');
+      }
+    }
+
     // Skip if notification provider is not set
-    if (_notificationProvider == null) return;
+    if (_notificationProvider == null) {
+      if (kDebugMode) print('❌ Notification provider is null, skipping message notifications');
+      return;
+    }
 
     // Check if message notifications are enabled
     if (!_notificationProvider!.settings.enabled || !_notificationProvider!.settings.messageNotificationsEnabled) {
+      if (kDebugMode) {
+        print('❌ Message notifications disabled:');
+        print('   General notifications: ${_notificationProvider!.settings.enabled}');
+        print('   Message notifications: ${_notificationProvider!.settings.messageNotificationsEnabled}');
+      }
       return;
     }
 
@@ -4420,10 +4488,14 @@ class WalletProvider with ChangeNotifier {
         );
       }
 
+      // Note: We don't need to track "notified" status separately anymore
+      // The bulletproof system uses read/unread status and timestamp checking
+
       // Log for debugging
       if (kDebugMode) {
         print('📬 NEW MEMO TRANSACTION: ${tx.txid.substring(0, 8)}... - ${tx.isReceived ? '+' : '-'}${tx.amount.toStringAsFixed(8)} BTCZ');
         print('   Memo: ${tx.memo ?? ''}');
+        print('   Transaction marked as notified (memo remains unread until user views it)');
       }
     }
   }
@@ -4572,6 +4644,49 @@ class WalletProvider with ChangeNotifier {
     }
   }
 
+  /// Reset notification timestamp for testing (development only)
+  Future<void> resetNotificationTracking() async {
+    if (kDebugMode) {
+      _lastNotificationCheck = null;
+      print('🔄 RESET: Cleared notification timestamp');
+    }
+  }
+
+  /// Reset all memo read statuses for testing (development only)
+  Future<void> resetAllMemoReadStatuses() async {
+    if (kDebugMode) {
+      // Clear in-memory cache
+      _memoReadStatusCache.clear();
+
+      // Clear SharedPreferences
+      if (_prefs != null) {
+        final keys = _prefs!.getKeys();
+        for (final key in keys) {
+          if (key.startsWith('memo_read_')) {
+            await _prefs!.remove(key);
+          }
+        }
+      }
+
+      // Update all transactions to unread
+      for (int i = 0; i < _transactions.length; i++) {
+        if (_transactions[i].hasMemo) {
+          _transactions[i] = _transactions[i].copyWith(memoRead: false);
+        }
+      }
+
+      // Recalculate unread count
+      await updateUnreadMemoCount();
+
+      print('🔄 RESET: All memo read statuses cleared');
+      print('📊 New unread memo count: $_unreadMemoCount');
+
+      notifyListeners();
+    }
+  }
+
+
+
   /// Load memo read status from SharedPreferences
   Future<void> _loadMemoStatusFromPrefs() async {
     if (_prefs == null) return;
@@ -4592,6 +4707,8 @@ class WalletProvider with ChangeNotifier {
 
       // Recalculate unread count after loading cache
       await updateUnreadMemoCount();
+
+      // Note: Notified set initialization moved to after transactions are loaded
     } catch (e) {
       if (kDebugMode) print('⚠️ Error loading memo status from SharedPreferences: $e');
     }
@@ -4666,6 +4783,62 @@ class WalletProvider with ChangeNotifier {
     return defaultValue;
   }
 
+  /// Bulletproof notification detection - uses EXACT same logic as messages UI
+  bool _shouldNotifyAboutMemo(TransactionModel tx) {
+    if (kDebugMode) {
+      print('🔍 NOTIFICATION CHECK: ${tx.txid.substring(0, 8)}...');
+      print('   Has memo: ${tx.hasMemo} (memo: "${tx.memo}")');
+      print('   Is received: ${tx.isReceived}');
+      print('   Transaction timestamp: ${tx.timestamp}');
+      print('   Last notification check: $_lastNotificationCheck');
+    }
+
+    // Must have memo
+    if (!tx.hasMemo) {
+      if (kDebugMode) print('   ❌ No memo');
+      return false;
+    }
+
+    // Only notify about incoming messages
+    if (!tx.isReceived) {
+      if (kDebugMode) print('   ❌ Not incoming');
+      return false;
+    }
+
+    // Must be a new transaction (after last notification check)
+    if (!_isNewTransaction(tx)) {
+      if (kDebugMode) print('   ❌ Not new transaction');
+      return false;
+    }
+
+    // Use EXACT same logic as UI for read/unread detection
+    final isRead = getTransactionMemoReadStatus(tx.txid, tx.memoRead);
+    if (kDebugMode) print('   Is read: $isRead');
+
+    final shouldNotify = !isRead;
+    if (kDebugMode) print('   ✅ SHOULD NOTIFY: $shouldNotify');
+
+    return shouldNotify; // Notify if unread
+  }
+
+  /// Check if transaction is new (after last notification check)
+  bool _isNewTransaction(TransactionModel tx) {
+    if (_lastNotificationCheck == null) {
+      // First run - don't notify about existing transactions
+      if (kDebugMode) print('   _lastNotificationCheck is null - first run');
+      return false;
+    }
+
+    final isNew = tx.timestamp.isAfter(_lastNotificationCheck!);
+    if (kDebugMode) {
+      print('   Transaction time: ${tx.timestamp}');
+      print('   Last check time: $_lastNotificationCheck');
+      print('   Is after last check: $isNew');
+    }
+
+    return isNew;
+  }
+
   /// Unlock wallet after safe initialization completion
   void _unlockWallet() {
     if (_walletLocked) {
@@ -4715,10 +4888,31 @@ class WalletProvider with ChangeNotifier {
     // Check if there's a significant change (above minimum threshold)
     final minChange = _notificationProvider!.settings.minimumBalanceChange;
 
+    // Check if this balance change is caused by a transaction with memo
+    // If so, skip balance notification since message notification will be sent
+    if (_hasRecentMemoTransaction(totalChange)) {
+      if (kDebugMode) {
+        print('🔔 Balance change caused by memo transaction - skipping balance notification');
+      }
+      return;
+    }
+
     // Detect incoming funds (positive change in total balance)
     if (totalChange > minChange) {
       if (kDebugMode) {
         print('🔔 Balance increase detected: +${totalChange.toStringAsFixed(8)} BTCZ');
+        print('   ⏳ Debouncing balance notification to allow memo processing...');
+      }
+
+      // Debounce: wait briefly to allow transaction processing to detect memo
+      await Future.delayed(const Duration(milliseconds: 1200));
+
+      // Re-check after delay
+      if (_hasRecentMemoTransaction(totalChange)) {
+        if (kDebugMode) {
+          print('🔕 Skipped balance notification after debounce due to detected memo transaction');
+        }
+        return;
       }
 
       await NotificationService.instance.showBalanceChangeNotification(
@@ -4753,6 +4947,49 @@ class WalletProvider with ChangeNotifier {
         changeAmount: unconfirmedChange,
         isIncoming: true,
       );
+    }
+  }
+
+  /// Check if balance change is caused by a recent memo transaction
+  bool _hasRecentMemoTransaction(double balanceChange) {
+    // Look for transactions from the last 60 seconds that match the balance change
+    final recentTime = DateTime.now().subtract(const Duration(seconds: 60));
+
+    for (final tx in _transactions) {
+      // Check if transaction is recent and has memo
+      if (tx.hasMemo && tx.timestamp.isAfter(recentTime)) {
+        // Check if transaction amount matches balance change (within small tolerance)
+        final amountDiff = (tx.amount.abs() - balanceChange.abs()).abs();
+        if (amountDiff < 0.00000001) { // Very small tolerance for floating point comparison
+          if (kDebugMode) {
+            print('🔍 Found matching memo transaction: ${tx.txid.substring(0, 8)}... amount: ${tx.amount}');
+            print('🔔 Balance change caused by memo transaction - skipping balance notification');
+          }
+          return true;
+        }
+      }
+    }
+
+    if (kDebugMode) {
+      print('🔍 No matching memo transaction found for balance change: ${balanceChange.toStringAsFixed(8)} BTCZ');
+    }
+    return false;
+  }
+
+  /// Mark notification as read by transaction ID to clear badge
+  Future<void> _markNotificationAsReadByTransactionId(String txid) async {
+    if (_notificationProvider != null) {
+      // Find notification with matching transaction ID
+      final notifications = _notificationProvider!.notificationHistory;
+      for (final notification in notifications) {
+        if (notification.payload?['transaction_id'] == txid) {
+          await _notificationProvider!.markNotificationAsRead(notification.id);
+          if (kDebugMode) {
+            print('📱 Marked notification as read for transaction: ${txid.substring(0, 8)}...');
+          }
+          break;
+        }
+      }
     }
   }
 }
