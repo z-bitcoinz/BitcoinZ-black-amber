@@ -139,7 +139,7 @@ class NotificationService with WidgetsBindingObserver {
     // Financial notifications channel
     const AndroidNotificationChannel financialChannel =
         AndroidNotificationChannel(
-      'financial_notifications',
+      'financial_notifications_v3',
       'Financial Notifications',
       description: 'Balance changes and transaction notifications',
       importance: Importance.high,
@@ -154,7 +154,7 @@ class NotificationService with WidgetsBindingObserver {
     // Message notifications channel
     const AndroidNotificationChannel messageChannel =
         AndroidNotificationChannel(
-      'message_notifications',
+      'message_notifications_v3',
       'Message Notifications',
       description: 'Transaction messages and memos',
       importance: Importance.high,
@@ -181,7 +181,7 @@ class NotificationService with WidgetsBindingObserver {
     // Security notifications channel
     const AndroidNotificationChannel securityChannel =
         AndroidNotificationChannel(
-      'security_notifications',
+      'security_notifications_v3',
       'Security Notifications',
       description: 'Security alerts and warnings',
       importance: Importance.max,
@@ -348,9 +348,9 @@ class NotificationService with WidgetsBindingObserver {
   String _getAndroidChannelId(NotificationCategory category) {
     switch (category) {
       case NotificationCategory.financial:
-        return 'financial_notifications';
+        return 'financial_notifications_v3';
       case NotificationCategory.messages:
-        return 'message_notifications';
+        return 'message_notifications_v3';
     }
   }
 
