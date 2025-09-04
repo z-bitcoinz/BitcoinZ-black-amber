@@ -177,8 +177,16 @@ class WalletProvider with ChangeNotifier {
       notifyListeners();
     };
     _rustService.fnSetTransactionsList = (transactions) async {
+      // Ensure SharedPreferences cache is loaded before processing transactions
+      await ensurePreferencesInitialized();
+      
       final unconfirmedCount = transactions.where((tx) => tx.confirmations == 0).length;
-      if (kDebugMode) print('🦀 Rust Bridge updated transactions: ${transactions.length} txs ($unconfirmedCount unconfirmed)');
+      final memoCount = transactions.where((tx) => tx.hasMemo).length;
+      if (kDebugMode) {
+        print('🦀 CALLBACK DEBUG: fnSetTransactionsList fired!');
+        print('🦀 CALLBACK DEBUG: Processing ${transactions.length} transactions ($unconfirmedCount unconfirmed, $memoCount with memos)');
+        print('🦀 CALLBACK DEBUG: Cache loaded, proceeding with transaction processing...');
+      }
 
       // NOTE: Transaction updates can come from cached data, so we don't override connection status here
 
@@ -264,7 +272,9 @@ class WalletProvider with ChangeNotifier {
       _lastNotificationCheck = DateTime.now();
 
       // Update unread memo count when transactions are updated
+      if (kDebugMode) print('🦀 CALLBACK DEBUG: Calling updateUnreadMemoCount() from fnSetTransactionsList...');
       await updateUnreadMemoCount();
+      if (kDebugMode) print('🦀 CALLBACK DEBUG: Badge count updated in callback: $_unreadMemoCount');
 
       // Cache transactions for faster startup (limit to recent 20 transactions)
       if (_wallet != null) {
@@ -285,6 +295,12 @@ class WalletProvider with ChangeNotifier {
         }
       }
 
+      // 🔄 BADGE FIX: Failsafe badge sync before notifying listeners
+      if (kDebugMode) print('🔄 BADGE FIX: Failsafe badge sync before notifyListeners...');
+      if (_notificationProvider != null) {
+        _notificationProvider!.updateUnreadMemoCount(_unreadMemoCount);
+      }
+      
       notifyListeners();
     };
     _rustService.fnSetAllAddresses = (addresses) {
@@ -2625,12 +2641,22 @@ class WalletProvider with ChangeNotifier {
         print('📱 WALLET_PROVIDER DEBUG: About to call _rustService.fetchTransactions()...');
         await _rustService.fetchTransactions();
         print('📱 WALLET_PROVIDER DEBUG: fetchTransactions() completed');
+        
+        // 🔄 BADGE FIX: Force badge recalculation after transactions are loaded
+        if (kDebugMode) print('🔄 BADGE FIX: Recalculating badge count after transaction loading...');
+        await updateUnreadMemoCount();
+        if (kDebugMode) print('🔄 BADGE FIX: Badge count updated to $_unreadMemoCount');
 
         if (kDebugMode) print('   Fetching addresses...');
         print('📱 WALLET_PROVIDER DEBUG: About to fetch addresses...');
         await _rustService.fetchAddresses();
 
         if (kDebugMode) print('✅ Wallet data refresh complete');
+
+        // 🔄 BADGE FIX: Final badge sync after complete wallet refresh
+        if (kDebugMode) print('🔄 BADGE FIX: Final badge sync after wallet refresh completion...');
+        await updateUnreadMemoCount();
+        if (kDebugMode) print('🔄 BADGE FIX: Final badge count: $_unreadMemoCount');
 
         // Save wallet state to disk for persistence
         try {
@@ -4284,8 +4310,13 @@ class WalletProvider with ChangeNotifier {
   /// Mark a transaction memo as read
   Future<void> markMemoAsRead(String txid) async {
     try {
+      if (kDebugMode) print('🔄 MARKING MEMO AS READ: ${txid.substring(0, 8)}...');
+      
       // Update in-memory cache first
+      final previousCacheValue = _memoReadStatusCache[txid];
       _memoReadStatusCache[txid] = true;
+      
+      if (kDebugMode) print('   Cache updated: $previousCacheValue -> true');
 
       // Always save to SharedPreferences for persistence
       await _saveMemoStatusToPrefs(txid, true);
@@ -4307,6 +4338,7 @@ class WalletProvider with ChangeNotifier {
       await _markNotificationAsReadByTransactionId(txid);
 
       // Update unread count
+      if (kDebugMode) print('   Updating badge count after marking memo as read...');
       await updateUnreadMemoCount();
 
       notifyListeners();
@@ -4318,8 +4350,13 @@ class WalletProvider with ChangeNotifier {
   /// Mark a transaction memo as unread
   Future<void> markMemoAsUnread(String txid) async {
     try {
+      if (kDebugMode) print('🔄 MARKING MEMO AS UNREAD: ${txid.substring(0, 8)}...');
+      
       // Update in-memory cache first
+      final previousCacheValue = _memoReadStatusCache[txid];
       _memoReadStatusCache[txid] = false;
+      
+      if (kDebugMode) print('   Cache updated: $previousCacheValue -> false');
 
       // Always save to SharedPreferences for persistence
       await _saveMemoStatusToPrefs(txid, false);
@@ -4338,6 +4375,7 @@ class WalletProvider with ChangeNotifier {
       }
 
       // Update unread count
+      if (kDebugMode) print('   Updating badge count after marking memo as unread...');
       await updateUnreadMemoCount();
 
       notifyListeners();
@@ -4348,25 +4386,116 @@ class WalletProvider with ChangeNotifier {
 
   /// Update the count of unread memos
   Future<void> updateUnreadMemoCount() async {
-    final previousCount = _unreadMemoCount;
+    try {
+      final previousCount = _unreadMemoCount;
+
+      if (kDebugMode) {
+        print('🔍 BADGE COUNT DEBUG: Starting updateUnreadMemoCount() v2');
+        print('   Previous count: $previousCount');
+        try {
+          print('   Total transactions: ${_transactions.length}');
+        } catch (e) {
+          print('   ERROR accessing _transactions: $e');
+        }
+        try {
+          print('   Cache size: ${_memoReadStatusCache.length}');
+        } catch (e) {
+          print('   ERROR accessing _memoReadStatusCache: $e');
+        }
+        print('   SharedPreferences initialized: $_prefsInitialized');
+        print('   _prefs is null: ${_prefs == null}');
+      }
+
+      // Add debug check for transaction processing
+      if (kDebugMode) {
+        print('🔍 BADGE COUNT DEBUG: About to check transaction memos...');
+        final memosTransactions = _transactions.where((tx) => tx.hasMemo);
+        print('🔍 BADGE COUNT DEBUG: Found ${memosTransactions.length} transactions with memos');
+      }
+
+    // Verify cache consistency with SharedPreferences
+    if (kDebugMode) {
+      print('🔍 BADGE COUNT DEBUG: About to verify cache consistency...');
+    }
+    if (_prefs != null && kDebugMode) {
+      var cacheInconsistencies = 0;
+      for (final tx in _transactions.where((tx) => tx.hasMemo)) {
+        final cacheValue = _memoReadStatusCache[tx.txid];
+        final prefsValue = _prefs!.getBool('memo_read_${tx.txid}');
+        if (cacheValue != null && prefsValue != null && cacheValue != prefsValue) {
+          cacheInconsistencies++;
+          print('⚠️ CACHE INCONSISTENCY: ${tx.txid.substring(0,8)}... cache=$cacheValue prefs=$prefsValue');
+          // Fix inconsistency by updating cache with SharedPreferences value
+          _memoReadStatusCache[tx.txid] = prefsValue;
+        }
+      }
+      if (cacheInconsistencies > 0) {
+        print('🔧 Fixed $cacheInconsistencies cache inconsistencies');
+      }
+    }
 
     // Always use the same method as the transaction list for consistency
     // Don't use database since we're storing memo status in SharedPreferences
+    final memosWithStatus = <Map<String, dynamic>>[];
+    
+    if (kDebugMode) {
+      print('🔍 BADGE COUNT DEBUG: Starting memo calculation loop...');
+    }
+    
     _unreadMemoCount = _transactions.where((tx) {
       if (!tx.hasMemo) return false;
       // Use the exact same helper method as transaction list uses
       final isRead = getTransactionMemoReadStatus(tx.txid, tx.memoRead);
+      
+      if (kDebugMode) {
+        memosWithStatus.add({
+          'txid': tx.txid.substring(0, 8) + '...',
+          'memo': tx.memo != null 
+            ? (tx.memo!.length > 20 ? tx.memo!.substring(0, 20) : tx.memo!) 
+            : 'null',
+          'memoRead': tx.memoRead,
+          'isReadFromCache': isRead,
+          'inCache': _memoReadStatusCache.containsKey(tx.txid),
+          'cacheValue': _memoReadStatusCache[tx.txid],
+          'prefsKey': 'memo_read_${tx.txid}',
+          'prefsValue': _prefs?.getBool('memo_read_${tx.txid}'),
+        });
+      }
+      
       return !isRead;
     }).length;
 
-    if (kDebugMode) print('📊 Unread memo count: $_unreadMemoCount (from ${_transactions.where((tx) => tx.hasMemo).length} total memos)');
+    if (kDebugMode) {
+      print('📊 BADGE COUNT DEBUG: Calculated unread memo count: $_unreadMemoCount (from ${_transactions.where((tx) => tx.hasMemo).length} total memos)');
+      print('   Memo status details:');
+      for (final memo in memosWithStatus) {
+        final isUnread = memo['isReadFromCache'] == false;
+        print('     ${memo['txid']}: "${memo['memo']}" -> ${isUnread ? "UNREAD" : "READ"}');
+        print('       tx.memoRead=${memo['memoRead']}, cache=${memo['cacheValue']}, prefs=${memo['prefsValue']}');
+      }
+    }
 
     // Update notification provider with new memo count
     if (_notificationProvider != null && _unreadMemoCount != previousCount) {
+      if (kDebugMode) print('🔔 Updating notification provider: $previousCount -> $_unreadMemoCount');
       _notificationProvider!.updateUnreadMemoCount(_unreadMemoCount);
     }
 
+    // Reconcile badge/notification history with authoritative memo read state
+    if (_notificationProvider != null) {
+      await _notificationProvider!.reconcileWithMemoReadState(actualUnreadMemos: _unreadMemoCount);
+    }
+
     notifyListeners();
+    
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print('❌ ERROR in updateUnreadMemoCount: $e');
+        print('   Stack trace: $stackTrace');
+      }
+      // Reset to safe value on error
+      _unreadMemoCount = 0;
+    }
   }
 
   /// Get transactions with unread memos

@@ -25,10 +25,20 @@ class NotificationService with WidgetsBindingObserver {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  // macOS dock badge method channel
+  static const MethodChannel _macBadgeChannel = MethodChannel('com.bitcoinz/app_badge');
+
   bool _isInitialized = false;
   NotificationSettings _settings = const NotificationSettings();
   final List<NotificationData> _notificationHistory = [];
   int _notificationIdCounter = 1000;
+  // Optional provider for authoritative badge count (e.g., NotificationProvider.totalUnreadCount)
+  int Function()? _badgeCountProvider;
+
+  void setBadgeCountProvider(int Function() provider) {
+    _badgeCountProvider = provider;
+  }
+
   AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
   final List<NotificationData> _pendingNotifications = [];
 
@@ -246,7 +256,7 @@ class NotificationService with WidgetsBindingObserver {
 
     try {
       final int notificationId = _notificationIdCounter++;
-      
+
       // Get platform-specific details
       final NotificationDetails platformDetails = _getPlatformNotificationDetails(
         notificationData.category,
@@ -264,7 +274,7 @@ class NotificationService with WidgetsBindingObserver {
       // Add to history
       final historyItem = notificationData.copyWith(id: notificationId.toString());
       _notificationHistory.insert(0, historyItem);
-      
+
       // Limit history size
       if (_notificationHistory.length > 100) {
         _notificationHistory.removeRange(100, _notificationHistory.length);
@@ -307,12 +317,18 @@ class NotificationService with WidgetsBindingObserver {
     );
 
     // iOS/macOS details
+    final int? providerCount = _badgeCountProvider?.call();
+    if (kDebugMode) {
+      print('🧭 Darwin badgeNumber source = '
+          '${providerCount != null ? 'provider:' + providerCount.toString() : 'history:' + _getUnreadNotificationCount().toString()}');
+    }
     final DarwinNotificationDetails darwinDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: _settings.soundEnabled,
       sound: _settings.soundEnabled ? 'default' : null,
-      badgeNumber: _getUnreadNotificationCount(),
+      // Use ONLY the unified provider (same as app's unread messages). Default to 0 if not yet set.
+      badgeNumber: providerCount ?? 0,
     );
 
     // Linux details
@@ -444,6 +460,7 @@ class NotificationService with WidgetsBindingObserver {
   Future<void> _saveNotificationToDatabase(NotificationData notification) async {
     try {
       final db = await DatabaseService.instance.database;
+      final now = DateTime.now().millisecondsSinceEpoch;
       await db.insert('notifications', {
         'id': notification.id,
         'type': notification.type.name,
@@ -459,6 +476,8 @@ class NotificationService with WidgetsBindingObserver {
         'icon_path': notification.iconPath,
         'image_path': notification.imagePath,
         'sound_path': notification.soundPath,
+        'created_at': now,
+        'updated_at': now,
       });
     } catch (e) {
       if (kDebugMode) print('⚠️ Failed to save notification to database: $e');
@@ -478,7 +497,10 @@ class NotificationService with WidgetsBindingObserver {
       final db = await DatabaseService.instance.database;
       await db.update(
         'notifications',
-        {'is_read': 1},
+        {
+          'is_read': 1,
+          'updated_at': DateTime.now().millisecondsSinceEpoch,
+        },
         where: 'id = ?',
         whereArgs: [notificationId],
       );
@@ -493,9 +515,18 @@ class NotificationService with WidgetsBindingObserver {
   /// Update app badge count
   Future<void> _updateAppBadge() async {
     try {
-      final unreadCount = _getUnreadNotificationCount();
+      // Use ONLY the authoritative provider (WalletProvider via NotificationProvider).
+      // If not yet set, default to 0 to avoid stale history-based numbers.
+      final unreadCount = _badgeCountProvider?.call() ?? 0;
+
+      if (kDebugMode) {
+        print('🔢 Badge update -> count=$unreadCount (provider-only)');
+      }
+
       if (Platform.isIOS || Platform.isAndroid) {
         await AppBadgePlus.updateBadge(unreadCount);
+      } else if (Platform.isMacOS) {
+        await _setMacBadge(unreadCount);
       }
     } catch (e) {
       if (kDebugMode) print('⚠️ Failed to update app badge: $e');
@@ -511,11 +542,9 @@ class NotificationService with WidgetsBindingObserver {
   Future<void> updateAppBadge(int count) async {
     try {
       if (Platform.isIOS || Platform.isAndroid) {
-        if (count > 0) {
-          await AppBadgePlus.updateBadge(count);
-        } else {
-          await AppBadgePlus.updateBadge(0);
-        }
+        await AppBadgePlus.updateBadge(count.clamp(0, 9999));
+      } else if (Platform.isMacOS) {
+        await _setMacBadge(count);
       }
     } catch (e) {
       if (kDebugMode) print('⚠️ Failed to update app badge: $e');
@@ -527,11 +556,25 @@ class NotificationService with WidgetsBindingObserver {
     try {
       if (Platform.isIOS || Platform.isAndroid) {
         await AppBadgePlus.updateBadge(0);
+      } else if (Platform.isMacOS) {
+        await _setMacBadge(0);
       }
     } catch (e) {
       if (kDebugMode) print('⚠️ Failed to clear app badge: $e');
     }
   }
+  /// Set macOS dock badge (via MethodChannel)
+  Future<void> _setMacBadge(int count) async {
+    try {
+      final clamped = count < 0 ? 0 : count;
+      await _macBadgeChannel.invokeMethod('setBadge', {
+        'count': clamped,
+      });
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to set macOS badge: $e');
+    }
+  }
+
 
   /// Get notification settings
   NotificationSettings get settings => _settings;

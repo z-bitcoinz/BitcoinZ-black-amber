@@ -36,17 +36,20 @@ class NotificationProvider extends ChangeNotifier {
       // Load settings and history
       await _loadSettings();
       await _loadNotificationHistory();
-      
+
       // Initialize notification service
       await NotificationService.instance.initialize();
-      
+
       // Set up callbacks
       NotificationService.instance.onNotificationReceived = _onNotificationReceived;
       NotificationService.instance.onNotificationTapped = _onNotificationTapped;
-      
+
+      // Provide NotificationService with the authoritative badge count source (unread memos only)
+      NotificationService.instance.setBadgeCountProvider(() => _unreadMemoCount);
+
       _isInitialized = true;
       _updateUnreadCount();
-      
+
       if (kDebugMode) print('🔔 NotificationProvider initialized');
       notifyListeners();
     } catch (e) {
@@ -107,9 +110,9 @@ class NotificationProvider extends ChangeNotifier {
         'quietHoursEnabled': _settings.quietHoursEnabled,
         'minimumBalanceChange': _settings.minimumBalanceChange,
       };
-      
+
       await StorageService.write(key: _settingsKey, value: json.encode(settingsMap));
-      
+
       // Update notification service settings
       await NotificationService.instance.updateSettings(_settings);
     } catch (e) {
@@ -178,7 +181,7 @@ class NotificationProvider extends ChangeNotifier {
           'soundPath': notification.soundPath,
         };
       }).toList();
-      
+
       await StorageService.write(key: _historyKey, value: json.encode(historyList));
     } catch (e) {
       if (kDebugMode) print('⚠️ Failed to save notification history: $e');
@@ -310,9 +313,38 @@ class NotificationProvider extends ChangeNotifier {
 
   /// Update unread count
   void _updateUnreadCount() {
-    _unreadCount = _notificationHistory.where((n) => !n.isRead).length;
+    final historyUnread = _notificationHistory.where((n) => !n.isRead).length;
+    _unreadCount = historyUnread;
     _updateAppBadge();
+    if (kDebugMode) {
+      print('🔎 Badge sync: historyUnread=$_unreadCount, memoUnread=$_unreadMemoCount, total=$totalUnreadCount');
+    }
   }
+  /// Reconcile notification history with actual memo read state
+  Future<void> reconcileWithMemoReadState({required int actualUnreadMemos}) async {
+    try {
+      // If app shows 0 unread memos but history has unread message notifications, mark them read
+      if (actualUnreadMemos == 0) {
+        bool changed = false;
+        for (int i = 0; i < _notificationHistory.length; i++) {
+          final n = _notificationHistory[i];
+          if (!n.isRead && n.type == NotificationType.messageReceived) {
+            _notificationHistory[i] = n.copyWith(isRead: true);
+            changed = true;
+          }
+        }
+        if (changed) {
+          _updateUnreadCount();
+          await _saveNotificationHistory();
+          notifyListeners();
+          if (kDebugMode) print('🧹 Reconciled notification history with memo read state');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed reconciliation: $e');
+    }
+  }
+
 
   /// Update unread memo count from wallet provider
   void updateUnreadMemoCount(int count) {
@@ -323,15 +355,20 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Update app badge with total unread count
+  /// Update app badge with memo count only (consistent with setBadgeCountProvider)
   void _updateAppBadge() {
     try {
-      final totalCount = totalUnreadCount;
-      if (totalCount > 0) {
-        NotificationService.instance.updateAppBadge(totalCount);
+      // 🔄 BADGE FIX: Use memos only (consistent with line 48 setBadgeCountProvider)
+      final memoCount = _unreadMemoCount;
+      if (kDebugMode) print('🔄 BADGE FIX: Updating app badge to $memoCount (memos only)');
+      
+      if (memoCount > 0) {
+        NotificationService.instance.updateAppBadge(memoCount);
       } else {
         NotificationService.instance.clearAppBadge();
       }
+      
+      if (kDebugMode) print('🔄 BADGE FIX: App badge updated successfully');
     } catch (e) {
       if (kDebugMode) print('⚠️ Failed to update app badge: $e');
     }
