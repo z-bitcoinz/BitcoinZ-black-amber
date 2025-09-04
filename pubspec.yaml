@@ -9,21 +9,21 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
+
   # State management
   provider: ^6.1.1
-  
+
   # Secure storage
   flutter_secure_storage: ^9.0.0
   shared_preferences: ^2.2.2
-  
+
   # Authentication
   local_auth: ^2.1.6
-  
+
   # QR Code
   qr_flutter: ^4.1.0
   mobile_scanner: ^5.1.1  # Modern QR scanner that works with latest Android
-  
+
   # Sharing
   share_plus: ^7.2.1
   url_launcher: ^6.2.4
@@ -32,40 +32,40 @@ dependencies:
   path_provider: ^2.1.1
   path: ^1.8.3
   file_selector: ^1.0.3
-  
+
   # FFI for Rust integration
   ffi: ^2.1.0
   flutter_rust_bridge: 2.11.1
-  
+
   # HTTP requests (for fallback API calls)
   http: ^1.1.0
-  
-  
+
+
   # JSON handling
   json_annotation: ^4.8.1
-  
+
   # UI and utilities
   cupertino_icons: ^1.0.2
-  
+
   # Crypto utilities
   crypto: ^3.0.6
-  
+
   # Image handling
   image_picker: ^1.0.7
   image: ^4.1.7  # Used for image processing and compression
-  
+
   # BIP39 for seed phrase validation
   bip39: ^1.0.6
-  
+
   # Number formatting
   intl: ^0.18.1
-  
+
   # Logging
   logger: ^2.0.2
-  
+
   # Database
   sqflite: ^2.3.0
-  
+
   # Desktop window management
   window_manager: ^0.3.7
 
@@ -81,7 +81,7 @@ dev_dependencies:
   json_serializable: ^6.7.1
   build_runner: ^2.4.7
   args: ^2.4.2
-  
+
   # Interactive CLI dependencies
   chalkdart: ^2.0.9
   cli_util: ^0.4.1
@@ -89,7 +89,26 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
+
   # App assets
   assets:
     - assets/images/
+
+
+# Multi-platform app icon configuration
+icons_launcher:
+  image_path: assets/app_icon/app_icon.png
+  platforms:
+    android:
+      enable: true
+      adaptive_background_color: "#000000"
+      adaptive_foreground_image: assets/app_icon/app_icon_foreground.png
+      # If you add a monochrome asset later, you can set adaptive_monochrome_image
+    ios:
+      enable: true
+    macos:
+      enable: true
+    windows:
+      enable: true
+    linux:
+      enable: true
