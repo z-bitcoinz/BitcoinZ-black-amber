@@ -16,6 +16,7 @@ import '../models/analytics_data.dart';
 import '../models/address_label.dart';
 // import '../services/bitcoinz_service.dart'; // Not used - using Rust service instead
 import '../services/database_service.dart';
+import '../services/storage_service.dart';
 import '../services/bitcoinz_rust_service.dart';
 import '../providers/auth_provider.dart';
 import '../src/rust/api.dart' as rust_api;
@@ -51,7 +52,7 @@ class WalletProvider with ChangeNotifier {
   // Simple timestamp-based new transaction detection (bulletproof approach)
   DateTime? _lastNotificationCheck;
 
-  // Transaction notification tracking to prevent duplicates
+  // Transaction notification tracking to prevent duplicates (with persistence)
   final Set<String> _notifiedTransactionIds = <String>{};
 
   // Comprehensive notification attempt tracking
@@ -152,6 +153,9 @@ class WalletProvider with ChangeNotifier {
   WalletProvider() {
     // Initialize SharedPreferences early
     _initializePreferences();
+
+    // Load persisted notification tracking data
+    _loadNotifiedTransactionIds();
 
     // Start simple connection monitoring
     _startSimpleConnectionMonitoring();
@@ -4602,6 +4606,7 @@ class WalletProvider with ChangeNotifier {
 
         // Track this transaction to prevent duplicate balance notifications
         _notifiedTransactionIds.add(tx.txid);
+        _saveNotifiedTransactionIds();
         
         if (kDebugMode) {
           print('🔔 Tracked memo notification for tx: ${tx.txid.substring(0, 8)}...');
@@ -4730,7 +4735,25 @@ class WalletProvider with ChangeNotifier {
 
   /// Process ALL new incoming transactions for immediate notifications (mempool monitoring)
   Future<void> _processNewIncomingTransactions(List<TransactionModel> newTransactions) async {
-    for (final tx in newTransactions) {
+    // Skip notifications if wallet is still syncing or restoration is in progress
+    if (_isLoading || _isSyncing) {
+      if (kDebugMode) {
+        print('🔄 Wallet is syncing, skipping ${newTransactions.length} transaction notifications');
+      }
+      return;
+    }
+
+    // Only process recent transactions (last 10 minutes) to avoid historical notifications
+    final recentCutoff = DateTime.now().subtract(const Duration(minutes: 10));
+    final recentTransactions = newTransactions.where((tx) => tx.timestamp.isAfter(recentCutoff)).toList();
+    
+    if (recentTransactions.length < newTransactions.length) {
+      if (kDebugMode) {
+        print('🕐 Filtered out ${newTransactions.length - recentTransactions.length} historical transactions from notifications');
+      }
+    }
+
+    for (final tx in recentTransactions) {
       if (kDebugMode) {
         print('🔔 PROCESSING NEW INCOMING TRANSACTION: ${tx.txid.substring(0, 8)}...');
         print('   Amount: ${tx.amount.toStringAsFixed(8)} BTCZ');
@@ -4775,6 +4798,7 @@ class WalletProvider with ChangeNotifier {
 
           // Track this transaction to prevent duplicate notifications
           _notifiedTransactionIds.add(tx.txid);
+          _saveNotifiedTransactionIds();
 
           if (kDebugMode) {
             print('✅ Message notification sent for mempool transaction: ${tx.txid.substring(0, 8)}...');
@@ -5668,6 +5692,43 @@ class WalletProvider with ChangeNotifier {
     }
   }
 
+  /// Load persisted notified transaction IDs
+  Future<void> _loadNotifiedTransactionIds() async {
+    try {
+      final notifiedIdsJson = await StorageService.read(key: 'notified_transaction_ids');
+      if (notifiedIdsJson != null) {
+        final List<dynamic> idsList = json.decode(notifiedIdsJson);
+        _notifiedTransactionIds.clear();
+        _notifiedTransactionIds.addAll(idsList.cast<String>());
+        
+        if (kDebugMode) {
+          print('📱 Loaded ${_notifiedTransactionIds.length} notified transaction IDs from storage');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ Failed to load notified transaction IDs: $e');
+      }
+    }
+  }
+
+  /// Save notified transaction IDs to persistent storage
+  Future<void> _saveNotifiedTransactionIds() async {
+    try {
+      final idsList = _notifiedTransactionIds.toList();
+      final notifiedIdsJson = json.encode(idsList);
+      await StorageService.write(key: 'notified_transaction_ids', value: notifiedIdsJson);
+      
+      if (kDebugMode) {
+        print('💾 Saved ${idsList.length} notified transaction IDs to storage');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ Failed to save notified transaction IDs: $e');
+      }
+    }
+  }
+
   /// Clean up old notification tracking entries to prevent memory bloat
   void _cleanupNotificationTracking() {
     // Only keep tracking for transactions from the last 24 hours
@@ -5696,6 +5757,11 @@ class WalletProvider with ChangeNotifier {
     
     if (kDebugMode && txidsToRemove.isNotEmpty) {
       print('🧹 Cleaned up ${txidsToRemove.length} old notification tracking entries');
+    }
+    
+    // Save updated tracking data if anything was cleaned up
+    if (txidsToRemove.isNotEmpty) {
+      _saveNotifiedTransactionIds();
     }
   }
 
