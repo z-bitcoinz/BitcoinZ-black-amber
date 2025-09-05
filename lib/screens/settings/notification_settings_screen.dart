@@ -144,43 +144,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   ),
                 ),
                 
-                const SizedBox(height: 24),
-                
-                // Notification history
-                Text('Notification History', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 8),
-                
-                Card(
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: Icon(Icons.history, color: Theme.of(context).colorScheme.primary),
-                        title: const Text('View Notification History'),
-                        subtitle: Text('${notificationProvider.notificationHistory.length} notifications'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _showNotificationHistory(context),
-                      ),
-                      
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: Icon(Icons.mark_email_read, color: Theme.of(context).colorScheme.primary),
-                        title: const Text('Mark All as Read'),
-                        subtitle: Text('${notificationProvider.totalUnreadCount} unread'),
-                        trailing: notificationProvider.hasAnyUnread ? const Icon(Icons.chevron_right) : null,
-                        onTap: notificationProvider.hasAnyUnread ? () => _markAllAsRead(context, notificationProvider) : null,
-                      ),
-                      
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: Icon(Icons.delete_sweep, color: Theme.of(context).colorScheme.error),
-                        title: const Text('Clear History'),
-                        subtitle: const Text('Remove all notification history'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _clearHistory(context, notificationProvider),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ],
           );
@@ -215,42 +178,4 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     return '${hour - 12}:00 PM';
   }
 
-  void _showNotificationHistory(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Notification history coming soon')),
-    );
-  }
-
-  void _markAllAsRead(BuildContext context, NotificationProvider notificationProvider) {
-    notificationProvider.markAllNotificationsAsRead();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('All notifications marked as read')),
-    );
-  }
-
-  void _clearHistory(BuildContext context, NotificationProvider notificationProvider) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear History'),
-        content: const Text('This will permanently delete all notification history.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              notificationProvider.clearNotificationHistory();
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notification history cleared')),
-              );
-            },
-            child: const Text('Clear'),
-          ),
-        ],
-      ),
-    );
-  }
 }

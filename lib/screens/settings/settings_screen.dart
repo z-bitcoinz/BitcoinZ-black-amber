@@ -23,7 +23,6 @@ import '../../services/database_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/wallet_storage_service.dart';
 import '../onboarding/welcome_screen.dart';
-import '../debug/notification_debug_screen.dart';
 import 'package:flutter/foundation.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -165,20 +164,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         icon: Icons.notifications,
                         title: 'Notification Settings',
                         subtitle: notificationProvider.settings.enabled
-                            ? 'Enabled (${notificationProvider.totalUnreadCount} unread)'
+                            ? 'Enabled'
                             : 'Disabled',
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (notificationProvider.hasAnyUnread)
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: notificationProvider.settings.enabled 
+                                    ? Colors.green 
+                                    : Colors.red,
+                                shape: BoxShape.circle,
                               ),
+                            ),
                             const SizedBox(width: 8),
                             const Icon(Icons.chevron_right),
                           ],
@@ -192,22 +192,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           );
                         },
                       ),
-                      if (kDebugMode) ...[
-                        _buildSettingsTile(
-                          context: context,
-                          icon: Icons.bug_report,
-                          title: 'Notification Debug',
-                          subtitle: 'Test and validate notification functionality',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const NotificationDebugScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
                     ],
                   );
                 },
