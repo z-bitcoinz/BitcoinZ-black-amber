@@ -615,8 +615,16 @@ class NotificationService with WidgetsBindingObserver {
     // No minimum threshold - notify for all changes
 
     final String title = isIncoming ? 'Funds Received' : 'Funds Sent';
-    final String sign = isIncoming ? '+' : '-';
-    final String body = '$sign${changeAmount.toStringAsFixed(8)} BTCZ';
+    
+    // Create balance change notification data to get proper formatting
+    final balanceData = BalanceChangeNotificationData(
+      previousBalance: previousBalance,
+      newBalance: newBalance,
+      changeAmount: changeAmount,
+      transactionId: transactionId,
+      isIncoming: isIncoming,
+    );
+    final String body = balanceData.formattedChangeAmount;
 
     final notificationData = NotificationData(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -657,9 +665,15 @@ class NotificationService with WidgetsBindingObserver {
     if (!_settings.messageNotificationsEnabled) return;
 
     try {
-      // Format amount with proper sign (messenger style)
-      final String sign = isIncoming ? '+' : '-';
-      final String amountStr = '$sign${amount.toStringAsFixed(8)} BTCZ';
+      // Create message notification data to get proper formatting
+      final messageData = MessageNotificationData(
+        transactionId: transactionId,
+        message: message,
+        fromAddress: fromAddress,
+        amount: amount,
+        transactionTime: DateTime.now(),
+      );
+      final String amountStr = messageData.formattedAmount;
 
       // Truncate message for preview (messenger style - shorter for better readability)
       final String messagePreview = message.length > 35

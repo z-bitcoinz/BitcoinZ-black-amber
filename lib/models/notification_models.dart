@@ -229,7 +229,18 @@ class BalanceChangeNotificationData {
 
   String get formattedChangeAmount {
     final sign = isIncoming ? '+' : '-';
-    return '$sign${changeAmount.toStringAsFixed(8)} BTCZ';
+    return '$sign${_formatAmount(changeAmount)} BTCZ';
+  }
+
+  String _formatAmount(double amount) {
+    if (amount == 0) return '0.00000000';
+    
+    // Show up to 8 decimal places, removing trailing zeros
+    String formatted = amount.abs().toStringAsFixed(8);
+    formatted = formatted.replaceAll(RegExp(r'0*$'), '');
+    formatted = formatted.replaceAll(RegExp(r'\.$'), '');
+    
+    return formatted;
   }
 }
 
@@ -256,7 +267,18 @@ class MessageNotificationData {
   Map<String, dynamic> toJson() => _$MessageNotificationDataToJson(this);
 
   String get formattedAmount {
-    return '+${amount.toStringAsFixed(8)} BTCZ';
+    return '+${_formatAmount(amount)} BTCZ';
+  }
+
+  String _formatAmount(double amount) {
+    if (amount == 0) return '0.00000000';
+    
+    // Show up to 8 decimal places, removing trailing zeros
+    String formatted = amount.abs().toStringAsFixed(8);
+    formatted = formatted.replaceAll(RegExp(r'0*$'), '');
+    formatted = formatted.replaceAll(RegExp(r'\.$'), '');
+    
+    return formatted;
   }
 
   String get shortFromAddress {
