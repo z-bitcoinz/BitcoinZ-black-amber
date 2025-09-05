@@ -51,6 +51,21 @@ class WalletProvider with ChangeNotifier {
   // Simple timestamp-based new transaction detection (bulletproof approach)
   DateTime? _lastNotificationCheck;
 
+  // Transaction notification tracking to prevent duplicates
+  final Set<String> _notifiedTransactionIds = <String>{};
+
+  // Comprehensive notification attempt tracking
+  final List<Map<String, dynamic>> _notificationAttempts = [];
+  int _notificationAttemptCounter = 0;
+
+  // Race condition prevention
+  bool _isProcessingNotifications = false;
+  final List<Function> _pendingNotificationOperations = [];
+
+  // Retry mechanism for failed notifications
+  final List<Map<String, dynamic>> _failedNotifications = [];
+  Timer? _retryTimer;
+
   // Simple connection monitoring (single Rust anchor)
   Timer? _simpleConnectionTimer;
 
@@ -146,8 +161,8 @@ class WalletProvider with ChangeNotifier {
     _rustService.fnSetTotalBalance = (balance) async {
       if (kDebugMode) print('🦀 Rust Bridge updated balance: ${balance.formattedTotal} BTCZ (unconfirmed: ${balance.unconfirmed})');
 
-      // Detect balance changes for notifications
-      await _handleBalanceChange(_balance, balance);
+      // OLD APPROACH: Balance-change-triggered notifications (DISABLED - now using direct transaction monitoring)
+      // await _handleBalanceChange(_balance, balance);
 
       _previousBalance = _balance;
       _balance = balance;
@@ -206,9 +221,9 @@ class WalletProvider with ChangeNotifier {
         }
       }
 
-      // Check for new transactions with memos
+      // DIRECT TRANSACTION MONITORING - Monitor mempool directly for all new transactions
       final Set<String> existingTxIds = _transactions.map((tx) => tx.txid).toSet();
-      final List<TransactionModel> newMemoTransactions = [];
+      final List<TransactionModel> newIncomingTransactions = [];
 
       // Initialize notification timestamp on first run
       if (_lastNotificationCheck == null) {
@@ -216,13 +231,14 @@ class WalletProvider with ChangeNotifier {
       }
 
       if (kDebugMode) {
-        print('🔍 TRANSACTION PROCESSING:');
-        print('   New transactions: ${transactions.length}');
-        print('   Transactions with memos: ${transactions.where((tx) => tx.hasMemo).length}');
-        print('   Last notification check: $_lastNotificationCheck');
+        print('🔍 DIRECT TRANSACTION MONITORING:');
+        print('   Total transactions: ${transactions.length}');
+        print('   Existing transactions: ${existingTxIds.length}');
+        print('   Unconfirmed transactions: ${unconfirmedCount}');
+        print('   Transactions with memos: ${memoCount}');
       }
 
-      // Update transactions with preserved read status and check for notifications
+      // Update transactions with preserved read status and detect ALL new incoming transactions
       final updatedTransactions = <TransactionModel>[];
       for (int i = 0; i < transactions.length; i++) {
         final tx = transactions[i];
@@ -234,12 +250,15 @@ class WalletProvider with ChangeNotifier {
           updatedTx = tx.copyWith(memoRead: memoReadStatus[tx.txid]);
         }
 
-        // Check if this transaction needs notification using bulletproof logic
-        if (_shouldNotifyAboutMemo(updatedTx)) {
-          newMemoTransactions.add(updatedTx);
+        // Check if this is a NEW incoming transaction (mempool monitoring)
+        if (!existingTxIds.contains(tx.txid) && tx.isReceived) {
+          newIncomingTransactions.add(updatedTx);
           if (kDebugMode) {
-            print('🔔 MEMO NOTIFICATION NEEDED: ${tx.txid.substring(0, 8)}... - ${tx.isReceived ? '+' : '-'}${tx.amount} BTCZ');
-            print('   Memo: "${tx.memo}"');
+            print('🔔 NEW INCOMING TRANSACTION DETECTED: ${tx.txid.substring(0, 8)}...');
+            print('   Amount: ${tx.amount.toStringAsFixed(8)} BTCZ');
+            print('   Confirmations: ${tx.confirmations}');
+            print('   Has memo: ${tx.hasMemo}');
+            if (tx.hasMemo) print('   Memo: "${tx.memo}"');
           }
         }
 
@@ -248,28 +267,29 @@ class WalletProvider with ChangeNotifier {
 
       _transactions = updatedTransactions;
 
-      // Initialization moved to earlier in the method
-
-      // Show notification for new memo transactions
+      // DIRECT TRANSACTION NOTIFICATION PROCESSING - Process ALL new incoming transactions
       if (kDebugMode) {
-        print('🔔 About to check for memo notifications:');
-        print('   New memo transactions count: ${newMemoTransactions.length}');
-        for (final tx in newMemoTransactions) {
-          print('   - ${tx.txid.substring(0, 8)}... memo: "${tx.memo}"');
+        print('🔔 DIRECT NOTIFICATION PROCESSING:');
+        print('   New incoming transactions: ${newIncomingTransactions.length}');
+        for (final tx in newIncomingTransactions) {
+          print('   - ${tx.txid.substring(0, 8)}... ${tx.amount.toStringAsFixed(8)} BTCZ ${tx.hasMemo ? 'WITH MEMO' : 'NO MEMO'}');
         }
       }
 
-      if (newMemoTransactions.isNotEmpty) {
+      if (newIncomingTransactions.isNotEmpty) {
         if (kDebugMode) {
-          print('🔔 Calling _notifyNewMemoTransactions with ${newMemoTransactions.length} transactions');
+          print('🔔 Processing ${newIncomingTransactions.length} new incoming transactions for notifications');
         }
-        _notifyNewMemoTransactions(newMemoTransactions);
+        await _processNotificationSafely(() => _processNewIncomingTransactions(newIncomingTransactions));
       } else if (kDebugMode) {
-        print('🔔 No new memo transactions to notify about');
+        print('🔔 No new incoming transactions to process');
       }
 
       // Update notification timestamp after processing
       _lastNotificationCheck = DateTime.now();
+
+      // Clean up old notification tracking entries
+      _cleanupNotificationTracking();
 
       // Update unread memo count when transactions are updated
       if (kDebugMode) print('🦀 CALLBACK DEBUG: Calling updateUnreadMemoCount() from fnSetTransactionsList...');
@@ -4547,14 +4567,75 @@ class WalletProvider with ChangeNotifier {
         print('   Is received: ${tx.isReceived}, Has memo: ${tx.hasMemo}');
       }
 
-      // Show proper local notification with absolute amount and direction
-      await NotificationService.instance.showMessageNotification(
+      // Track message notification attempt
+      _trackNotificationAttempt(
+        type: 'message',
+        status: 'attempted',
+        reason: 'New memo transaction detected',
+        amount: tx.amount.abs(),
         transactionId: tx.txid,
-        message: tx.memo ?? '',
-        amount: tx.amount.abs(), // Use absolute amount, notification service will add the sign
-        fromAddress: tx.fromAddress,
-        isIncoming: tx.isReceived, // Pass the transaction direction
+        details: {
+          'memo': tx.memo ?? '',
+          'from_address': tx.fromAddress,
+          'is_incoming': tx.isReceived,
+        },
       );
+
+      // Show proper local notification with absolute amount and direction
+      try {
+        await NotificationService.instance.showMessageNotification(
+          transactionId: tx.txid,
+          message: tx.memo ?? '',
+          amount: tx.amount.abs(), // Use absolute amount, notification service will add the sign
+          fromAddress: tx.fromAddress,
+          isIncoming: tx.isReceived, // Pass the transaction direction
+        );
+
+        // Track successful message notification
+        _trackNotificationAttempt(
+          type: 'message',
+          status: 'sent',
+          reason: 'Message notification sent successfully',
+          amount: tx.amount.abs(),
+          transactionId: tx.txid,
+        );
+
+        // Track this transaction to prevent duplicate balance notifications
+        _notifiedTransactionIds.add(tx.txid);
+        
+        if (kDebugMode) {
+          print('🔔 Tracked memo notification for tx: ${tx.txid.substring(0, 8)}...');
+        }
+      } catch (e) {
+        _trackNotificationAttempt(
+          type: 'message',
+          status: 'failed',
+          reason: 'Exception during message notification: $e',
+          amount: tx.amount.abs(),
+          transactionId: tx.txid,
+        );
+        
+        // Schedule retry for failed message notification
+        _scheduleNotificationRetry(
+          type: 'message',
+          notificationData: {
+            'transaction_id': tx.txid,
+            'amount': tx.amount.abs(),
+            'memo': tx.memo ?? '',
+          },
+          retryOperation: () => NotificationService.instance.showMessageNotification(
+            transactionId: tx.txid,
+            message: tx.memo ?? '',
+            amount: tx.amount.abs(),
+            fromAddress: tx.fromAddress,
+            isIncoming: tx.isReceived,
+          ),
+        );
+        
+        if (kDebugMode) {
+          print('❌ Failed to send message notification: $e');
+        }
+      }
 
       // Also show in-app snackbar if context is available (for immediate feedback)
       if (_notificationContext != null && _notificationContext!.mounted) {
@@ -4647,6 +4728,150 @@ class WalletProvider with ChangeNotifier {
     );
   }
 
+  /// Process ALL new incoming transactions for immediate notifications (mempool monitoring)
+  Future<void> _processNewIncomingTransactions(List<TransactionModel> newTransactions) async {
+    for (final tx in newTransactions) {
+      if (kDebugMode) {
+        print('🔔 PROCESSING NEW INCOMING TRANSACTION: ${tx.txid.substring(0, 8)}...');
+        print('   Amount: ${tx.amount.toStringAsFixed(8)} BTCZ');
+        print('   Confirmations: ${tx.confirmations}');
+        print('   Has memo: ${tx.hasMemo}');
+        if (tx.hasMemo) print('   Memo: "${tx.memo}"');
+      }
+
+      // Immediate notification based on transaction type
+      if (tx.hasMemo && tx.memo != null && tx.memo!.isNotEmpty) {
+        // Transaction WITH memo → Send message notification
+        _trackNotificationAttempt(
+          type: 'message',
+          status: 'attempted',
+          reason: 'New mempool transaction with memo detected',
+          amount: tx.amount.abs(),
+          transactionId: tx.txid,
+          details: {
+            'memo': tx.memo!,
+            'from_address': tx.fromAddress,
+            'confirmations': tx.confirmations,
+            'source': 'mempool_monitor',
+          },
+        );
+
+        try {
+          await NotificationService.instance.showMessageNotification(
+            transactionId: tx.txid,
+            message: tx.memo!,
+            amount: tx.amount.abs(),
+            fromAddress: tx.fromAddress,
+            isIncoming: tx.isReceived,
+          );
+
+          _trackNotificationAttempt(
+            type: 'message',
+            status: 'sent',
+            reason: 'Mempool message notification sent successfully',
+            amount: tx.amount.abs(),
+            transactionId: tx.txid,
+          );
+
+          // Track this transaction to prevent duplicate notifications
+          _notifiedTransactionIds.add(tx.txid);
+
+          if (kDebugMode) {
+            print('✅ Message notification sent for mempool transaction: ${tx.txid.substring(0, 8)}...');
+          }
+        } catch (e) {
+          _trackNotificationAttempt(
+            type: 'message',
+            status: 'failed',
+            reason: 'Exception during mempool message notification: $e',
+            amount: tx.amount.abs(),
+            transactionId: tx.txid,
+          );
+
+          _scheduleNotificationRetry(
+            type: 'message',
+            notificationData: {
+              'transaction_id': tx.txid,
+              'amount': tx.amount.abs(),
+              'memo': tx.memo!,
+            },
+            retryOperation: () => NotificationService.instance.showMessageNotification(
+              transactionId: tx.txid,
+              message: tx.memo!,
+              amount: tx.amount.abs(),
+              fromAddress: tx.fromAddress,
+              isIncoming: tx.isReceived,
+            ),
+          );
+
+          if (kDebugMode) {
+            print('❌ Failed to send mempool message notification: $e');
+          }
+        }
+      } else {
+        // Transaction WITHOUT memo → Send balance change notification
+        _trackNotificationAttempt(
+          type: 'balance_change',
+          status: 'attempted',
+          reason: 'New mempool transaction without memo detected',
+          amount: tx.amount.abs(),
+          transactionId: tx.txid,
+          details: {
+            'confirmations': tx.confirmations,
+            'source': 'mempool_monitor',
+          },
+        );
+
+        try {
+          await NotificationService.instance.showBalanceChangeNotification(
+            previousBalance: _balance.total - tx.amount.abs(),
+            newBalance: _balance.total,
+            changeAmount: tx.amount.abs(),
+            isIncoming: true,
+          );
+
+          _trackNotificationAttempt(
+            type: 'balance_change',
+            status: 'sent',
+            reason: 'Mempool balance change notification sent successfully',
+            amount: tx.amount.abs(),
+            transactionId: tx.txid,
+          );
+
+          if (kDebugMode) {
+            print('✅ Balance change notification sent for mempool transaction: ${tx.txid.substring(0, 8)}...');
+          }
+        } catch (e) {
+          _trackNotificationAttempt(
+            type: 'balance_change',
+            status: 'failed',
+            reason: 'Exception during mempool balance notification: $e',
+            amount: tx.amount.abs(),
+            transactionId: tx.txid,
+          );
+
+          _scheduleNotificationRetry(
+            type: 'balance_change',
+            notificationData: {
+              'transaction_id': tx.txid,
+              'amount': tx.amount.abs(),
+            },
+            retryOperation: () => NotificationService.instance.showBalanceChangeNotification(
+              previousBalance: _balance.total - tx.amount.abs(),
+              newBalance: _balance.total,
+              changeAmount: tx.amount.abs(),
+              isIncoming: true,
+            ),
+          );
+
+          if (kDebugMode) {
+            print('❌ Failed to send mempool balance notification: $e');
+          }
+        }
+      }
+    }
+  }
+
   /// Clear all wallet data (for logout)
   void clearWallet() {
     // DEFENSIVE: Check if wallet is locked to prevent accidental clears during initialization
@@ -4685,6 +4910,19 @@ class WalletProvider with ChangeNotifier {
 
     // Clean up simple connection monitoring
     _simpleConnectionTimer?.cancel();
+    
+    // Cancel retry timer for notifications
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    
+    // Cancel sync status timer
+    _syncStatusTimer?.cancel();
+    
+    // Clear tracking data
+    _failedNotifications.clear();
+    _pendingNotificationOperations.clear();
+    _notificationAttempts.clear();
+    _notifiedTransactionIds.clear();
 
     super.dispose();
   }
@@ -5004,7 +5242,25 @@ class WalletProvider with ChangeNotifier {
     }
 
     // Check if notification settings are enabled
+    if (kDebugMode) {
+      print('🔔 BALANCE NOTIFICATION CHECK:');
+      print('   Notifications enabled: ${_notificationProvider?.settings.enabled}');
+      print('   Balance change enabled: ${_notificationProvider?.settings.balanceChangeEnabled}');
+    }
+    
     if (!_notificationProvider!.settings.enabled || !_notificationProvider!.settings.balanceChangeEnabled) {
+      _trackNotificationAttempt(
+        type: 'balance_change',
+        status: 'skipped', 
+        reason: 'Settings disabled: enabled=${_notificationProvider!.settings.enabled}, balanceChangeEnabled=${_notificationProvider!.settings.balanceChangeEnabled}',
+        details: {
+          'old_balance': oldBalance.total,
+          'new_balance': newBalance.total,
+        },
+      );
+      if (kDebugMode) {
+        print('🔕 BALANCE NOTIFICATIONS DISABLED - returning early');
+      }
       return;
     }
 
@@ -5013,12 +5269,32 @@ class WalletProvider with ChangeNotifier {
     final transparentChange = newBalance.transparent - oldBalance.transparent;
     final shieldedChange = newBalance.shielded - oldBalance.shielded;
     final unconfirmedChange = newBalance.unconfirmed - oldBalance.unconfirmed;
+    
+    if (kDebugMode) {
+      print('🔔 BALANCE CHANGES:');
+      print('   Total change: ${totalChange.toStringAsFixed(8)} BTCZ');
+      print('   Transparent change: ${transparentChange.toStringAsFixed(8)} BTCZ');
+      print('   Shielded change: ${shieldedChange.toStringAsFixed(8)} BTCZ');
+      print('   Unconfirmed change: ${unconfirmedChange.toStringAsFixed(8)} BTCZ');
+    }
 
     // Notify for any balance change (no minimum threshold)
 
     // Check if this balance change is caused by a transaction with memo
     // If so, skip balance notification since message notification will be sent
     if (_hasRecentMemoTransaction(totalChange)) {
+      _trackNotificationAttempt(
+        type: 'balance_change',
+        status: 'skipped',
+        reason: 'Blocked by memo transaction detection',
+        amount: totalChange,
+        details: {
+          'total_change': totalChange,
+          'transparent_change': transparentChange,
+          'shielded_change': shieldedChange,
+          'unconfirmed_change': unconfirmedChange,
+        },
+      );
       if (kDebugMode) {
         print('🔔 Balance change caused by memo transaction - skipping balance notification');
       }
@@ -5043,42 +5319,170 @@ class WalletProvider with ChangeNotifier {
         return;
       }
 
-      await NotificationService.instance.showBalanceChangeNotification(
-        previousBalance: oldBalance.total,
-        newBalance: newBalance.total,
-        changeAmount: totalChange,
-        isIncoming: true,
+      _trackNotificationAttempt(
+        type: 'balance_change',
+        status: 'attempted',
+        reason: 'Confirmed balance increase detected',
+        amount: totalChange,
+        details: {
+          'previous_balance': oldBalance.total,
+          'new_balance': newBalance.total,
+        },
       );
+      
+      if (kDebugMode) {
+        print('🔔 ✅ SENDING balance change notification: +${totalChange.toStringAsFixed(8)} BTCZ');
+      }
+      
+      try {
+        await NotificationService.instance.showBalanceChangeNotification(
+          previousBalance: oldBalance.total,
+          newBalance: newBalance.total,
+          changeAmount: totalChange,
+          isIncoming: true,
+        );
+        
+        _trackNotificationAttempt(
+          type: 'balance_change',
+          status: 'sent',
+          reason: 'Balance change notification sent successfully',
+          amount: totalChange,
+        );
+        
+        if (kDebugMode) {
+          print('🔔 ✅ Balance change notification sent successfully');
+        }
+      } catch (e) {
+        _trackNotificationAttempt(
+          type: 'balance_change',
+          status: 'failed',
+          reason: 'Exception during notification: $e',
+          amount: totalChange,
+        );
+        if (kDebugMode) {
+          print('❌ Failed to send balance change notification: $e');
+        }
+      }
     }
     // Outgoing funds (negative change) - no notification needed for sends
     // Detect unconfirmed incoming funds
+    // Track when no significant balance change is detected
+    else if (totalChange <= 0.00000001 && totalChange >= -0.00000001) {
+      _trackNotificationAttempt(
+        type: 'balance_change',
+        status: 'skipped',
+        reason: 'No significant balance change detected',
+        amount: totalChange,
+        details: {
+          'total_change': totalChange,
+          'transparent_change': transparentChange,
+          'shielded_change': shieldedChange,
+          'unconfirmed_change': unconfirmedChange,
+        },
+      );
+    }
+    // Detect unconfirmed incoming funds
     else if (unconfirmedChange > 0.00000001) {
+      _trackNotificationAttempt(
+        type: 'balance_change',
+        status: 'attempted',
+        reason: 'Unconfirmed balance increase detected',
+        amount: unconfirmedChange,
+        details: {
+          'previous_balance': oldBalance.total,
+          'new_balance': newBalance.total,
+          'unconfirmed': true,
+        },
+      );
+      
       if (kDebugMode) {
         print('🔔 Unconfirmed funds detected: +${unconfirmedChange.toStringAsFixed(8)} BTCZ');
+        print('🔔 ✅ SENDING unconfirmed balance change notification');
       }
 
-      await NotificationService.instance.showBalanceChangeNotification(
-        previousBalance: oldBalance.total,
-        newBalance: newBalance.total,
-        changeAmount: unconfirmedChange,
-        isIncoming: true,
-      );
+      try {
+        await NotificationService.instance.showBalanceChangeNotification(
+          previousBalance: oldBalance.total,
+          newBalance: newBalance.total,
+          changeAmount: unconfirmedChange,
+          isIncoming: true,
+        );
+        
+        _trackNotificationAttempt(
+          type: 'balance_change',
+          status: 'sent',
+          reason: 'Unconfirmed balance change notification sent successfully',
+          amount: unconfirmedChange,
+        );
+        
+        if (kDebugMode) {
+          print('🔔 ✅ Unconfirmed balance change notification sent successfully');
+        }
+      } catch (e) {
+        _trackNotificationAttempt(
+          type: 'balance_change',
+          status: 'failed',
+          reason: 'Exception during unconfirmed notification: $e',
+          amount: unconfirmedChange,
+        );
+        if (kDebugMode) {
+          print('❌ Failed to send unconfirmed balance change notification: $e');
+        }
+      }
     }
   }
 
   /// Check if balance change is caused by a recent memo transaction
   bool _hasRecentMemoTransaction(double balanceChange) {
+    if (kDebugMode) {
+      print('🔍 CHECKING: _hasRecentMemoTransaction for balance change: ${balanceChange.toStringAsFixed(8)} BTCZ');
+      print('   Total transactions to check: ${_transactions.length}');
+      print('   Notified transaction IDs: ${_notifiedTransactionIds.length}');
+    }
+    
     // Look for transactions from the last 60 seconds that match the balance change
     final recentTime = DateTime.now().subtract(const Duration(seconds: 60));
+    int recentTransactionCount = 0;
+    int memoTransactionCount = 0;
 
     for (final tx in _transactions) {
+      // Count recent transactions for debugging
+      if (tx.timestamp.isAfter(recentTime) && tx.isReceived) {
+        recentTransactionCount++;
+        if (tx.hasMemo) {
+          memoTransactionCount++;
+        }
+      }
+      
       // Check if transaction is recent and has memo
-      if (tx.hasMemo && tx.timestamp.isAfter(recentTime)) {
-        // Check if transaction amount matches balance change (within small tolerance)
-        final amountDiff = (tx.amount.abs() - balanceChange.abs()).abs();
-        if (amountDiff < 0.00000001) { // Very small tolerance for floating point comparison
+      if (tx.hasMemo && tx.timestamp.isAfter(recentTime) && tx.isReceived) {
+        if (kDebugMode) {
+          print('🔍 Checking memo transaction: ${tx.txid.substring(0, 8)}...');
+          print('   Amount: ${tx.amount.abs().toStringAsFixed(8)} BTCZ');
+          print('   Balance change: ${balanceChange.abs().toStringAsFixed(8)} BTCZ');
+          print('   Already notified: ${_notifiedTransactionIds.contains(tx.txid)}');
+        }
+        
+        // Check if this transaction was already notified as a memo transaction
+        if (_notifiedTransactionIds.contains(tx.txid)) {
           if (kDebugMode) {
-            print('🔍 Found matching memo transaction: ${tx.txid.substring(0, 8)}... amount: ${tx.amount}');
+            print('🔍 ✅ Found memo transaction already notified: ${tx.txid.substring(0, 8)}... - skipping balance notification');
+          }
+          return true;
+        }
+        
+        // Check if transaction amount matches balance change (with reasonable tolerance)
+        final amountDiff = (tx.amount.abs() - balanceChange.abs()).abs();
+        if (kDebugMode) {
+          print('   Amount difference: ${amountDiff.toStringAsFixed(10)}');
+        }
+        
+        // Use a more reasonable tolerance for floating point comparison
+        // Also ensure this is actually a memo transaction before blocking balance notification
+        if (amountDiff < 0.0001 && tx.hasMemo && tx.memo != null && tx.memo!.isNotEmpty) { 
+          if (kDebugMode) {
+            print('🔍 ✅ Found matching memo transaction by amount: ${tx.txid.substring(0, 8)}... amount: ${tx.amount}');
+            print('   Memo: "${tx.memo}"');
             print('🔔 Balance change caused by memo transaction - skipping balance notification');
           }
           return true;
@@ -5087,9 +5491,212 @@ class WalletProvider with ChangeNotifier {
     }
 
     if (kDebugMode) {
-      print('🔍 No matching memo transaction found for balance change: ${balanceChange.toStringAsFixed(8)} BTCZ');
+      print('🔍 RESULT: No matching memo transaction found for balance change: ${balanceChange.toStringAsFixed(8)} BTCZ');
+      print('   Recent incoming transactions: $recentTransactionCount (${memoTransactionCount} with memos)');
+      print('🔔 ✅ ALLOWING balance change notification');
     }
     return false;
+  }
+
+  /// Track notification attempts for debugging missed notifications
+  void _trackNotificationAttempt({
+    required String type,
+    required String status, // 'attempted', 'sent', 'skipped', 'failed'
+    required String reason,
+    double? amount,
+    String? transactionId,
+    Map<String, dynamic>? details,
+  }) {
+    final attemptId = ++_notificationAttemptCounter;
+    final attempt = {
+      'id': attemptId,
+      'timestamp': DateTime.now().toIso8601String(),
+      'type': type, // 'balance_change' or 'message'  
+      'status': status,
+      'reason': reason,
+      'amount': amount,
+      'transaction_id': transactionId,
+      'details': details ?? {},
+    };
+    
+    _notificationAttempts.insert(0, attempt);
+    
+    // Keep only last 50 attempts to prevent memory bloat
+    if (_notificationAttempts.length > 50) {
+      _notificationAttempts.removeRange(50, _notificationAttempts.length);
+    }
+    
+    if (kDebugMode) {
+      print('🔔 NOTIFICATION ATTEMPT #$attemptId:');
+      print('   Type: $type');
+      print('   Status: $status');  
+      print('   Reason: $reason');
+      if (amount != null) print('   Amount: ${amount.toStringAsFixed(8)} BTCZ');
+      if (transactionId != null) print('   Transaction: ${transactionId.substring(0, 8)}...');
+    }
+  }
+
+  /// Get recent notification attempts for debugging
+  List<Map<String, dynamic>> getRecentNotificationAttempts({int limit = 20}) {
+    return _notificationAttempts.take(limit).toList();
+  }
+
+  /// Process notification with race condition protection
+  Future<void> _processNotificationSafely(Function notificationOperation) async {
+    // If already processing, queue this operation
+    if (_isProcessingNotifications) {
+      _pendingNotificationOperations.add(notificationOperation);
+      _trackNotificationAttempt(
+        type: 'system',
+        status: 'queued',
+        reason: 'Notification processing in progress - queued operation',
+      );
+      return;
+    }
+
+    _isProcessingNotifications = true;
+    
+    try {
+      // Execute the notification operation
+      await notificationOperation();
+      
+      // Process any pending operations
+      while (_pendingNotificationOperations.isNotEmpty) {
+        final pendingOperation = _pendingNotificationOperations.removeAt(0);
+        try {
+          await pendingOperation();
+        } catch (e) {
+          _trackNotificationAttempt(
+            type: 'system',
+            status: 'failed',
+            reason: 'Failed to process queued notification: $e',
+          );
+        }
+      }
+    } catch (e) {
+      _trackNotificationAttempt(
+        type: 'system',
+        status: 'failed',
+        reason: 'Failed to process notification operation: $e',
+      );
+    } finally {
+      _isProcessingNotifications = false;
+    }
+  }
+
+  /// Add failed notification for retry
+  void _scheduleNotificationRetry({
+    required String type,
+    required Map<String, dynamic> notificationData,
+    required Function retryOperation,
+    int retryCount = 0,
+  }) {
+    if (retryCount >= 3) {
+      _trackNotificationAttempt(
+        type: type,
+        status: 'permanently_failed',
+        reason: 'Maximum retry attempts reached',
+        details: notificationData,
+      );
+      return;
+    }
+
+    final retryItem = {
+      'type': type,
+      'data': notificationData,
+      'retry_operation': retryOperation,
+      'retry_count': retryCount,
+      'next_retry': DateTime.now().add(Duration(seconds: (retryCount + 1) * 10)), // 10s, 20s, 30s delays
+    };
+
+    _failedNotifications.add(retryItem);
+    _startRetryTimer();
+  }
+
+  /// Start or restart the retry timer
+  void _startRetryTimer() {
+    _retryTimer?.cancel();
+    _retryTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      _processRetryQueue();
+    });
+  }
+
+  /// Process retry queue for failed notifications
+  Future<void> _processRetryQueue() async {
+    if (_failedNotifications.isEmpty) {
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      return;
+    }
+
+    final now = DateTime.now();
+    final readyToRetry = _failedNotifications.where((item) => 
+      (item['next_retry'] as DateTime).isBefore(now)
+    ).toList();
+
+    for (final retryItem in readyToRetry) {
+      _failedNotifications.remove(retryItem);
+      
+      final String type = retryItem['type'];
+      final Map<String, dynamic> data = retryItem['data'];
+      final Function retryOperation = retryItem['retry_operation'];
+      final int retryCount = retryItem['retry_count'];
+
+      _trackNotificationAttempt(
+        type: type,
+        status: 'retrying',
+        reason: 'Retrying failed notification (attempt ${retryCount + 1})',
+        details: data,
+      );
+
+      try {
+        await retryOperation();
+        _trackNotificationAttempt(
+          type: type,
+          status: 'retry_successful',
+          reason: 'Notification succeeded on retry',
+          details: data,
+        );
+      } catch (e) {
+        _scheduleNotificationRetry(
+          type: type,
+          notificationData: data,
+          retryOperation: retryOperation,
+          retryCount: retryCount + 1,
+        );
+      }
+    }
+  }
+
+  /// Clean up old notification tracking entries to prevent memory bloat
+  void _cleanupNotificationTracking() {
+    // Only keep tracking for transactions from the last 24 hours
+    final cutoffTime = DateTime.now().subtract(const Duration(hours: 24));
+    
+    // Find transaction IDs to remove
+    final txidsToRemove = <String>{};
+    for (final txid in _notifiedTransactionIds) {
+      final tx = _transactions.firstWhere(
+        (t) => t.txid == txid,
+        orElse: () => TransactionModel(
+          txid: '',
+          amount: 0,
+          timestamp: DateTime(1970), // Very old timestamp
+          type: 'sent',
+        ),
+      );
+      
+      if (tx.txid.isEmpty || tx.timestamp.isBefore(cutoffTime)) {
+        txidsToRemove.add(txid);
+      }
+    }
+    
+    // Remove old entries
+    _notifiedTransactionIds.removeAll(txidsToRemove);
+    
+    if (kDebugMode && txidsToRemove.isNotEmpty) {
+      print('🧹 Cleaned up ${txidsToRemove.length} old notification tracking entries');
+    }
   }
 
   /// Mark notification as read by transaction ID to clear badge

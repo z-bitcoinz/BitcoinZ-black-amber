@@ -311,7 +311,7 @@ class NotificationService with WidgetsBindingObserver {
       priority: _getAndroidPriority(priority),
       playSound: _settings.soundEnabled,
       enableVibration: _settings.vibrationEnabled,
-      icon: '@mipmap/ic_launcher',
+      icon: '@drawable/ic_notification',
       largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
       styleInformation: const BigTextStyleInformation(''),
     );
