@@ -32,7 +32,7 @@ class StorageService {
     if (_useSecureStorage) {
       try {
         await _secureStorage.write(key: key, value: value);
-        if (kDebugMode) print('💾 StorageService.write(secure): $key = "${value.length > 50 ? '${value.substring(0, 50)}...' : value}"');
+        // Debug logging removed for performance
         return;
       } catch (e) {
         if (kDebugMode) {
@@ -47,7 +47,7 @@ class StorageService {
     // Fallback to SharedPreferences
     _prefs ??= await SharedPreferences.getInstance();
     await _prefs!.setString(key, value);
-    if (kDebugMode) print('💾 StorageService.write(prefs): $key = "${value.length > 50 ? '${value.substring(0, 50)}...' : value}"');
+    // Debug logging removed for performance
   }
 
   /// Read a value from storage
@@ -55,7 +55,7 @@ class StorageService {
     if (_useSecureStorage) {
       try {
         final value = await _secureStorage.read(key: key);
-        if (kDebugMode) print('🔍 StorageService.read(secure): $key = "${value ?? 'null'}"');
+        // Debug logging removed for performance
         return value;
       } catch (e) {
         if (kDebugMode) {
@@ -70,7 +70,7 @@ class StorageService {
     // Fallback to SharedPreferences
     _prefs ??= await SharedPreferences.getInstance();
     final value = _prefs!.getString(key);
-    if (kDebugMode) print('🔍 StorageService.read(prefs): $key = "${value ?? 'null'}"');
+    // Debug logging removed for performance
     return value;
   }
 

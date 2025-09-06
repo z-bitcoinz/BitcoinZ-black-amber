@@ -19,20 +19,22 @@ lazy_static! {
 /// Check if a wallet exists
 pub fn wallet_exists(wallet_dir: Option<String>) -> bool {
     let config = if let Some(ref dir) = wallet_dir {
-        println!("🔍 Checking if wallet exists in directory: {}", dir);
         LightClientConfig::<MainNetwork>::create_unconnected(MainNetwork, Some(dir.clone()))
     } else {
-        println!("🔍 Checking if wallet exists in default directory");
         LightClientConfig::<MainNetwork>::create_unconnected(MainNetwork, None)
     };
     
     let exists = config.wallet_exists();
     let wallet_path = config.get_wallet_path();
     
-    if exists {
-        println!("✅ Wallet exists at: {:?}", wallet_path);
-    } else {
-        println!("❌ No wallet found at: {:?}", wallet_path);
+    // Only log in debug builds
+    #[cfg(debug_assertions)]
+    {
+        if exists {
+            println!("Wallet exists at: {:?}", wallet_path);
+        } else {
+            println!("No wallet found at: {:?}", wallet_path);
+        }
     }
     
     exists
@@ -63,9 +65,11 @@ pub fn initialize_new(server_uri: String, wallet_dir: Option<String>) -> String 
 
     // Start mempool monitor (CRITICAL for unconfirmed transactions!)
     let lc = Arc::new(lightclient);
-    println!("🚀 Starting mempool monitor for unconfirmed transaction detection...");
+    #[cfg(debug_assertions)]
+    println!("Starting mempool monitor for unconfirmed transaction detection...");
     LightClient::start_mempool_monitor(lc.clone());
-    println!("✅ Mempool monitor started");
+    #[cfg(debug_assertions)]
+    println!("Mempool monitor started");
 
     // Store the client globally
     LIGHTCLIENT.lock().unwrap().replace(Some(lc));
@@ -138,9 +142,11 @@ pub fn initialize_new_with_info(server_uri: String, wallet_dir: Option<String>) 
 
     // Start mempool monitor (CRITICAL for unconfirmed transactions!)
     let lc = Arc::new(lightclient);
-    println!("🚀 Starting mempool monitor for unconfirmed transaction detection...");
+    #[cfg(debug_assertions)]
+    println!("Starting mempool monitor for unconfirmed transaction detection...");
     LightClient::start_mempool_monitor(lc.clone());
-    println!("✅ Mempool monitor started");
+    #[cfg(debug_assertions)]
+    println!("Mempool monitor started");
 
     // Store the client globally
     LIGHTCLIENT.lock().unwrap().replace(Some(lc));
@@ -209,9 +215,11 @@ pub fn initialize_existing_with_birthday(server_uri: String, wallet_dir: Option<
 
     // Start mempool monitor (CRITICAL for unconfirmed transactions!)
     let lc = Arc::new(lightclient);
-    println!("🚀 Starting mempool monitor for unconfirmed transaction detection...");
+    #[cfg(debug_assertions)]
+    println!("Starting mempool monitor for unconfirmed transaction detection...");
     LightClient::start_mempool_monitor(lc.clone());
-    println!("✅ Mempool monitor started");
+    #[cfg(debug_assertions)]
+    println!("Mempool monitor started");
 
     // Store the client globally
     LIGHTCLIENT.lock().unwrap().replace(Some(lc));
@@ -268,9 +276,11 @@ pub fn initialize_from_phrase(
 
     // Start mempool monitor (CRITICAL for unconfirmed transactions!)
     let lc = Arc::new(lightclient);
-    println!("🚀 Starting mempool monitor for unconfirmed transaction detection...");
+    #[cfg(debug_assertions)]
+    println!("Starting mempool monitor for unconfirmed transaction detection...");
     LightClient::start_mempool_monitor(lc.clone());
-    println!("✅ Mempool monitor started");
+    #[cfg(debug_assertions)]
+    println!("Mempool monitor started");
 
     // Store the client globally
     LIGHTCLIENT.lock().unwrap().replace(Some(lc));

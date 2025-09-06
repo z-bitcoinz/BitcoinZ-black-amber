@@ -11,6 +11,7 @@ import '../models/message_label.dart';
 import '../models/transaction_category.dart';
 import '../models/address_label.dart';
 import './wallet_storage_service.dart';
+import '../utils/logger.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -31,7 +32,7 @@ class DatabaseService {
         await _database!.rawQuery('SELECT 1');
         return _database!;
       } catch (e) {
-        if (kDebugMode) print('⚠️ Database is closed or invalid, resetting...');
+        Logger.database('Database is closed or invalid, resetting...', level: LogLevel.warning);
         await _resetDatabase();
       }
     }
@@ -41,13 +42,13 @@ class DatabaseService {
       _database = await _initDatabase();
       return _database!;
     } catch (e) {
-      if (kDebugMode) print('❌ Database initialization failed: $e');
+      Logger.database('Database initialization failed', level: LogLevel.error);
       
       // On authorization errors, reset and retry with fresh state
       if (e.toString().contains('authorization denied') || 
           e.toString().contains('authorization') ||
           e.toString().contains('sqlite3_step')) {
-        if (kDebugMode) print('🔄 Authorization error detected, attempting recovery...');
+        Logger.database('Authorization error detected, attempting recovery...', level: LogLevel.warning);
         await _resetDatabase();
         
         // Delete the database file and try again
@@ -58,7 +59,7 @@ class DatabaseService {
           _database = await _initDatabase();
           return _database!;
         } catch (retryError) {
-          if (kDebugMode) print('❌ Database recovery failed: $retryError');
+          Logger.database('Database recovery failed', level: LogLevel.error);
           // If still failing, throw a more descriptive error
           throw Exception('Database initialization failed. Please restart the app.');
         }
@@ -71,10 +72,7 @@ class DatabaseService {
     // Use WalletStorageService for consistent cross-platform paths
     final dbPath = await WalletStorageService.getDatabasePath();
 
-    if (kDebugMode) {
-      print('📁 Database path: $dbPath');
-      print('   App: BitcoinZ Black Amber');
-    }
+    Logger.database('Database path: $dbPath - App: BitcoinZ Black Amber');
 
     return await openDatabase(
       dbPath,
@@ -390,16 +388,16 @@ class DatabaseService {
           );
         } catch (e) {
           // Continue with other transactions if one fails
-          if (kDebugMode) print('Warning: Failed to insert transaction ${transaction.txid}: $e');
+          Logger.database('Failed to insert transaction ${transaction.txid}', level: LogLevel.warning);
         }
       }
     } catch (e) {
-      if (kDebugMode) print('Warning: Failed to insert transactions: $e');
+      Logger.database('Failed to insert transactions', level: LogLevel.warning);
       
       // If authorization error, try to reset and retry once
       if (e.toString().contains('authorization') && !e.toString().contains('retry')) {
         try {
-          if (kDebugMode) print('🔄 Retrying after database reset...');
+          Logger.database('Retrying after database reset...', level: LogLevel.warning);
           await forceReset();
           final db = await database;
           
@@ -411,12 +409,11 @@ class DatabaseService {
                 conflictAlgorithm: ConflictAlgorithm.replace,
               );
             } catch (insertError) {
-              if (kDebugMode) print('Warning: Failed to insert transaction ${transaction.txid}: $insertError');
+              Logger.database('Failed to insert transaction ${transaction.txid}', level: LogLevel.warning);
             }
           }
-          if (kDebugMode) print('✅ Retry successful!');
-        } catch (retryError) {
-          if (kDebugMode) print('⚠️ Retry failed: $retryError');
+                  } catch (retryError) {
+          Logger.database('Retry failed', level: LogLevel.error);
         }
       }
     }
@@ -562,12 +559,12 @@ class DatabaseService {
         whereArgs: [txid],
       );
     } catch (e) {
-      if (kDebugMode) print('Warning: Failed to mark memo as read: $e');
+      Logger.database('Failed to mark memo as read', level: LogLevel.warning);
       
       // If authorization error, try to reset and retry once
       if (e.toString().contains('authorization') && !e.toString().contains('retry')) {
         try {
-          if (kDebugMode) print('🔄 Retrying after database reset...');
+          Logger.database('Retrying after database reset...', level: LogLevel.warning);
           await forceReset();
           final db = await database;
           await db.update(
@@ -576,10 +573,9 @@ class DatabaseService {
             where: 'txid = ?',
             whereArgs: [txid],
           );
-          if (kDebugMode) print('✅ Retry successful!');
-          return;
+                    return;
         } catch (retryError) {
-          if (kDebugMode) print('⚠️ Retry failed: $retryError');
+          Logger.database('Retry failed', level: LogLevel.error);
         }
       }
       // Continue silently - memo status will be stored in memory/SharedPreferences
@@ -596,12 +592,12 @@ class DatabaseService {
         whereArgs: [txid],
       );
     } catch (e) {
-      if (kDebugMode) print('Warning: Failed to mark memo as unread: $e');
+      Logger.database('Failed to mark memo as unread', level: LogLevel.warning);
 
       // If authorization error, try to reset and retry once
       if (e.toString().contains('authorization') && !e.toString().contains('retry')) {
         try {
-          if (kDebugMode) print('🔄 Retrying after database reset...');
+          Logger.database('Retrying after database reset...', level: LogLevel.warning);
           await forceReset();
           final db = await database;
           await db.update(
@@ -610,10 +606,9 @@ class DatabaseService {
             where: 'txid = ?',
             whereArgs: [txid],
           );
-          if (kDebugMode) print('✅ Retry successful!');
-          return;
+                    return;
         } catch (retryError) {
-          if (kDebugMode) print('⚠️ Retry failed: $retryError');
+          Logger.database('Retry failed', level: LogLevel.error);
         }
       }
       // Continue silently - memo status will be stored in memory/SharedPreferences
@@ -630,22 +625,21 @@ class DatabaseService {
       
       return Sqflite.firstIntValue(result) ?? 0;
     } catch (e) {
-      if (kDebugMode) print('Warning: Failed to get unread memo count: $e');
+      Logger.database('Failed to get unread memo count', level: LogLevel.warning);
       
       // If authorization error, try to reset and retry once
       if (e.toString().contains('authorization') && !e.toString().contains('retry')) {
         try {
-          if (kDebugMode) print('🔄 Retrying after database reset...');
+          Logger.database('Retrying after database reset...', level: LogLevel.warning);
           await forceReset();
           final db = await database;
           final result = await db.rawQuery('''
             SELECT COUNT(*) as count FROM transactions 
             WHERE memo IS NOT NULL AND memo != '' AND memo_read = 0
           ''');
-          if (kDebugMode) print('✅ Retry successful!');
-          return Sqflite.firstIntValue(result) ?? 0;
+                    return Sqflite.firstIntValue(result) ?? 0;
         } catch (retryError) {
-          if (kDebugMode) print('⚠️ Retry failed: $retryError');
+          Logger.database('Retry failed', level: LogLevel.error);
         }
       }
       return 0;
@@ -671,7 +665,7 @@ class DatabaseService {
       // If authorization error, try to reset and retry once
       if (e.toString().contains('authorization') && !e.toString().contains('retry')) {
         try {
-          if (kDebugMode) print('🔄 Retrying after database reset...');
+          Logger.database('Retrying after database reset...', level: LogLevel.warning);
           await forceReset();
           final db = await database;
           final results = await db.rawQuery('''
@@ -683,10 +677,9 @@ class DatabaseService {
           for (final row in results) {
             readStatus[row['txid'] as String] = (row['memo_read'] as int) == 1;
           }
-          if (kDebugMode) print('✅ Retry successful!');
-          return readStatus;
+                    return readStatus;
         } catch (retryError) {
-          if (kDebugMode) print('⚠️ Retry failed: $retryError');
+          Logger.database('Retry failed', level: LogLevel.error);
         }
       }
       return {};

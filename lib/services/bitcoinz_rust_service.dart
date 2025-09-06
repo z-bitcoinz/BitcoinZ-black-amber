@@ -13,6 +13,7 @@ import '../services/database_service.dart';
 import '../services/wallet_storage_service.dart';
 import '../src/rust/api.dart' as rust_api;
 import '../src/rust/frb_generated.dart';
+import '../utils/logger.dart';
 
 /// Pending transaction data for tracking change amounts
 class PendingTransaction {
@@ -32,7 +33,7 @@ class BitcoinzRustService {
   static BitcoinzRustService get instance {
     if (_instance == null) {
       _instance = BitcoinzRustService._();
-      if (kDebugMode) print('🔨 Creating new BitcoinzRustService singleton instance');
+      Logger.rust('Creating new BitcoinzRustService singleton instance');
     }
     return _instance!;
   }
@@ -87,50 +88,31 @@ class BitcoinzRustService {
     int? birthdayHeight,
   }) async {
     try {
-      print('🔧 RUST_SERVICE DEBUG: initialize() called');
-      print('🔧 RUST_SERVICE DEBUG: serverUri: $serverUri');
-      print('🔧 RUST_SERVICE DEBUG: seedPhrase: ${seedPhrase != null ? "[EXISTS ${seedPhrase!.length} chars]" : "null"}');
-      print('🔧 RUST_SERVICE DEBUG: createNew: $createNew');
-      print('🔧 RUST_SERVICE DEBUG: birthdayHeight: $birthdayHeight');
-      print('🔧 RUST_SERVICE DEBUG: Platform: ${Platform.operatingSystem}');
+      Logger.rust('Initialize called - serverUri: $serverUri, createNew: $createNew, birthdayHeight: $birthdayHeight, platform: ${Platform.operatingSystem}');
       
-      if (kDebugMode) {
-        print('🚀 Initializing Rust Bridge...');
-        print('🎂 ANDROID BIRTHDAY FIX: Critical parameter analysis:');
-        print('   Platform: ${Platform.isAndroid ? "Android" : Platform.isMacOS ? "macOS" : "Other"}');
-        print('   serverUri: $serverUri');
-        print('   seedPhrase: ${seedPhrase != null ? "[EXISTS ${seedPhrase.length} chars]" : "null"}');
-        print('   createNew: $createNew');
-        print('   🚨 BIRTHDAY HEIGHT: $birthdayHeight (${birthdayHeight.runtimeType})');
-        print('     Is null: ${birthdayHeight == null}');
-        print('     Is > 0: ${birthdayHeight != null && birthdayHeight > 0}');
-        print('     Expected behavior: null/0 = sync from genesis, >0 = sync from that height');
-      }
+      Logger.rust('Initializing Rust Bridge - Platform: ${Platform.isAndroid ? "Android" : Platform.isMacOS ? "macOS" : "Other"}');
       
       // Check if bridge is already initialized (done in main.dart)
       if (!_bridgeInitialized) {
         try {
-          if (kDebugMode) print('📱 ANDROID: Attempting to load Rust native library...');
+          Logger.rust('ANDROID: Attempting to load Rust native library...');
           await RustLib.init();
           _bridgeInitialized = true;
-          if (kDebugMode) print('✅ Rust bridge initialized successfully on Android');
+          Logger.rust('Rust bridge initialized successfully on Android');
         } catch (e) {
           // Bridge might already be initialized from main.dart
           if (e.toString().contains('Should not initialize flutter_rust_bridge twice')) {
             _bridgeInitialized = true;
-            if (kDebugMode) print('✅ Rust bridge already initialized');
+            Logger.rust('Rust bridge already initialized');
           } else {
             if (kDebugMode) {
-              print('❌ ANDROID: Failed to load Rust library!');
-              print('   Error: $e');
-              print('   This means native .so files may not be loading');
-              print('   Check if libbitcoinz_mobile.so is in the APK');
+              Logger.rust('ANDROID: Failed to load Rust library - native .so files may not be loading', level: LogLevel.error);
             }
             rethrow;
           }
         }
       } else {
-        if (kDebugMode) print('✅ Rust bridge already initialized, skipping');
+        Logger.rust('Rust bridge already initialized, skipping');
       }
       
       // Get the wallet data directory for Black Amber (where wallet.dat will be stored)
@@ -140,21 +122,19 @@ class BitcoinzRustService {
         final walletDir = await WalletStorageService.getWalletDataDirectory();
         walletDirPath = walletDir.path;
         if (kDebugMode) {
-          print('📁 Using Black Amber wallet directory: $walletDirPath');
+          Logger.rust('Using Black Amber wallet directory: $walletDirPath');
           
           // Check if wallet.dat already exists
           final walletFile = File('$walletDirPath/wallet.dat');
           if (await walletFile.exists()) {
             final stat = await walletFile.stat();
-            print('✅ Found existing wallet.dat:');
-            print('   Size: ${stat.size} bytes');
-            print('   Modified: ${stat.modified}');
+            Logger.rust('Found existing wallet.dat - Size: ${stat.size} bytes, Modified: ${stat.modified}');
           } else {
-            print('📝 No existing wallet.dat found, will create new or restore');
+            Logger.rust('No existing wallet.dat found, will create new or restore');
           }
         }
       } catch (e) {
-        if (kDebugMode) print('⚠️ Failed to get wallet directory, using default: $e');
+        Logger.rust('Failed to get wallet directory, using default', level: LogLevel.warning);
         walletDirPath = null;
       }
       
@@ -162,13 +142,11 @@ class BitcoinzRustService {
       if (createNew) {
         // Create new wallet
         if (kDebugMode) {
-          print('📝 Creating new wallet via Rust...');
-          print('   Server: $serverUri');
-          print('   Directory: ${walletDirPath ?? "default"}');
+          Logger.rust('Creating new wallet via Rust - Server: $serverUri, Directory: ${walletDirPath ?? "default"}');
         }
         
         // Use Black Amber's wallet directory to avoid conflicts with BitcoinZ Blue
-        if (kDebugMode) print('📁 Creating wallet in: ${walletDirPath ?? "default"}');
+        Logger.rust('Creating wallet in: ${walletDirPath ?? "default"}');
         
         String result;
         try {
@@ -178,20 +156,18 @@ class BitcoinzRustService {
           );
         } catch (e) {
           if (kDebugMode) {
-            print('❌ Exception calling initializeNewWithInfo: $e');
-            print('   Error type: ${e.runtimeType}');
+            Logger.rust('Exception calling initializeNewWithInfo: $e', level: LogLevel.error);
           }
           return false;
         }
         
         if (result.startsWith('Error:')) {
-          if (kDebugMode) print('❌ Failed to create wallet: $result');
+          Logger.rust('Failed to create wallet: $result', level: LogLevel.error);
           return false;
         }
         
         // Parse JSON response to get seed and birthday
         try {
-          if (kDebugMode) print('📋 Raw response: $result');
           
           // The response structure is:
           // {"seed": "{\"seed\":\"actual words here\",\"birthday\":1612745}", "birthday": 1612745, "latest_block": 1612845}
@@ -202,7 +178,6 @@ class BitcoinzRustService {
           final innerSeedMatch = RegExp(r'\\"seed\\":\\"([^"\\]+)\\"').firstMatch(result);
           if (innerSeedMatch != null) {
             _seedPhrase = innerSeedMatch.group(1)!;
-            if (kDebugMode) print('📝 Extracted seed phrase via regex');
           } else {
             // Fallback: try to find any seed phrase pattern (24 words)
             final wordsMatch = RegExp(r'"([a-z]+(?: [a-z]+){23})"').firstMatch(result);
@@ -621,10 +596,10 @@ class BitcoinzRustService {
       return;
     }
     
-    if (kDebugMode) print('💰 fetchBalance: Starting balance fetch...');
+    // Debug logging reduced for performance
     
     try {
-      if (kDebugMode) print('💰 fetchBalance: Executing "balance" command...');
+      // Debug logging reduced for performance
       // Add timeout to prevent hanging
       final balanceJson = await rust_api.execute(command: 'balance', args: '').timeout(
         const Duration(seconds: 10),
@@ -633,18 +608,11 @@ class BitcoinzRustService {
           return '{"tbalance": 0, "zbalance": 0}'; // Return empty balance on timeout
         },
       );
-      if (kDebugMode) print('💰 fetchBalance: Got response');
+      // Debug logging reduced for performance
       final data = jsonDecode(balanceJson);
       
-      if (kDebugMode) {
-        print('💰 Balance from Rust: $data');
-        print('💰 Spendable Balance Debug:');
-        print('   spendable_tbalance: ${data['spendable_tbalance']} (${(data['spendable_tbalance'] ?? 0) / 100000000.0} BTCZ)');
-        print('   spendable_zbalance: ${data['spendable_zbalance']} (${(data['spendable_zbalance'] ?? 0) / 100000000.0} BTCZ)');
-        print('   tbalance: ${data['tbalance']} (${(data['tbalance'] ?? 0) / 100000000.0} BTCZ)');
-        print('   zbalance: ${data['zbalance']} (${(data['zbalance'] ?? 0) / 100000000.0} BTCZ)');
-        print('   🎯 Final spendable will be: ${((data['spendable_tbalance'] ?? 0) + (data['spendable_zbalance'] ?? 0)) / 100000000.0} BTCZ');
-      }
+      // Debug logging reduced for performance
+      Logger.rust('Balance fetch completed');
       
       // Get current block height for confirmation calculations
       final currentBlockHeight = await getCurrentBlockHeight();
@@ -675,25 +643,13 @@ class BitcoinzRustService {
       double rustSpendableTransparent = (data['spendable_tbalance'] ?? 0) / 100000000.0;
       double rustSpendableShielded = (data['spendable_zbalance'] ?? 0) / 100000000.0;
       
-      if (kDebugMode) {
-        print('🔍 RAW RUST VALUES:');
-        print('   tbalance: ${data['tbalance']} zatoshis = ${(data['tbalance'] ?? 0) / 100000000.0} BTCZ');
-        print('   spendable_tbalance: ${data['spendable_tbalance']} zatoshis = $rustSpendableTransparent BTCZ');
-        print('   zbalance: ${data['zbalance']} zatoshis = ${(data['zbalance'] ?? 0) / 100000000.0} BTCZ');
-        print('   spendable_zbalance: ${data['spendable_zbalance']} zatoshis = $rustSpendableShielded BTCZ');
-        print('   🚨 ISSUE: If spendable_tbalance equals tbalance but transaction shows "Confirming", then Rust is incorrectly including unconfirmed funds!');
-      }
+      // Debug logging reduced for performance
       
       // Get total balances for display
       double totalTransparent = (data['tbalance'] ?? 0) / 100000000.0;
       double totalShielded = (data['zbalance'] ?? 0) / 100000000.0;
       
-      if (kDebugMode) {
-        print('📊 RUST BACKEND BALANCES:');
-        print('   Total: ${totalTransparent} T + ${totalShielded} Z = ${totalTransparent + totalShielded} BTCZ');
-        print('   🎯 Backend says spendable: ${rustSpendableTransparent} T + ${rustSpendableShielded} Z = ${rustSpendableTransparent + rustSpendableShielded} BTCZ');
-        print('   ⚠️  PROBLEM CHECK: If receiving unconfirmed T transaction, spendable_tbalance should be 0, not include the unconfirmed amount!');
-      }
+      // Debug logging reduced for performance
       
       // Calculate unconfirmed amounts - separate incoming vs change
       double pureIncomingBalance = 0;      // Only from others
@@ -717,10 +673,7 @@ class BitcoinzRustService {
                                    tx['block_height'] == null || 
                                    tx['block_height'] == 0;
         
-        if (kDebugMode && amount > 0) {
-          print('🔍 Analyzing tx: ${amount.toStringAsFixed(4)} BTCZ, incoming=$isIncoming, unconfirmed=$isUnconfirmed, transparent=$isTransparent');
-          print('   Address: $address, Block height: ${tx['block_height']}, Outgoing metadata: ${tx['outgoing_metadata'] != null}');
-        }
+        // Debug logging reduced for performance
         
         // Only track transactions that aren't fully spendable yet
         // This includes both unconfirmed AND confirmed-but-not-enough-confirmations
@@ -795,25 +748,9 @@ class BitcoinzRustService {
         }
       }
       
-      if (kDebugMode) {
-        print('🎯 CORRECTED BALANCE CALCULATION:');
-        print('   Total balance: ${totalBalance.toStringAsFixed(8)} BTCZ');
-        print('   Spendable: ${totalSpendable.toStringAsFixed(8)} BTCZ'); 
-        print('   Total non-spendable: ${totalNonSpendable.toStringAsFixed(8)} BTCZ');
-        print('   Pure incoming (from transactions): ${pureIncomingBalance.toStringAsFixed(8)} BTCZ');
-        print('   Actual change returning: ${changeBalance.toStringAsFixed(8)} BTCZ');
-        print('   🧮 BREAKDOWN: ${totalSpendable.toStringAsFixed(2)} + ${pureIncomingBalance.toStringAsFixed(2)} + ${changeBalance.toStringAsFixed(2)} = ${(totalSpendable + pureIncomingBalance + changeBalance).toStringAsFixed(2)}');
-      }
+      // Debug logging reduced for performance
 
-      if (kDebugMode) {
-        print('🧮 FINAL BALANCE FOR UI:');
-        print('   📊 Total from Rust: ${totalBalance} BTCZ');
-        print('   🎯 Available to Send (spendable): ${totalSpendable} BTCZ');
-        print('   📨 Incoming (Confirming): ${pureIncomingBalance} BTCZ');
-        print('   🔄 Change Returning: ${changeBalance} BTCZ');
-        print('   🧮 UI MATH CHECK: ${totalSpendable.toStringAsFixed(2)} + ${pureIncomingBalance.toStringAsFixed(2)} + ${changeBalance.toStringAsFixed(2)} = ${(totalSpendable + pureIncomingBalance + changeBalance).toStringAsFixed(2)} (should equal ${totalBalance.toStringAsFixed(2)})');
-        print('   ✅ Balance breakdown will now be accurate and math will add up!');
-      }
+      // Debug logging reduced for performance
       
       final balance = BalanceModel(
         transparent: totalT,
@@ -852,18 +789,7 @@ class BitcoinzRustService {
         actualSpendableShielded *= ratio;
       }
       
-      if (kDebugMode) {
-        print('💰 Final BalanceModel Summary:');
-        print('   📊 Total Balance: $totalBalance BTCZ (${totalT} T + ${totalZ} Z)');
-        print('   🎯 Spendable: ${actualSpendableTransparent + actualSpendableShielded} BTCZ (${actualSpendableTransparent} T + ${actualSpendableShielded} Z)');
-        print('   📨 Pure Incoming: ${pureIncomingBalance.toStringAsFixed(8)} BTCZ - real unconfirmed incoming');
-        print('   🔄 Change Returning: ${changeBalance.toStringAsFixed(8)} BTCZ - actual change only');
-        print('   📊 Total Unconfirmed: ${(pureIncomingBalance + changeBalance).toStringAsFixed(8)} BTCZ - will show "Incoming (Confirming)" = ${pureIncomingBalance.toStringAsFixed(2)} BTCZ');
-        print('   🧮 UI BREAKDOWN: ${(actualSpendableTransparent + actualSpendableShielded).toStringAsFixed(2)} + ${pureIncomingBalance.toStringAsFixed(2)} + ${changeBalance.toStringAsFixed(2)} = ${(actualSpendableTransparent + actualSpendableShielded + pureIncomingBalance + changeBalance).toStringAsFixed(2)}');
-        print('   🏛️ Rust backend spendable: ${rustSpendableTransparent} T + ${rustSpendableShielded} Z');
-        print('   🔍 VALIDATION: Spendable ${actualSpendableTransparent + actualSpendableShielded <= totalBalance ? '≤' : '>'} Total ✅');
-        print('   ✅ FIXED: Balance model now has correct unconfirmed total for pureIncoming calculation!');
-      }
+      // Debug logging reduced for performance
       
       fnSetTotalBalance?.call(balance);
       if (kDebugMode) print('✅ Balance fetched successfully');
@@ -926,11 +852,11 @@ class BitcoinzRustService {
       return;
     }
     
-    if (kDebugMode) print('🔍 fetchTransactions: Starting transaction fetch...');
+    // Debug logging reduced for performance
     
     try {
       // Add timeout to prevent infinite loading
-      if (kDebugMode) print('🔍 fetchTransactions: Executing "list" command...');
+      // Debug logging reduced for performance
       final txListJson = await rust_api.execute(command: 'list', args: '').timeout(
         const Duration(seconds: 10),
         onTimeout: () {
@@ -939,7 +865,7 @@ class BitcoinzRustService {
         },
       );
       
-      if (kDebugMode) print('🔍 fetchTransactions: Got response: ${txListJson.substring(0, math.min(100, txListJson.length))}...');
+      // Debug logging reduced for performance
       final txListDecoded = jsonDecode(txListJson);
       
       // Check if response is an error
@@ -950,13 +876,8 @@ class BitcoinzRustService {
       
       final txList = txListDecoded as List;
       
-      if (kDebugMode) {
-        final unconfirmedCount = txList.where((tx) => tx['unconfirmed'] == true).length;
-        print('📋 Transactions from Rust: ${txList.length} total, $unconfirmedCount unconfirmed');
-        if (txList.isEmpty) {
-          print('📋 No transactions found - wallet may be empty or not synced');
-        }
-      }
+      // Debug logging reduced for performance
+      Logger.transaction('Fetched ${txList.length} transactions from Rust');
       
       // Get current block height for confirmation calculation
       final currentHeight = await getCurrentBlockHeight();
@@ -971,10 +892,7 @@ class BitcoinzRustService {
         index++;
         
         // Debug log first transaction to see available fields
-        if (kDebugMode && index == 1) {
-          print('📋 First transaction fields: ${(tx as Map).keys.toList()}');
-          print('📋 Transaction data: txid=${tx['txid']?.toString()?.substring(0, 8)}..., unconfirmed=${tx['unconfirmed']}, block_height=${tx['block_height']}');
-        }
+        // Debug logging reduced for performance
         
         // Check if transaction is unconfirmed (multiple ways)
         final bool txUnconfirmed = tx['unconfirmed'] == true || 
@@ -1081,7 +999,7 @@ class BitcoinzRustService {
                 print('✅ PENDING CHANGE NOW SPENDABLE: $txId');
                 print('   Change amount: ${pendingTx.changeAmount} BTCZ');
                 print('   Confirmations: $confirmations');
-                print('   🎯 This change will now be included in spendable balance');
+                // Debug logging reduced for performance
               }
               completedTxIds.add(txId);
             } else {
@@ -1207,13 +1125,13 @@ class BitcoinzRustService {
         
         if (kDebugMode) {
           print('📝 Android memo processing:');
-          print('   Original: ${memo.substring(0, math.min(memo.length, 50))}${memo.length > 50 ? "..." : ""}');
-          print('   Safe: ${safeMemo.substring(0, math.min(safeMemo.length, 50))}${safeMemo.length > 50 ? "..." : ""}');
-          print('   Length: ${safeMemo.length} chars');
+          print('   Original length: ${memo.length} chars');
+          print('   Safe length: ${safeMemo.length} chars');
+          print('   Has content: ${memo.isNotEmpty}');
         }
       }
       
-      if (kDebugMode) print('🔧 Using dedicated sendTransaction API: address=$address, amount=$zatoshis, memo=${safeMemo.isEmpty ? "null" : "\"$safeMemo\""}');
+      if (kDebugMode) print('🔧 Using dedicated sendTransaction API: address=$address, amount=$zatoshis, memo=${safeMemo.isEmpty ? "null" : "[REDACTED]"}');
       
       final result = await rust_api.sendTransaction(
         address: address,
@@ -1221,7 +1139,7 @@ class BitcoinzRustService {
         memo: safeMemo.isEmpty ? null : safeMemo,
       );
       
-      if (kDebugMode) print('🔍 Raw send result: ${result.length > 200 ? result.substring(0, 200) + "..." : result}');
+      // Debug logging reduced for performance
       
       final data = jsonDecode(result);
       
@@ -1259,14 +1177,12 @@ class BitcoinzRustService {
             );
             
             if (kDebugMode) {
-              print('⏳ CRITICAL: Tracking REAL pending change');
-              print('   Transaction ID: $txid');
-              print('   🎯 Real change amount: $actualChange BTCZ (from actual transaction)');
-              print('   🚫 This real change will be excluded from spendable until confirmed');
+              // Debug logging reduced for performance
+              Logger.transaction('Tracking real pending change: $actualChange BTCZ');
             }
           } else {
             if (kDebugMode) {
-              print('💰 No meaningful change detected');
+              // Debug logging reduced for performance
               print('   Calculated change: $actualChange BTCZ');
             }
           }
@@ -1394,7 +1310,7 @@ class BitcoinzRustService {
     }
     
     try {
-      if (kDebugMode) print('🔍 Calling syncstatus command...');
+      // Debug logging reduced for performance
       
       // Add timeout to prevent hanging on Android
       // Use shorter timeout on Android where syncstatus tends to hang

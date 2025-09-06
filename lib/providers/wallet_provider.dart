@@ -25,6 +25,7 @@ import '../providers/notification_provider.dart';
 import '../screens/wallet/paginated_transaction_history_screen.dart';
 import '../services/notification_service.dart';
 import '../utils/constants.dart';
+import '../utils/logger.dart';
 
 class WalletProvider with ChangeNotifier {
   WalletModel? _wallet;
@@ -163,7 +164,7 @@ class WalletProvider with ChangeNotifier {
     // Initialize Native Rust service with mempool monitoring
     _rustService = BitcoinzRustService.instance;
     _rustService.fnSetTotalBalance = (balance) async {
-      if (kDebugMode) print('🦀 Rust Bridge updated balance: ${balance.formattedTotal} BTCZ (unconfirmed: ${balance.unconfirmed})');
+      Logger.wallet('Rust Bridge updated balance: ${balance.formattedTotal} BTCZ (unconfirmed: ${balance.unconfirmed})');
 
       // OLD APPROACH: Balance-change-triggered notifications (DISABLED - now using direct transaction monitoring)
       // await _handleBalanceChange(_balance, balance);
@@ -189,7 +190,7 @@ class WalletProvider with ChangeNotifier {
             await authProvider.updateWalletData(walletData);
           }
         } catch (e) {
-          if (kDebugMode) print('⚠️ Failed to cache balance: $e');
+          Logger.wallet('Failed to cache balance', level: LogLevel.warning);
         }
       }
 
@@ -201,11 +202,7 @@ class WalletProvider with ChangeNotifier {
       
       final unconfirmedCount = transactions.where((tx) => tx.confirmations == 0).length;
       final memoCount = transactions.where((tx) => tx.hasMemo).length;
-      if (kDebugMode) {
-        print('🦀 CALLBACK DEBUG: fnSetTransactionsList fired!');
-        print('🦀 CALLBACK DEBUG: Processing ${transactions.length} transactions ($unconfirmedCount unconfirmed, $memoCount with memos)');
-        print('🦀 CALLBACK DEBUG: Cache loaded, proceeding with transaction processing...');
-      }
+      Logger.transaction('Processing ${transactions.length} transactions ($unconfirmedCount unconfirmed, $memoCount with memos)');
 
       // NOTE: Transaction updates can come from cached data, so we don't override connection status here
 
@@ -234,13 +231,7 @@ class WalletProvider with ChangeNotifier {
         _lastNotificationCheck = DateTime.now();
       }
 
-      if (kDebugMode) {
-        print('🔍 DIRECT TRANSACTION MONITORING:');
-        print('   Total transactions: ${transactions.length}');
-        print('   Existing transactions: ${existingTxIds.length}');
-        print('   Unconfirmed transactions: ${unconfirmedCount}');
-        print('   Transactions with memos: ${memoCount}');
-      }
+      Logger.transaction('Direct transaction monitoring - Total: ${transactions.length}, Existing: ${existingTxIds.length}, Unconfirmed: ${unconfirmedCount}, With memos: ${memoCount}');
 
       // Update transactions with preserved read status and detect ALL new incoming transactions
       final updatedTransactions = <TransactionModel>[];
@@ -257,13 +248,7 @@ class WalletProvider with ChangeNotifier {
         // Check if this is a NEW incoming transaction (mempool monitoring)
         if (!existingTxIds.contains(tx.txid) && tx.isReceived) {
           newIncomingTransactions.add(updatedTx);
-          if (kDebugMode) {
-            print('🔔 NEW INCOMING TRANSACTION DETECTED: ${tx.txid.substring(0, 8)}...');
-            print('   Amount: ${tx.amount.toStringAsFixed(8)} BTCZ');
-            print('   Confirmations: ${tx.confirmations}');
-            print('   Has memo: ${tx.hasMemo}');
-            if (tx.hasMemo) print('   Memo: "${tx.memo}"');
-          }
+          Logger.transaction('New incoming transaction detected: ${tx.txid.substring(0, 8)}... Amount: ${tx.amount.toStringAsFixed(8)} BTCZ, Confirmations: ${tx.confirmations}${tx.hasMemo ? ', Has memo: yes' : ''}');
         }
 
         updatedTransactions.add(updatedTx);
@@ -272,21 +257,10 @@ class WalletProvider with ChangeNotifier {
       _transactions = updatedTransactions;
 
       // DIRECT TRANSACTION NOTIFICATION PROCESSING - Process ALL new incoming transactions
-      if (kDebugMode) {
-        print('🔔 DIRECT NOTIFICATION PROCESSING:');
-        print('   New incoming transactions: ${newIncomingTransactions.length}');
-        for (final tx in newIncomingTransactions) {
-          print('   - ${tx.txid.substring(0, 8)}... ${tx.amount.toStringAsFixed(8)} BTCZ ${tx.hasMemo ? 'WITH MEMO' : 'NO MEMO'}');
-        }
-      }
+      Logger.notification('Processing ${newIncomingTransactions.length} new incoming transactions for notifications');
 
       if (newIncomingTransactions.isNotEmpty) {
-        if (kDebugMode) {
-          print('🔔 Processing ${newIncomingTransactions.length} new incoming transactions for notifications');
-        }
         await _processNotificationSafely(() => _processNewIncomingTransactions(newIncomingTransactions));
-      } else if (kDebugMode) {
-        print('🔔 No new incoming transactions to process');
       }
 
       // Update notification timestamp after processing
@@ -296,9 +270,7 @@ class WalletProvider with ChangeNotifier {
       _cleanupNotificationTracking();
 
       // Update unread memo count when transactions are updated
-      if (kDebugMode) print('🦀 CALLBACK DEBUG: Calling updateUnreadMemoCount() from fnSetTransactionsList...');
       await updateUnreadMemoCount();
-      if (kDebugMode) print('🦀 CALLBACK DEBUG: Badge count updated in callback: $_unreadMemoCount');
 
       // Cache transactions for faster startup (limit to recent 20 transactions)
       if (_wallet != null) {
@@ -312,15 +284,13 @@ class WalletProvider with ChangeNotifier {
             walletData['cachedTransactions'] = recentTransactions.map((tx) => tx.toJson()).toList();
             walletData['cacheTimestamp'] = DateTime.now().millisecondsSinceEpoch;
             await authProvider.updateWalletData(walletData);
-            if (kDebugMode) print('💾 Cached ${recentTransactions.length} recent transactions');
           }
         } catch (e) {
-          if (kDebugMode) print('⚠️ Failed to cache transactions: $e');
+          Logger.wallet('Failed to cache transactions', level: LogLevel.warning);
         }
       }
 
       // 🔄 BADGE FIX: Failsafe badge sync before notifying listeners
-      if (kDebugMode) print('🔄 BADGE FIX: Failsafe badge sync before notifyListeners...');
       if (_notificationProvider != null) {
         _notificationProvider!.updateUnreadMemoCount(_unreadMemoCount);
       }
@@ -328,22 +298,20 @@ class WalletProvider with ChangeNotifier {
       notifyListeners();
     };
     _rustService.fnSetAllAddresses = (addresses) {
-      if (kDebugMode) {
-        final tCount = addresses['transparent']?.length ?? 0;
-        final sCount = addresses['shielded']?.length ?? 0;
-        print('🦀 Rust Bridge updated addresses: ${tCount} transparent + ${sCount} shielded');
-      }
+      final tCount = addresses['transparent']?.length ?? 0;
+      final sCount = addresses['shielded']?.length ?? 0;
+      Logger.rust('Updated addresses: ${tCount} transparent + ${sCount} shielded');
       _addresses = addresses;
       notifyListeners();
     };
     _rustService.fnSetInfo = (info) {
-      if (kDebugMode) print('🦀 Rust Bridge info: Block ${info['latestBlock']}');
+      Logger.rust('Block ${info['latestBlock']}');
     };
   }
 
   /// Start simple connection monitoring using only Rust
   void _startSimpleConnectionMonitoring() {
-    if (kDebugMode) print('🔗 Starting simple Rust-only connection monitoring');
+    Logger.network('Starting connection monitoring');
 
     // Single timer that checks connection every 3 seconds - ONLY source of connection status
     _simpleConnectionTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
@@ -358,7 +326,6 @@ class WalletProvider with ChangeNotifier {
   Future<bool> _testRealServerConnection({String? context}) async {
     try {
       final contextMsg = context != null ? ' ($context)' : '';
-      if (kDebugMode) print('🔍 REAL gRPC test$contextMsg...');
 
       // Use rust_api.getServerInfo() to make actual gRPC call to server
       final result = await rust_api.getServerInfo(serverUri: currentServerUrl)
@@ -366,18 +333,18 @@ class WalletProvider with ChangeNotifier {
       final responseData = jsonDecode(result) as Map<String, dynamic>;
 
       if (responseData.containsKey('success') && responseData['success'] == true) {
-        if (kDebugMode) print('✅ REAL server connection SUCCESS$contextMsg');
+        Logger.network('Server connection success$contextMsg');
         _setConnectionStatus(true, 'Connected');
         return true;
       } else {
         final errorMsg = responseData['error'] ?? 'Unknown server error';
-        if (kDebugMode) print('❌ REAL server connection FAILED$contextMsg: $errorMsg');
+        Logger.network('Server connection failed$contextMsg: $errorMsg', level: LogLevel.warning);
         _setConnectionStatus(false, 'Server error');
         return false;
       }
     } catch (e) {
       final contextMsg = context != null ? ' ($context)' : '';
-      if (kDebugMode) print('❌ REAL server connection FAILED$contextMsg: $e');
+      Logger.network('Server connection failed$contextMsg', level: LogLevel.error);
       _setConnectionStatus(false, 'Connection failed');
       return false;
     }
@@ -456,7 +423,7 @@ class WalletProvider with ChangeNotifier {
   /// Generate a new wallet seed and get real birthday from blockchain
   Future<Map<String, dynamic>> generateNewWallet() async {
     if (kDebugMode) {
-      print('🎲 Generating new wallet with real blockchain birthday...');
+      Logger.wallet('Generating new wallet with real blockchain birthday...');
     }
 
     // Generate seed phrase locally first
@@ -470,7 +437,7 @@ class WalletProvider with ChangeNotifier {
 
       if (!_rustService.initialized) {
         try {
-          if (kDebugMode) print('📡 Initializing Rust service to get blockchain height...');
+          Logger.rust('Initializing Rust service to get blockchain height...');
 
           // Create a temporary wallet to establish server connection
           final tempInitialized = await _rustService.initialize(
@@ -479,41 +446,41 @@ class WalletProvider with ChangeNotifier {
           );
 
           if (tempInitialized) {
-            if (kDebugMode) print('✅ Rust service initialized, getting blockchain height...');
+            Logger.rust('Rust service initialized, getting blockchain height...');
 
             // Now we can get the real blockchain height
             try {
               currentHeight = await _rustService.getCurrentBlockHeight();
               if (currentHeight != null && currentHeight > 0) {
-                if (kDebugMode) print('📊 Got real blockchain height: $currentHeight');
+                Logger.rust('Got blockchain height: $currentHeight');
               }
             } catch (e) {
-              if (kDebugMode) print('⚠️ Failed to get block height: $e');
+              Logger.rust('Failed to get block height', level: LogLevel.warning);
             }
 
             // Note: The temporary wallet will be overwritten when createWallet() is called
             // This is just to get the blockchain height
           } else {
-            if (kDebugMode) print('⚠️ Failed to initialize Rust service for height check');
+            Logger.rust('Failed to initialize Rust service for height check', level: LogLevel.warning);
           }
         } catch (e) {
-          if (kDebugMode) print('⚠️ Error initializing Rust service: $e');
+          Logger.rust('Error initializing Rust service', level: LogLevel.error);
         }
       } else {
         // Rust service already initialized, just get the height
         try {
           currentHeight = await _rustService.getCurrentBlockHeight();
-          if (kDebugMode) print('📊 Got blockchain height from existing service: $currentHeight');
+          Logger.rust('Got blockchain height from existing service: $currentHeight');
         } catch (e) {
-          if (kDebugMode) print('⚠️ Failed to get height: $e');
+          Logger.rust('Failed to get height', level: LogLevel.warning);
         }
       }
 
       // If we still couldn't get the height, log it
       if (currentHeight == null || currentHeight == 0) {
         if (kDebugMode) {
-          print('📊 Could not get real blockchain height');
-          print('📊 Will use estimated height for birthday calculation');
+          Logger.wallet('Could not get real blockchain height');
+          Logger.wallet('Will use estimated height for birthday calculation');
         }
       }
 
@@ -523,7 +490,7 @@ class WalletProvider with ChangeNotifier {
         // Use a recent mainnet height as fallback
         currentHeight = 1625000; // Updated mainnet height as of Dec 2024
         if (kDebugMode) {
-          print('⚠️ Using fallback height: $currentHeight');
+          Logger.wallet('Using fallback height: $currentHeight', level: LogLevel.warning);
         }
       }
 
@@ -532,13 +499,9 @@ class WalletProvider with ChangeNotifier {
       birthday = currentHeight - 100;
 
       if (kDebugMode) {
-        print('✅ New wallet seed generated:');
-        print('   Seed: ${mnemonic.split(' ').length} words (locally generated)');
-        print('   Birthday block: $birthday');
-        print('   Current height: $currentHeight (${currentHeight == 1620000 ? "FALLBACK/ESTIMATED" : "REAL from blockchain"})');
-        print('   Rust initialized: ${_rustService.initialized}');
+        Logger.wallet('New wallet seed generated');
         if (currentHeight == 1620000) {
-          print('⚠️ WARNING: Using fallback height - Rust service may not be connecting to server');
+          Logger.wallet('WARNING: Using fallback height - Rust service may not be connecting to server', level: LogLevel.warning);
         }
       }
 
@@ -548,8 +511,7 @@ class WalletProvider with ChangeNotifier {
       };
     } catch (e) {
       if (kDebugMode) {
-        print('⚠️ Error during wallet generation: $e');
-        print('⚠️ Using fallback values');
+        Logger.wallet('Error during wallet generation', level: LogLevel.error);
       }
 
       // Ultimate fallback - use a recent block height
@@ -569,10 +531,7 @@ class WalletProvider with ChangeNotifier {
 
     try {
       if (kDebugMode) {
-        print('🏗️ WalletProvider.createWallet() starting...');
-        print('  seedPhrase provided: ${seedPhrase.isNotEmpty}');
-        print('  isNewWallet: $isNewWallet');
-        print('  authProvider provided: ${authProvider != null}');
+        Logger.wallet('WalletProvider.createWallet() starting...');
       }
 
       // Create wallet directly via Rust Bridge if no seed provided
@@ -584,8 +543,7 @@ class WalletProvider with ChangeNotifier {
         {
           // This is a different flow or wallet not initialized, create new wallet
           if (kDebugMode) {
-            print('🦀 Creating new wallet via Rust Bridge...');
-            print('   Note: This is a fresh wallet creation');
+            Logger.wallet('Creating new wallet via Rust Bridge...');
           }
           final rustInitialized = await _rustService.initialize(
             serverUri: currentServerUrl,
@@ -603,13 +561,13 @@ class WalletProvider with ChangeNotifier {
           }
 
           if (kDebugMode) {
-            print('✅ New wallet created with seed phrase from Rust');
+            Logger.wallet('New wallet created with seed phrase from Rust');
             print('   Birthday: ${_rustService.getBirthday()}');
           }
         }
       } else {
         // Restore wallet from provided seed phrase
-        if (kDebugMode) print('🦀 Restoring wallet via Rust Bridge...');
+        Logger.wallet('Restoring wallet via Rust Bridge...');
 
         // When restoring, use current block height as birthday for fast sync
         // This is appropriate for new wallets being restored
@@ -631,7 +589,7 @@ class WalletProvider with ChangeNotifier {
           throw Exception('Failed to restore wallet via Rust Bridge');
         }
 
-        if (kDebugMode) print('✅ Wallet restored from seed phrase with birthday: $birthdayToUse');
+        Logger.wallet('Wallet restored from seed phrase with birthday: $birthdayToUse');
       }
 
       // Refresh wallet data from Rust to get real addresses
@@ -666,7 +624,7 @@ class WalletProvider with ChangeNotifier {
 
       // Store wallet data persistently
       if (authProvider != null) {
-        if (kDebugMode) print('💾 Calling authProvider.registerWallet()...');
+        Logger.auth('Calling authProvider.registerWallet()...');
         await authProvider.registerWallet(
           walletId,
           seedPhrase: finalSeedPhrase,
@@ -678,9 +636,9 @@ class WalletProvider with ChangeNotifier {
             'createdAt': DateTime.now().toIso8601String(),
           },
         );
-        if (kDebugMode) print('✅ Wallet storage completed!');
+        Logger.wallet('Wallet storage completed!');
       } else {
-        if (kDebugMode) print('⚠️ No authProvider - wallet will not persist!');
+        Logger.auth('No authProvider - wallet will not persist!', level: LogLevel.warning);
       }
 
       // Start auto-sync after wallet creation
@@ -688,7 +646,7 @@ class WalletProvider with ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) print('❌ WalletProvider.createWallet() failed: $e');
+      Logger.wallet('WalletProvider.createWallet() failed', level: LogLevel.error);
       _setError('Failed to create wallet: $e');
     } finally {
       _setLoading(false);
@@ -697,18 +655,16 @@ class WalletProvider with ChangeNotifier {
 
   /// Restore wallet from seed phrase
   Future<void> restoreWallet(String seedPhrase, {int birthdayHeight = 0, AuthProvider? authProvider}) async {
-    print('📱 WALLET_PROVIDER DEBUG: restoreWallet called');
-    print('📱 WALLET_PROVIDER DEBUG: seedPhrase length: ${seedPhrase.length}');
-    print('📱 WALLET_PROVIDER DEBUG: birthdayHeight: $birthdayHeight');
-    print('📱 WALLET_PROVIDER DEBUG: currentServerUrl: $currentServerUrl');
+    // Debug logging reduced for performance
+    Logger.wallet('restoreWallet called, seedLength: ${seedPhrase.length}, birthday: $birthdayHeight');
     
     _setLoading(true);
     _clearError();
 
     try {
       // Restore wallet directly via Rust Bridge with timeout
-      if (kDebugMode) print('🦀 Restoring wallet via Rust Bridge...');
-      print('📱 WALLET_PROVIDER DEBUG: About to call _rustService.initialize...');
+      Logger.wallet('Restoring wallet via Rust Bridge...');
+      // Debug logging reduced for performance
       
       final rustInitialized = await _rustService.initialize(
         serverUri: currentServerUrl,
@@ -718,13 +674,13 @@ class WalletProvider with ChangeNotifier {
       ).timeout(
         const Duration(seconds: 45),
         onTimeout: () {
-          if (kDebugMode) print('⏱️ Wallet restore initialization timed out');
-          print('📱 WALLET_PROVIDER DEBUG: TIMEOUT after 45 seconds');
+          Logger.wallet('Wallet restore initialization timed out', level: LogLevel.warning);
+          // Debug logging reduced for performance
           return false;
         },
       );
       
-      print('📱 WALLET_PROVIDER DEBUG: _rustService.initialize returned: $rustInitialized');
+      Logger.wallet('Rust service initialize completed: $rustInitialized');
 
       if (!rustInitialized) {
         throw Exception('Failed to restore wallet via Rust Bridge');
@@ -732,20 +688,20 @@ class WalletProvider with ChangeNotifier {
 
       // Skip data refresh for new wallet restore to prevent hanging
       // The wallet was just initialized, so we'll get minimal data without sync calls
-      print('📱 WALLET_PROVIDER DEBUG: Skipping _refreshWalletData() for restore to prevent hanging');
-      print('📱 WALLET_PROVIDER DEBUG: Getting basic addresses from Rust service...');
+      // Debug logging reduced for performance
+      Logger.wallet('Getting basic addresses from Rust service...');
       
       try {
         // Just get addresses without full data refresh to prevent hanging
         await _rustService.fetchAddresses();
-        print('📱 WALLET_PROVIDER DEBUG: Basic address fetch completed');
+        Logger.wallet('Basic address fetch completed');
       } catch (e) {
-        print('📱 WALLET_PROVIDER DEBUG: Address fetch failed: $e');
+        Logger.error('Address fetch failed', category: 'wallet', exception: e);
         // Continue anyway - we can still create the wallet
       }
       
       // Skip connection check too - it's not critical for wallet creation
-      print('📱 WALLET_PROVIDER DEBUG: Skipping _checkConnection() for restore');
+      // Debug logging reduced for performance
 
       // Create wallet model with real data from Rust
       final walletId = const Uuid().v4();
@@ -789,7 +745,6 @@ class WalletProvider with ChangeNotifier {
       _setSyncing(true);
       _syncMessage = 'Initializing sync...';
       _syncProgress = 0.1; // Show small initial progress
-      if (kDebugMode) print('🔔 IMMEDIATE: Setting initial sync progress display');
       notifyListeners(); // Immediate UI update
       
       // Trigger an immediate sync/update cycle
@@ -805,7 +760,6 @@ class WalletProvider with ChangeNotifier {
             _setSyncing(true);
             _syncMessage = 'Starting blockchain sync...';
             _syncProgress = 0.2;
-            if (kDebugMode) print('🔔 FORCED: Setting sync progress after sync trigger');
             notifyListeners();
           }
           
@@ -813,7 +767,7 @@ class WalletProvider with ChangeNotifier {
           await _updateSyncStatus();
           await _refreshWalletData();
         } catch (e) {
-          if (kDebugMode) print('Initial restore sync error: $e');
+          Logger.sync('Initial restore sync error', level: LogLevel.error);
         }
       });
 
@@ -874,7 +828,7 @@ class WalletProvider with ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) print('❌ Failed to load CLI wallet: $e');
+      Logger.wallet('Failed to load CLI wallet', level: LogLevel.error);
       _setError('Failed to load CLI wallet: $e');
     } finally {
       _setLoading(false);
@@ -1011,7 +965,6 @@ class WalletProvider with ChangeNotifier {
         // Load cached addresses first
         if (walletData['transparentAddresses'] != null) {
           _addresses['transparent'] = List<String>.from(walletData['transparentAddresses']);
-          if (kDebugMode) print('📋 Loaded ${_addresses['transparent']!.length} cached transparent addresses');
         }
         if (walletData['shieldedAddresses'] != null) {
           _addresses['shielded'] = List<String>.from(walletData['shieldedAddresses']);
@@ -1790,9 +1743,8 @@ class WalletProvider with ChangeNotifier {
       // Use the ACTUAL sync state from Rust service instead of unreliable syncstatus command
       final bool actuallyInProgress = _rustService.isActuallySyncing;
 
-      if (kDebugMode) {
-        print('🔍 ACTUAL Sync State: Rust service _isSyncing = $actuallyInProgress');
-      }
+      // Debug logging reduced for performance
+      Logger.sync('Rust service sync state: $actuallyInProgress');
 
       // If Rust service says it's syncing, try to get detailed progress
       int syncedBlocks = 0;
@@ -1811,10 +1763,8 @@ class WalletProvider with ChangeNotifier {
             currentBatch = status['batch_num'] ?? 0;
             totalBatches = status['batch_total'] ?? 0;
 
-            if (kDebugMode) {
-              print('🔍 Progress Details: $syncedBlocks/$totalBlocks blocks');
-              print('🔍 Batch Details: $currentBatch/$totalBatches batches');
-            }
+            // Debug logging reduced for performance
+            Logger.sync('Progress: $syncedBlocks/$totalBlocks blocks, batch: $currentBatch/$totalBatches');
 
             // WORKAROUND: If we get stale data (all zeros) but sync is actually active,
             // try to get the raw status string and parse it manually
@@ -1952,17 +1902,14 @@ class WalletProvider with ChangeNotifier {
 
           // 🚀 SMART GRACE PERIOD: If we detect wallet has data, hide immediately
           final walletHasData = _balance.total > 0 && _transactions.isNotEmpty;
-          if (kDebugMode) {
-            print('🔍 SMART GRACE PERIOD CHECK:');
-            print('   walletHasData: $walletHasData (balance=${_balance.total}, txs=${_transactions.length})');
-            print('   _lastSyncUIHideTime: $_lastSyncUIHideTime');
-          }
+          // Debug logging reduced for performance
+          Logger.sync('Smart grace period check - walletHasData: $walletHasData');
 
           if (walletHasData) {
             if (_lastSyncUIHideTime == null) {
               // ⚡ INSTANT HIDE: Set grace period for already-synced wallet
               _lastSyncUIHideTime = now.subtract(const Duration(seconds: 1));
-              if (kDebugMode) print('⚡ INSTANT HIDE: Wallet has data, setting immediate hide time');
+              // Debug logging reduced for performance
             } else {
               final timeUntilHide = _lastSyncUIHideTime!.difference(now).inSeconds;
               if (kDebugMode) print('   timeUntilHide: ${timeUntilHide}s');
@@ -1970,7 +1917,7 @@ class WalletProvider with ChangeNotifier {
               if (timeUntilHide > 0) {
                 // ⚡ INSTANT HIDE: Wallet already synced, hide immediately
                 _lastSyncUIHideTime = now.subtract(const Duration(seconds: 1));
-                if (kDebugMode) print('⚡ INSTANT HIDE: Wallet has data, updating to immediate hide');
+                // Debug logging reduced for performance
               }
             }
           }
@@ -1988,20 +1935,8 @@ class WalletProvider with ChangeNotifier {
 
         if (shouldHideUI && hasCompletionEvidence && (isInstantHide || (hasMultipleCompletePolls && hasExtendedInactivity))) {
           // ALL conditions met - sync is truly complete
-          if (kDebugMode) {
-            if (isInstantHide) {
-              print('⚡ HIDING sync UI - INSTANT HIDE for already-synced wallet:');
-              print('   ✅ Grace period expired: $shouldHideUI');
-              print('   ✅ Completion evidence: $hasCompletionEvidence');
-              print('   ✅ Wallet has data: $walletHasData (bypassing poll requirements)');
-            } else {
-              print('🎯 HIDING sync UI - ALL bulletproof conditions met:');
-              print('   ✅ Grace period expired: $shouldHideUI');
-              print('   ✅ Completion evidence: $hasCompletionEvidence');
-              print('   ✅ Multiple complete polls: $hasMultipleCompletePolls ($_consecutiveCompletePolls)');
-              print('   ✅ Extended inactivity: $hasExtendedInactivity ($_consecutiveInactivePolls)');
-            }
-          }
+          // Debug logging reduced for performance
+          Logger.sync(isInstantHide ? 'Instant hide for synced wallet' : 'Hiding sync UI - all conditions met');
 
           _setSyncing(false);
           _syncProgress = 100.0;
@@ -2234,26 +2169,26 @@ class WalletProvider with ChangeNotifier {
     try {
       // Evidence 1: We have block progress and it's at 100%
       if (totalBlocks > 0 && syncedBlocks >= totalBlocks) {
-        if (kDebugMode) print('🎯 Completion evidence: Blocks complete ($syncedBlocks/$totalBlocks)');
+        // Debug logging reduced for performance
         return true;
       }
 
       // Evidence 2: We have batch progress and all batches are complete
       if (totalBatches > 0 && currentBatch >= totalBatches) {
-        if (kDebugMode) print('🎯 Completion evidence: Batches complete ($currentBatch/$totalBatches)');
+        // Debug logging reduced for performance
         return true;
       }
 
       // Evidence 3: Sync progress is at or near 100%
       if (_syncProgress >= 99.5) {
-        if (kDebugMode) print('🎯 Completion evidence: Progress at ${_syncProgress.toStringAsFixed(1)}%');
+        // Debug logging reduced for performance
         return true;
       }
 
       // Evidence 4: Wallet has balance and transactions (indicating successful sync)
       // AND Rust service says sync is not active
       if (!_rustService.isActuallySyncing && _balance.total > 0 && _transactions.isNotEmpty) {
-        if (kDebugMode) print('🎯 Completion evidence: Wallet has data (balance=${_balance.total.toStringAsFixed(6)}, txs=${_transactions.length}) and Rust inactive');
+        // Debug logging reduced for performance
         return true;
       }
 
@@ -2261,15 +2196,12 @@ class WalletProvider with ChangeNotifier {
       // This handles the case where sync completed but we don't have progress data
       if (!_rustService.isActuallySyncing && hasWallet && _wallet != null &&
           (_balance.total > 0 || _transactions.isNotEmpty)) {
-        if (kDebugMode) print('🎯 Completion evidence: Wallet loaded with data and no active sync');
+        // Debug logging reduced for performance
         return true;
       }
 
       // No strong evidence of completion
-      if (kDebugMode) {
-        print('🔍 No completion evidence: blocks=$syncedBlocks/$totalBlocks, batches=$currentBatch/$totalBatches, progress=${_syncProgress.toStringAsFixed(1)}%');
-        print('   Rust active: ${_rustService.isActuallySyncing}, Balance: ${_balance.total}, Txs: ${_transactions.length}');
-      }
+      // Debug logging reduced for performance
       return false;
 
     } catch (e) {
@@ -2622,14 +2554,14 @@ class WalletProvider with ChangeNotifier {
   /// Private helper methods
   Future<void> _refreshWalletData() async {
     if (kDebugMode) print('🔄 _refreshWalletData called...');
-    print('📱 WALLET_PROVIDER DEBUG: _refreshWalletData() entered');
-    print('📱 WALLET_PROVIDER DEBUG: _rustService.initialized = ${_rustService.initialized}');
+    // Debug logging reduced for performance
+    Logger.wallet('refreshWalletData called, rust initialized: ${_rustService.initialized}');
 
     // Ensure Rust is initialized on app restart so balance/tx load correctly
     if (!_rustService.initialized) {
       try {
         if (kDebugMode) print('   Rust not initialized; attempting background load of existing wallet...');
-        print('📱 WALLET_PROVIDER DEBUG: Rust not initialized, calling initialize...');
+        // Debug logging reduced for performance
         final ok = await _rustService.initialize(
           serverUri: currentServerUrl,
           createNew: false,
@@ -2637,13 +2569,13 @@ class WalletProvider with ChangeNotifier {
           birthdayHeight: null,
         );
         if (kDebugMode) print('   Background initialize existing wallet result: $ok');
-        print('📱 WALLET_PROVIDER DEBUG: Background initialize result: $ok');
+        Logger.wallet('Background initialize result: $ok');
       } catch (e) {
         if (kDebugMode) print('   ⚠️ Background initialize failed: $e');
-        print('📱 WALLET_PROVIDER DEBUG: Background initialize failed: $e');
+        Logger.error('Background initialize failed', category: 'wallet', exception: e);
       }
     } else {
-      print('📱 WALLET_PROVIDER DEBUG: Rust already initialized, skipping');
+      // Debug logging reduced for performance
     }
 
     // Always use Rust Bridge for all wallets (provides mempool monitoring)
@@ -2657,30 +2589,24 @@ class WalletProvider with ChangeNotifier {
         // The sync is hanging on Android, so we'll fetch data without syncing
 
         if (kDebugMode) print('   Fetching balance...');
-        print('📱 WALLET_PROVIDER DEBUG: About to call _rustService.fetchBalance()...');
+        // Debug logging reduced for performance
         await _rustService.fetchBalance();
-        print('📱 WALLET_PROVIDER DEBUG: fetchBalance() completed');
 
         if (kDebugMode) print('   Fetching transactions...');
-        print('📱 WALLET_PROVIDER DEBUG: About to call _rustService.fetchTransactions()...');
+        // Debug logging reduced for performance
         await _rustService.fetchTransactions();
-        print('📱 WALLET_PROVIDER DEBUG: fetchTransactions() completed');
         
         // 🔄 BADGE FIX: Force badge recalculation after transactions are loaded
-        if (kDebugMode) print('🔄 BADGE FIX: Recalculating badge count after transaction loading...');
         await updateUnreadMemoCount();
-        if (kDebugMode) print('🔄 BADGE FIX: Badge count updated to $_unreadMemoCount');
 
         if (kDebugMode) print('   Fetching addresses...');
-        print('📱 WALLET_PROVIDER DEBUG: About to fetch addresses...');
+        // Debug logging reduced for performance
         await _rustService.fetchAddresses();
 
         if (kDebugMode) print('✅ Wallet data refresh complete');
 
         // 🔄 BADGE FIX: Final badge sync after complete wallet refresh
-        if (kDebugMode) print('🔄 BADGE FIX: Final badge sync after wallet refresh completion...');
         await updateUnreadMemoCount();
-        if (kDebugMode) print('🔄 BADGE FIX: Final badge count: $_unreadMemoCount');
 
         // Save wallet state to disk for persistence
         try {
@@ -3006,7 +2932,7 @@ class WalletProvider with ChangeNotifier {
 
           // Debug logging for unconfirmed transactions
           if (unconfirmed && kDebugMode) {
-            print('🔍 Processing unconfirmed transaction:');
+            // Debug logging reduced for performance
             print('   txid: ${txid.substring(0, 8)}...');
             print('   block_height: $blockHeight');
             print('   unconfirmed: $unconfirmed');
@@ -3055,7 +2981,7 @@ class WalletProvider with ChangeNotifier {
 
           // Debug logging for confirmation calculation
           if (kDebugMode && (unconfirmed || calculatedConfirmations <= 5)) {
-            print('🔍 Confirmation calculation:');
+            // Debug logging reduced for performance
             print('   txid: ${txid.substring(0, 8)}...');
             print('   unconfirmed: $unconfirmed');
             print('   blockHeight: $blockHeight');
@@ -3653,9 +3579,9 @@ class WalletProvider with ChangeNotifier {
       for (final txid in txids) {
         await markMemoAsRead(txid);
       }
-      if (kDebugMode) print('📱 Marked ${txids.length} memos as read');
+      Logger.notification('Marked ${txids.length} memos as read');
     } catch (e) {
-      if (kDebugMode) print('❌ Failed to mark multiple memos as read: $e');
+      Logger.notification('Failed to mark multiple memos as read', level: LogLevel.error);
       throw Exception('Failed to mark memos as read: $e');
     }
   }
@@ -3666,9 +3592,9 @@ class WalletProvider with ChangeNotifier {
       for (final txid in txids) {
         await markMemoAsUnread(txid);
       }
-      if (kDebugMode) print('📱 Marked ${txids.length} memos as unread');
+      Logger.notification('Marked ${txids.length} memos as unread');
     } catch (e) {
-      if (kDebugMode) print('❌ Failed to mark multiple memos as unread: $e');
+      Logger.notification('Failed to mark multiple memos as unread', level: LogLevel.error);
       throw Exception('Failed to mark memos as unread: $e');
     }
   }
@@ -4334,7 +4260,6 @@ class WalletProvider with ChangeNotifier {
   /// Mark a transaction memo as read
   Future<void> markMemoAsRead(String txid) async {
     try {
-      if (kDebugMode) print('🔄 MARKING MEMO AS READ: ${txid.substring(0, 8)}...');
       
       // Update in-memory cache first
       final previousCacheValue = _memoReadStatusCache[txid];
@@ -4362,19 +4287,17 @@ class WalletProvider with ChangeNotifier {
       await _markNotificationAsReadByTransactionId(txid);
 
       // Update unread count
-      if (kDebugMode) print('   Updating badge count after marking memo as read...');
       await updateUnreadMemoCount();
 
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) print('❌ Error marking memo as read: $e');
+      Logger.notification('Error marking memo as read', level: LogLevel.error);
     }
   }
 
   /// Mark a transaction memo as unread
   Future<void> markMemoAsUnread(String txid) async {
     try {
-      if (kDebugMode) print('🔄 MARKING MEMO AS UNREAD: ${txid.substring(0, 8)}...');
       
       // Update in-memory cache first
       final previousCacheValue = _memoReadStatusCache[txid];
@@ -4399,12 +4322,11 @@ class WalletProvider with ChangeNotifier {
       }
 
       // Update unread count
-      if (kDebugMode) print('   Updating badge count after marking memo as unread...');
       await updateUnreadMemoCount();
 
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) print('❌ Error marking memo as unread: $e');
+      Logger.notification('Error marking memo as unread', level: LogLevel.error);
     }
   }
 
@@ -4414,7 +4336,6 @@ class WalletProvider with ChangeNotifier {
       final previousCount = _unreadMemoCount;
 
       if (kDebugMode) {
-        print('🔍 BADGE COUNT DEBUG: Starting updateUnreadMemoCount() v2');
         print('   Previous count: $previousCount');
         try {
           print('   Total transactions: ${_transactions.length}');
@@ -4432,14 +4353,11 @@ class WalletProvider with ChangeNotifier {
 
       // Add debug check for transaction processing
       if (kDebugMode) {
-        print('🔍 BADGE COUNT DEBUG: About to check transaction memos...');
         final memosTransactions = _transactions.where((tx) => tx.hasMemo);
-        print('🔍 BADGE COUNT DEBUG: Found ${memosTransactions.length} transactions with memos');
       }
 
     // Verify cache consistency with SharedPreferences
     if (kDebugMode) {
-      print('🔍 BADGE COUNT DEBUG: About to verify cache consistency...');
     }
     if (_prefs != null && kDebugMode) {
       var cacheInconsistencies = 0;
@@ -4463,7 +4381,6 @@ class WalletProvider with ChangeNotifier {
     final memosWithStatus = <Map<String, dynamic>>[];
     
     if (kDebugMode) {
-      print('🔍 BADGE COUNT DEBUG: Starting memo calculation loop...');
     }
     
     _unreadMemoCount = _transactions.where((tx) {
@@ -4489,19 +4406,10 @@ class WalletProvider with ChangeNotifier {
       return !isRead;
     }).length;
 
-    if (kDebugMode) {
-      print('📊 BADGE COUNT DEBUG: Calculated unread memo count: $_unreadMemoCount (from ${_transactions.where((tx) => tx.hasMemo).length} total memos)');
-      print('   Memo status details:');
-      for (final memo in memosWithStatus) {
-        final isUnread = memo['isReadFromCache'] == false;
-        print('     ${memo['txid']}: "${memo['memo']}" -> ${isUnread ? "UNREAD" : "READ"}');
-        print('       tx.memoRead=${memo['memoRead']}, cache=${memo['cacheValue']}, prefs=${memo['prefsValue']}');
-      }
-    }
+    // Memo status logging removed to prevent privacy leaks of memo content
 
     // Update notification provider with new memo count
     if (_notificationProvider != null && _unreadMemoCount != previousCount) {
-      if (kDebugMode) print('🔔 Updating notification provider: $previousCount -> $_unreadMemoCount');
       _notificationProvider!.updateUnreadMemoCount(_unreadMemoCount);
     }
 
@@ -4567,8 +4475,8 @@ class WalletProvider with ChangeNotifier {
     for (final tx in newMemoTransactions) {
       if (kDebugMode) {
         print('🔔 Showing message notification for tx: ${tx.txid.substring(0, 8)}...');
-        print('   Amount: ${tx.amount} BTCZ, Memo: "${tx.memo}"');
-        print('   Is received: ${tx.isReceived}, Has memo: ${tx.hasMemo}');
+        print('   Amount: ${tx.amount} BTCZ, Has memo: ${tx.hasMemo}');
+        print('   Is received: ${tx.isReceived}');
       }
 
       // Track message notification attempt
@@ -4709,7 +4617,7 @@ class WalletProvider with ChangeNotifier {
       // Log for debugging
       if (kDebugMode) {
         print('📬 NEW MEMO TRANSACTION: ${tx.txid.substring(0, 8)}... - ${tx.isReceived ? '+' : '-'}${tx.amount.toStringAsFixed(8)} BTCZ');
-        print('   Memo: ${tx.memo ?? ''}');
+        // Memo content removed to prevent privacy leaks
         print('   Transaction marked as notified (memo remains unread until user views it)');
       }
     }
@@ -4759,7 +4667,7 @@ class WalletProvider with ChangeNotifier {
         print('   Amount: ${tx.amount.toStringAsFixed(8)} BTCZ');
         print('   Confirmations: ${tx.confirmations}');
         print('   Has memo: ${tx.hasMemo}');
-        if (tx.hasMemo) print('   Memo: "${tx.memo}"');
+        // Memo content removed to prevent privacy leaks
       }
 
       // Immediate notification based on transaction type
@@ -5022,7 +4930,6 @@ class WalletProvider with ChangeNotifier {
       _prefs = await SharedPreferences.getInstance();
       _prefsInitialized = true;
       await _loadMemoStatusFromPrefs();
-      if (kDebugMode) print('📱 SharedPreferences initialized with ${_memoReadStatusCache.length} memo statuses');
     } catch (e) {
       if (kDebugMode) print('⚠️ Failed to initialize SharedPreferences: $e');
     }
@@ -5101,7 +5008,7 @@ class WalletProvider with ChangeNotifier {
 
       // Note: Notified set initialization moved to after transactions are loaded
     } catch (e) {
-      if (kDebugMode) print('⚠️ Error loading memo status from SharedPreferences: $e');
+      Logger.storage('Error loading memo status from SharedPreferences', level: LogLevel.warning);
     }
   }
 
@@ -5126,7 +5033,7 @@ class WalletProvider with ChangeNotifier {
         print('💾 Saved memo read status to SharedPreferences: $txid = $isRead');
       }
     } catch (e) {
-      if (kDebugMode) print('⚠️ Error saving memo status to SharedPreferences: $e');
+      Logger.storage('Error saving memo status to SharedPreferences', level: LogLevel.warning);
     }
   }
 
@@ -5177,8 +5084,8 @@ class WalletProvider with ChangeNotifier {
   /// Bulletproof notification detection - uses EXACT same logic as messages UI
   bool _shouldNotifyAboutMemo(TransactionModel tx) {
     if (kDebugMode) {
-      print('🔍 NOTIFICATION CHECK: ${tx.txid.substring(0, 8)}...');
-      print('   Has memo: ${tx.hasMemo} (memo: "${tx.memo}")');
+      // Debug logging reduced for performance
+      print('   Has memo: ${tx.hasMemo}');
       print('   Is received: ${tx.isReceived}');
       print('   Transaction timestamp: ${tx.timestamp}');
       print('   Last notification check: $_lastNotificationCheck');
@@ -5186,7 +5093,6 @@ class WalletProvider with ChangeNotifier {
 
     // Must have memo
     if (!tx.hasMemo) {
-      if (kDebugMode) print('   ❌ No memo');
       return false;
     }
 
@@ -5458,11 +5364,8 @@ class WalletProvider with ChangeNotifier {
 
   /// Check if balance change is caused by a recent memo transaction
   bool _hasRecentMemoTransaction(double balanceChange) {
-    if (kDebugMode) {
-      print('🔍 CHECKING: _hasRecentMemoTransaction for balance change: ${balanceChange.toStringAsFixed(8)} BTCZ');
-      print('   Total transactions to check: ${_transactions.length}');
-      print('   Notified transaction IDs: ${_notifiedTransactionIds.length}');
-    }
+    // Debug logging reduced for performance
+    Logger.notification('Checking recent memo transactions for balance change: ${balanceChange.toStringAsFixed(8)} BTCZ');
     
     // Look for transactions from the last 60 seconds that match the balance change
     final recentTime = DateTime.now().subtract(const Duration(seconds: 60));
@@ -5480,18 +5383,12 @@ class WalletProvider with ChangeNotifier {
       
       // Check if transaction is recent and has memo
       if (tx.hasMemo && tx.timestamp.isAfter(recentTime) && tx.isReceived) {
-        if (kDebugMode) {
-          print('🔍 Checking memo transaction: ${tx.txid.substring(0, 8)}...');
-          print('   Amount: ${tx.amount.abs().toStringAsFixed(8)} BTCZ');
-          print('   Balance change: ${balanceChange.abs().toStringAsFixed(8)} BTCZ');
-          print('   Already notified: ${_notifiedTransactionIds.contains(tx.txid)}');
-        }
+        // Debug logging reduced for performance
         
         // Check if this transaction was already notified as a memo transaction
         if (_notifiedTransactionIds.contains(tx.txid)) {
-          if (kDebugMode) {
-            print('🔍 ✅ Found memo transaction already notified: ${tx.txid.substring(0, 8)}... - skipping balance notification');
-          }
+          // Debug logging reduced for performance
+          Logger.notification('Found memo transaction already notified - skipping balance notification');
           return true;
         }
         
@@ -5504,21 +5401,15 @@ class WalletProvider with ChangeNotifier {
         // Use a more reasonable tolerance for floating point comparison
         // Also ensure this is actually a memo transaction before blocking balance notification
         if (amountDiff < 0.0001 && tx.hasMemo && tx.memo != null && tx.memo!.isNotEmpty) { 
-          if (kDebugMode) {
-            print('🔍 ✅ Found matching memo transaction by amount: ${tx.txid.substring(0, 8)}... amount: ${tx.amount}');
-            print('   Memo: "${tx.memo}"');
-            print('🔔 Balance change caused by memo transaction - skipping balance notification');
-          }
+          // Debug logging reduced for performance
+          Logger.notification('Found matching memo transaction - skipping balance notification');
           return true;
         }
       }
     }
 
-    if (kDebugMode) {
-      print('🔍 RESULT: No matching memo transaction found for balance change: ${balanceChange.toStringAsFixed(8)} BTCZ');
-      print('   Recent incoming transactions: $recentTransactionCount (${memoTransactionCount} with memos)');
-      print('🔔 ✅ ALLOWING balance change notification');
-    }
+    // Debug logging reduced for performance
+    Logger.notification('No matching memo transaction found - allowing balance change notification');
     return false;
   }
 
