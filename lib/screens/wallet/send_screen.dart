@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -118,10 +119,24 @@ class _SendScreenState extends State<SendScreen>
 
   bool _canSend(WalletProvider walletProvider) {
     final amount = _getAmountValue();
-    if (amount == null || amount <= 0) return false;
-    
+    if (amount == null || amount <= 0) {
+      if (kDebugMode) print('🚫 CAN_SEND: Invalid amount ($amount)');
+      return false;
+    }
+
     final totalNeeded = amount + _estimatedFee;
-    return walletProvider.balance.spendable >= totalNeeded;
+    final canSend = walletProvider.balance.spendable >= totalNeeded;
+
+    if (kDebugMode) {
+      print('🔍 CAN_SEND CHECK:');
+      print('   Amount: $amount BTCZ');
+      print('   Estimated Fee: $_estimatedFee BTCZ');
+      print('   Total Needed: $totalNeeded BTCZ');
+      print('   Spendable Balance: ${walletProvider.balance.spendable} BTCZ');
+      print('   Can Send: $canSend');
+    }
+
+    return canSend;
   }
 
   Future<void> _scanQRCode() async {
@@ -208,25 +223,13 @@ class _SendScreenState extends State<SendScreen>
     try {
       final memo = _memoController.text.trim();
       
-      // Update progress
+      // Let wallet provider handle real progress - no hardcoded values
       await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) {
-        setState(() {
-          _sendingStatus = 'Creating transaction...';
-          _sendingProgress = 0.5;
-        });
-      }
       
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
       
-      // Update progress
+      // Let wallet provider handle all progress updates
       await Future.delayed(const Duration(milliseconds: 300));
-      if (mounted) {
-        setState(() {
-          _sendingStatus = 'Broadcasting to network...';
-          _sendingProgress = 0.75;
-        });
-      }
       
       final result = await walletProvider.sendTransaction(
         toAddress: address,
@@ -298,14 +301,27 @@ class _SendScreenState extends State<SendScreen>
 
   void _setMaxAmount(WalletProvider walletProvider) {
     final maxAmount = walletProvider.balance.spendable - _estimatedFee;
+
+    if (kDebugMode) {
+      print('💰 SET MAX AMOUNT:');
+      print('   Spendable Balance: ${walletProvider.balance.spendable} BTCZ');
+      print('   Estimated Fee: $_estimatedFee BTCZ');
+      print('   Max Amount: $maxAmount BTCZ');
+      print('   Is Fiat Input: $_isFiatInput');
+    }
+
     if (maxAmount > 0) {
       if (_isFiatInput) {
         final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
         final fiatAmount = currencyProvider.convertBtczToFiat(maxAmount);
         _amountController.text = fiatAmount?.toStringAsFixed(2) ?? '0.00';
+        if (kDebugMode) print('   Set Fiat Amount: ${_amountController.text}');
       } else {
         _amountController.text = maxAmount.toStringAsFixed(8);
+        if (kDebugMode) print('   Set BTCZ Amount: ${_amountController.text}');
       }
+    } else {
+      if (kDebugMode) print('   Max amount is 0 or negative, not setting');
     }
   }
 
@@ -707,9 +723,18 @@ class _SendScreenState extends State<SendScreen>
                                   if (_isFiatInput) {
                                     btczAmount = currencyProvider.convertFiatToBtcz(parsed) ?? 0;
                                   }
-                                  
+
                                   final totalNeeded = btczAmount + _estimatedFee;
                                   if (totalNeeded > walletProvider.balance.spendable) {
+                                    if (kDebugMode) {
+                                      print('❌ FORM VALIDATION: Insufficient balance');
+                                      print('   Input Amount: $parsed ${_isFiatInput ? "fiat" : "BTCZ"}');
+                                      print('   BTCZ Amount: $btczAmount BTCZ');
+                                      print('   Estimated Fee: $_estimatedFee BTCZ');
+                                      print('   Total Needed: $totalNeeded BTCZ');
+                                      print('   Spendable Balance: ${walletProvider.balance.spendable} BTCZ');
+                                      print('   Shortfall: ${totalNeeded - walletProvider.balance.spendable} BTCZ');
+                                    }
                                     return 'Insufficient balance';
                                   }
                                   return null;
@@ -1034,11 +1059,20 @@ class _SendScreenState extends State<SendScreen>
               ],
             ),
           ),
-          // Progress Overlay
+          // Progress Overlay - Use wallet provider's real progress exclusively
           SendingProgressOverlay(
-            status: _sendingStatus,
-            progress: _sendingProgress,
-            isVisible: _isSending,
+            status: walletProvider.isSendingTransaction
+                ? walletProvider.sendingStatus.isNotEmpty
+                    ? walletProvider.sendingStatus
+                    : 'Preparing transaction...'
+                : _sendingStatus,
+            progress: walletProvider.isSendingTransaction
+                ? walletProvider.sendingProgress
+                : _sendingProgress,
+            eta: walletProvider.isSendingTransaction
+                ? walletProvider.sendingETA
+                : '',
+            isVisible: _isSending || walletProvider.isSendingTransaction,
           ),
         ],
       );

@@ -346,6 +346,8 @@ pub fn get_transactions() -> String {
     execute("list".to_string(), "".to_string())
 }
 
+
+
 /// Send transaction
 pub async fn send_transaction(address: String, amount: i64, memo: Option<String>) -> String {
     // Send transaction initiated

@@ -83,6 +83,15 @@ class WalletProvider with ChangeNotifier {
   Timer? _syncStatusTimer;
   bool _autoSyncEnabled = true;
 
+  // Transaction sending progress tracking
+  bool _isSendingTransaction = false;
+  double _sendingProgress = 0.0;
+  String _sendingStatus = '';
+  Timer? _sendProgressTimer;
+  DateTime? _sendStartTime;
+  String _sendingETA = '';
+  int _lastSeenProgress = -1; // Track progress changes
+
   // Comprehensive sync tracking with batch info and ETA
   DateTime? _lastSyncTime;
   String _syncMessage = '';
@@ -389,6 +398,12 @@ class WalletProvider with ChangeNotifier {
   bool get hasWallet => _wallet != null;
   bool get isConnected => _isConnected;
   String get connectionStatus => _connectionStatus;
+
+  // Transaction sending progress getters
+  bool get isSendingTransaction => _isSendingTransaction;
+  double get sendingProgress => _sendingProgress;
+  String get sendingStatus => _sendingStatus;
+  String get sendingETA => _sendingETA;
   DateTime? get lastConnectionCheck => _lastConnectionCheck;
   bool get autoSyncEnabled => _autoSyncEnabled;
 
@@ -2379,19 +2394,45 @@ class WalletProvider with ChangeNotifier {
     required double amount,
     String? memo,
   }) async {
+    if (kDebugMode) {
+      print('🚀 SEND TRANSACTION DEBUG:');
+      print('   To Address: $toAddress');
+      print('   Amount: $amount BTCZ');
+      print('   Memo: ${memo ?? "none"}');
+      print('   Current Balance: ${_balance.total} BTCZ');
+      print('   Spendable Balance: ${_balance.spendable} BTCZ');
+      print('   Unconfirmed Balance: ${_balance.unconfirmed} BTCZ');
+    }
+
     if (!hasWallet) {
+      if (kDebugMode) print('❌ SEND ERROR: No wallet available');
       _setError('No wallet available');
       return null;
     }
 
-    // Mobile-specific validation
+    // Mobile-specific validation with detailed logging
     if (!_balance.hasSufficientBalance(amount)) {
+      if (kDebugMode) {
+        print('❌ SEND ERROR: Insufficient balance');
+        print('   Requested: $amount BTCZ');
+        print('   Available: ${_balance.spendable} BTCZ');
+        print('   Total: ${_balance.total} BTCZ');
+        print('   Difference: ${_balance.spendable - amount} BTCZ');
+      }
       _setError('Insufficient balance');
       return null;
     }
 
+    if (kDebugMode) print('✅ SEND: Balance validation passed');
+
     _setLoading(true);
     _clearError();
+
+    // Start transaction progress monitoring
+    _sendStartTime = DateTime.now(); // Initialize timer
+    _lastSeenProgress = -1; // Reset progress tracking
+    _setSendingProgress(true, progress: 0.0, status: 'Preparing transaction...');
+    _startSendProgressMonitoring();
 
     try {
       String? txid;
@@ -2399,7 +2440,10 @@ class WalletProvider with ChangeNotifier {
       // Always use Rust service for sending transactions
       // The BitcoinZService native library doesn't exist, so we use the working Rust bridge
       if (kDebugMode) {
-        print('📤 Sending via Rust Bridge: $amount BTCZ to $toAddress');
+        print('📤 RUST SEND: Starting transaction via Rust Bridge');
+        print('   Amount: $amount BTCZ (${(amount * 100000000).toInt()} zatoshis)');
+        print('   To Address: $toAddress');
+        print('   Memo: ${memo ?? "none"}');
       }
 
       txid = await _rustService.sendTransaction(
@@ -2409,7 +2453,9 @@ class WalletProvider with ChangeNotifier {
       );
 
       if (kDebugMode) {
-        print('📤 Rust Send result: txid=$txid');
+        print('📤 RUST SEND RESULT:');
+        print('   TXID: $txid');
+        print('   Success: ${txid != null}');
       }
 
       if (txid != null) {
@@ -2442,6 +2488,12 @@ class WalletProvider with ChangeNotifier {
       return null;
     } finally {
       _setLoading(false);
+      _cancelSendProgressMonitoring();
+
+      // Clear sending progress after a delay to show completion
+      Timer(const Duration(seconds: 2), () {
+        _setSendingProgress(false, progress: 0.0, status: '');
+      });
     }
   }
 
@@ -3245,6 +3297,129 @@ class WalletProvider with ChangeNotifier {
   void _setSyncing(bool syncing) {
     _isSyncing = syncing;
     notifyListeners();
+  }
+
+  /// Set transaction sending progress
+  void _setSendingProgress(bool sending, {double progress = 0.0, String status = ''}) {
+    _isSendingTransaction = sending;
+    _sendingProgress = progress;
+    _sendingStatus = status;
+
+    // Calculate ETA if we're in progress
+    if (sending && progress > 0) {
+      _sendStartTime ??= DateTime.now();
+      final elapsed = DateTime.now().difference(_sendStartTime!);
+      final remainingProgress = 1.0 - progress;
+
+      if (remainingProgress > 0 && progress > 0.01) { // Avoid division by zero and very small progress
+        final estimatedTotalTime = elapsed.inMilliseconds / progress;
+        final remainingTime = Duration(milliseconds: (estimatedTotalTime * remainingProgress).round());
+
+        if (remainingTime.inSeconds > 0) {
+          if (remainingTime.inMinutes > 0) {
+            _sendingETA = '${remainingTime.inMinutes}m ${remainingTime.inSeconds % 60}s remaining';
+          } else {
+            _sendingETA = '${remainingTime.inSeconds}s remaining';
+          }
+        } else {
+          _sendingETA = 'Almost done...';
+        }
+      } else {
+        _sendingETA = 'Calculating...';
+      }
+    } else {
+      _sendingETA = '';
+      if (!sending) {
+        _sendStartTime = null; // Reset for next transaction
+      }
+    }
+
+    if (kDebugMode) {
+      print('📤 SEND PROGRESS: $sending, ${(progress * 100).toInt()}%, $status${_sendingETA.isNotEmpty ? " ($_sendingETA)" : ""}');
+    }
+
+    notifyListeners();
+  }
+
+  /// Start monitoring transaction sending progress
+  void _startSendProgressMonitoring() {
+    _cancelSendProgressMonitoring();
+
+    if (kDebugMode) print('📤 Starting send progress monitoring...');
+
+    _sendProgressTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      try {
+        // Add small delay to allow Rust async task to update progress
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        // Get send progress from Rust service
+        final progressData = await _rustService.getSendProgress();
+
+        if (kDebugMode) {
+          print('📤 SEND PROGRESS RAW DATA: $progressData');
+        }
+
+        if (progressData != null) {
+          // Debug: Print all keys in the response
+          if (kDebugMode) {
+            print('📤 SEND PROGRESS KEYS: ${progressData.keys.toList()}');
+          }
+
+          final isInProgress = progressData['sending'] == true;
+          final progress = progressData['progress'] ?? 0;
+          final total = progressData['total'] ?? 100;
+          final error = progressData['error'];
+          final txid = progressData['txid'];
+
+          if (kDebugMode) {
+            print('📤 SEND PROGRESS PARSED:');
+            print('   isInProgress: $isInProgress');
+            print('   progress: $progress');
+            print('   total: $total');
+            print('   error: $error');
+            print('   txid: $txid');
+            print('   PROGRESS CHANGED: ${progress != _lastSeenProgress}');
+          }
+
+          // Track if progress actually changed
+          final progressChanged = progress != _lastSeenProgress;
+          _lastSeenProgress = progress;
+
+          if (isInProgress && total > 0) {
+            final progressPercent = (progress / total).clamp(0.0, 1.0);
+            _setSendingProgress(true,
+              progress: progressPercent,
+              status: 'Processing note $progress of $total...'
+            );
+          } else if (txid != null && txid.toString().isNotEmpty) {
+            // Transaction completed successfully
+            _setSendingProgress(false, progress: 1.0, status: 'Transaction sent!');
+            if (kDebugMode) print('📤 SEND COMPLETE: Transaction sent with TXID: $txid');
+            timer.cancel();
+          } else if (error != null && error.toString().isNotEmpty) {
+            // Transaction failed
+            _setSendingProgress(false, progress: 0.0, status: 'Transaction failed: $error');
+            if (kDebugMode) print('📤 SEND FAILED: $error');
+            timer.cancel();
+          } else if (!isInProgress && progress >= total && total > 0) {
+            // Transaction completed (progress >= total and not sending)
+            _setSendingProgress(false, progress: 1.0, status: 'Transaction completed!');
+            if (kDebugMode) print('📤 SEND COMPLETE: Progress complete ($progress/$total)');
+            timer.cancel();
+          }
+        } else {
+          if (kDebugMode) print('📤 SEND PROGRESS: No data returned from Rust');
+        }
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Send progress monitoring error: $e');
+      }
+    });
+  }
+
+  /// Cancel send progress monitoring
+  void _cancelSendProgressMonitoring() {
+    _sendProgressTimer?.cancel();
+    _sendProgressTimer = null;
   }
 
   void _setError(String error) {
@@ -4865,7 +5040,10 @@ class WalletProvider with ChangeNotifier {
     
     // Cancel sync status timer
     _syncStatusTimer?.cancel();
-    
+
+    // Cancel send progress monitoring
+    _cancelSendProgressMonitoring();
+
     // Clear tracking data
     _failedNotifications.clear();
     _pendingNotificationOperations.clear();

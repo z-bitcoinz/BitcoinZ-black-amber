@@ -1635,6 +1635,8 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
             while let Some(r) = rx2.recv().await {
                 println!("Progress: {}", r);
                 progress.write().await.progress = r;
+                // Small delay to ensure progress is persisted before next poll
+                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
             }
 
             progress.write().await.is_send_in_progress = false;

@@ -1104,6 +1104,32 @@ class BitcoinzRustService {
     }
   }
   
+  /// Get send progress from Rust
+  Future<Map<String, dynamic>?> getSendProgress() async {
+    if (!_initialized) return null;
+
+    try {
+      final result = await rust_api.execute(command: 'sendprogress', args: '');
+
+      if (kDebugMode) {
+        print('📤 RUST SENDPROGRESS RAW RESULT: $result');
+        print('   Type: ${result.runtimeType}');
+        print('   Length: ${result.length}');
+      }
+
+      final parsed = jsonDecode(result);
+
+      if (kDebugMode) {
+        print('📤 RUST SENDPROGRESS PARSED: $parsed');
+      }
+
+      return parsed;
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to get send progress: $e');
+      return null;
+    }
+  }
+
   /// Send transaction
   Future<String?> sendTransaction(String address, double amount, String? memo) async {
     if (!_initialized) return null;

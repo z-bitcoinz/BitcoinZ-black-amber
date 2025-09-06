@@ -266,8 +266,13 @@ class _SyncStatusCardState extends State<SyncStatusCard>
           // Not syncing - cancel any pending delay and reset state
           _cancelSyncUIDelay();
           if (_allowSyncUIDisplay) {
-            setState(() {
-              _allowSyncUIDisplay = false;
+            // Use post-frame callback to avoid setState during build
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _allowSyncUIDisplay = false;
+                });
+              }
             });
           }
         }

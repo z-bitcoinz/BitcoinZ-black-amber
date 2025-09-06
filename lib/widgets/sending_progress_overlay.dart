@@ -5,12 +5,14 @@ class SendingProgressOverlay extends StatefulWidget {
   final String status;
   final double progress;
   final bool isVisible;
-  
+  final String eta;
+
   const SendingProgressOverlay({
     super.key,
     required this.status,
     required this.progress,
     required this.isVisible,
+    this.eta = '',
   });
 
   @override
@@ -114,6 +116,11 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
 
   @override
   Widget build(BuildContext context) {
+    // Debug: Print what values the overlay is receiving
+    if (widget.isVisible) {
+      print('🎨 PROGRESS OVERLAY: status="${widget.status}", progress=${widget.progress}, eta="${widget.eta}", visible=${widget.isVisible}');
+    }
+
     if (!widget.isVisible && _fadeController.isDismissed) {
       return const SizedBox.shrink();
     }
@@ -254,17 +261,63 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
                             ),
                           ),
                           
-                          const SizedBox(height: 8),
-                          
+                          const SizedBox(height: 16),
+
+                          // Progress bar (only show if progress > 0)
+                          if (widget.progress > 0) ...[
+                            Container(
+                              width: 200,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(2),
+                                color: Colors.white.withOpacity(0.2),
+                              ),
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: widget.progress.clamp(0.0, 1.0),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(2),
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // Progress percentage
+                            Text(
+                              '${(widget.progress * 100).toInt()}%',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+
+                          // ETA display (if available)
+                          if (widget.eta.isNotEmpty) ...[
+                            Text(
+                              widget.eta,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+
                           // Subtext
                           Text(
-                            'Please wait...',
+                            widget.progress > 0 ? 'Processing...' : 'Please wait...',
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.5),
                               fontSize: 12,
                             ),
                           ),
-                          
+
                           // Add animated dots for loading effect
                           const SizedBox(height: 16),
                           _LoadingDots(),

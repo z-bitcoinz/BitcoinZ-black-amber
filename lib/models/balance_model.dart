@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:json_annotation/json_annotation.dart';
 import '../utils/constants.dart';
 
@@ -151,7 +152,23 @@ class BalanceModel {
   String get formattedEffectiveSpendable => _formatBalance(effectiveSpendable);
 
   /// Check if sufficient balance for amount
-  bool hasSufficientBalance(double amount) => spendable >= amount;
+  bool hasSufficientBalance(double amount) {
+    final sufficient = spendable >= amount;
+    if (kDebugMode) {
+      print('💰 BALANCE CHECK:');
+      print('   Requested Amount: $amount BTCZ');
+      print('   Spendable Balance: $spendable BTCZ');
+      print('   Total Balance: $total BTCZ');
+      print('   Transparent: $transparent BTCZ');
+      print('   Shielded: $shielded BTCZ');
+      print('   Unconfirmed: $unconfirmed BTCZ');
+      print('   Sufficient: $sufficient');
+      if (!sufficient) {
+        print('   Shortfall: ${amount - spendable} BTCZ');
+      }
+    }
+    return sufficient;
+  }
 
   /// Check if sufficient transparent balance for amount
   bool hasSufficientTransparentBalance(double amount) => transparent >= amount;

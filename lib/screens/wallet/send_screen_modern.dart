@@ -40,8 +40,6 @@ class _SendScreenModernState extends State<SendScreenModern> {
   String? _selectedContactName;
   String? _selectedContactPhoto;
 
-  bool _isSending = false;
-  String _sendingStatus = '';
   String? _errorMessage;
   bool _isShieldedTransaction = false;
   final double _estimatedFee = 0.00001; // Standard BitcoinZ fee (much lower)
@@ -454,7 +452,8 @@ class _SendScreenModernState extends State<SendScreenModern> {
   }
 
   Future<void> _sendTransaction() async {
-    if (!_formKey.currentState!.validate() || _isSending) return;
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    if (!_formKey.currentState!.validate() || walletProvider.isSendingTransaction) return;
 
     final amount = _getAmountValue()!;
     final address = _addressController.text.trim();
@@ -496,24 +495,13 @@ class _SendScreenModernState extends State<SendScreenModern> {
     final needsAutoShielding = hasTransparentFunds && _isShieldedTransaction;
 
     setState(() {
-      _isSending = true;
-      _sendingStatus = needsAutoShielding
-          ? 'Preparing transaction...\nAuto-shielding transparent funds'
-          : hasTransparentFunds
-              ? 'Broadcasting transaction...\nUsing transparent funds'
-              : 'Broadcasting transaction...';
       _errorMessage = null;
     });
 
     try {
       final memo = _isShieldedTransaction ? _memoController.text : null;
 
-      // Update status during the actual send
-      if (needsAutoShielding) {
-        setState(() {
-          _sendingStatus = 'Auto-shielding in progress...\nConverting transparent to shielded funds';
-        });
-      }
+      // The wallet provider will handle progress updates automatically
 
       final txid = await walletProvider.sendTransaction(
         toAddress: address,
@@ -522,12 +510,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
       );
 
       if (txid != null && mounted) {
-        // Update status to show success
-        setState(() {
-          _sendingStatus = 'Transaction sent successfully!';
-        });
-
-        // Brief delay to show success message
+        // Brief delay to show success message (wallet provider handles status)
         await Future.delayed(const Duration(milliseconds: 800));
 
         // Show success dialog
@@ -559,21 +542,12 @@ class _SendScreenModernState extends State<SendScreenModern> {
       } else {
         setState(() {
           _errorMessage = 'Transaction failed. Please try again.';
-          _sendingStatus = '';
         });
       }
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
-        _sendingStatus = '';
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSending = false;
-          _sendingStatus = '';
-        });
-      }
     }
   }
 
@@ -1452,7 +1426,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                   height: 54,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: _canSend(walletProvider) && !_isSending
+                      colors: _canSend(walletProvider) && !walletProvider.isSendingTransaction
                           ? [const Color(0xFFFF6B00), const Color(0xFFFFAA00)]
                           : [const Color(0xFF1A1A1A), const Color(0xFF0F0F0F)],
                       begin: Alignment.topLeft,
@@ -1460,12 +1434,12 @@ class _SendScreenModernState extends State<SendScreenModern> {
                     ),
                     borderRadius: BorderRadius.circular(8), // Sharp corners
                     border: Border.all(
-                      color: _canSend(walletProvider) && !_isSending
+                      color: _canSend(walletProvider) && !walletProvider.isSendingTransaction
                           ? const Color(0xFFFF6B00).withOpacity(0.6)
                           : Colors.white.withOpacity(0.2),
                       width: 1.5,
                     ),
-                    boxShadow: _canSend(walletProvider) && !_isSending
+                    boxShadow: _canSend(walletProvider) && !walletProvider.isSendingTransaction
                         ? [
                             BoxShadow(
                               color: const Color(0xFFFF6B00).withOpacity(0.3),
@@ -1487,7 +1461,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                           ],
                   ),
                   child: ElevatedButton(
-                    onPressed: _canSend(walletProvider) && !_isSending
+                    onPressed: _canSend(walletProvider) && !walletProvider.isSendingTransaction
                         ? _sendTransaction
                         : null,
                     style: ElevatedButton.styleFrom(
@@ -1497,7 +1471,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                         borderRadius: BorderRadius.circular(8), // Sharp corners
                       ),
                     ),
-                    child: _isSending
+                    child: walletProvider.isSendingTransaction
                         ? const SizedBox(
                             width: 24,
                             height: 24,
@@ -1527,9 +1501,10 @@ class _SendScreenModernState extends State<SendScreenModern> {
     ),
     // Sending Progress Overlay
     SendingProgressOverlay(
-      status: _isSending ? _sendingStatus : '',
-      progress: _isSending ? 0.5 : 0,
-      isVisible: _isSending,
+      status: walletProvider.isSendingTransaction ? walletProvider.sendingStatus : '',
+      progress: walletProvider.isSendingTransaction ? walletProvider.sendingProgress : 0,
+      eta: walletProvider.isSendingTransaction ? walletProvider.sendingETA : '',
+      isVisible: walletProvider.isSendingTransaction,
     ),
   ],
 );
