@@ -52,6 +52,14 @@ class WalletProvider with ChangeNotifier {
 
   // Simple timestamp-based new transaction detection (bulletproof approach)
   DateTime? _lastNotificationCheck;
+  
+  // Transaction processing deduplication
+  DateTime? _lastTransactionProcessing;
+  String? _lastTransactionHash;
+  static const Duration _transactionProcessingCacheTimeout = Duration(seconds: 15);
+  
+  // Balance log cache
+  DateTime? _lastBalanceLog;
 
   // Transaction notification tracking to prevent duplicates (with persistence)
   final Set<String> _notifiedTransactionIds = <String>{};
@@ -202,7 +210,21 @@ class WalletProvider with ChangeNotifier {
       
       final unconfirmedCount = transactions.where((tx) => tx.confirmations == 0).length;
       final memoCount = transactions.where((tx) => tx.hasMemo).length;
-      Logger.transaction('Processing ${transactions.length} transactions ($unconfirmedCount unconfirmed, $memoCount with memos)');
+      
+      // Create hash for transaction set deduplication
+      final txIds = transactions.map((tx) => tx.txid).toList()..sort();
+      final transactionHash = '${transactions.length}_${txIds.take(5).join('_')}_${unconfirmedCount}_${memoCount}';
+      
+      final now = DateTime.now();
+      final shouldLog = _lastTransactionProcessing == null ||
+                       now.difference(_lastTransactionProcessing!).compareTo(_transactionProcessingCacheTimeout) > 0 ||
+                       _lastTransactionHash != transactionHash;
+      
+      if (shouldLog) {
+        Logger.transaction('Processing ${transactions.length} transactions ($unconfirmedCount unconfirmed, $memoCount with memos)');
+        _lastTransactionProcessing = now;
+        _lastTransactionHash = transactionHash;
+      }
 
       // NOTE: Transaction updates can come from cached data, so we don't override connection status here
 
@@ -2588,12 +2610,20 @@ class WalletProvider with ChangeNotifier {
         // Skip the full refresh which includes sync - just fetch the data directly
         // The sync is hanging on Android, so we'll fetch data without syncing
 
-        if (kDebugMode) print('   Fetching balance...');
-        // Debug logging reduced for performance
+        // Only log if it's been more than 30 seconds since last log
+        final now = DateTime.now();
+        final shouldLog = _lastBalanceLog == null || 
+                         now.difference(_lastBalanceLog!).inSeconds > 30;
+        
+        if (kDebugMode && shouldLog) {
+          print('   Fetching balance...');
+          _lastBalanceLog = now;
+        }
         await _rustService.fetchBalance();
 
-        if (kDebugMode) print('   Fetching transactions...');
-        // Debug logging reduced for performance
+        if (kDebugMode && shouldLog) {
+          print('   Fetching transactions...');
+        }
         await _rustService.fetchTransactions();
         
         // 🔄 BADGE FIX: Force badge recalculation after transactions are loaded
@@ -4335,21 +4365,8 @@ class WalletProvider with ChangeNotifier {
     try {
       final previousCount = _unreadMemoCount;
 
-      if (kDebugMode) {
-        print('   Previous count: $previousCount');
-        try {
-          print('   Total transactions: ${_transactions.length}');
-        } catch (e) {
-          print('   ERROR accessing _transactions: $e');
-        }
-        try {
-          print('   Cache size: ${_memoReadStatusCache.length}');
-        } catch (e) {
-          print('   ERROR accessing _memoReadStatusCache: $e');
-        }
-        print('   SharedPreferences initialized: $_prefsInitialized');
-        print('   _prefs is null: ${_prefs == null}');
-      }
+      // Repetitive status logging removed to reduce log spam
+      // Enable only for specific debugging if needed
 
       // Add debug check for transaction processing
       if (kDebugMode) {
@@ -4391,9 +4408,8 @@ class WalletProvider with ChangeNotifier {
       if (kDebugMode) {
         memosWithStatus.add({
           'txid': tx.txid.substring(0, 8) + '...',
-          'memo': tx.memo != null 
-            ? (tx.memo!.length > 20 ? tx.memo!.substring(0, 20) : tx.memo!) 
-            : 'null',
+          'memo_length': tx.memo?.length ?? 0,
+          'has_memo': tx.memo != null && tx.memo!.isNotEmpty,
           'memoRead': tx.memoRead,
           'isReadFromCache': isRead,
           'inCache': _memoReadStatusCache.containsKey(tx.txid),

@@ -63,6 +63,16 @@ class BitcoinzRustService {
   double? lastBalance;
   int? lastTxCount;
   
+  // Balance fetch caching for log reduction
+  DateTime? _lastBalanceFetch;
+  String? _lastBalanceHash;
+  static const Duration _balanceCacheTimeout = Duration(seconds: 10);
+  
+  // Transaction fetch caching for log reduction
+  DateTime? _lastTransactionFetch;
+  String? _lastTransactionHash;
+  static const Duration _transactionCacheTimeout = Duration(seconds: 15);
+  
   // Pending transaction tracking (like BitcoinZ Blue)
   final Map<String, PendingTransaction> _pendingTransactions = {};
   static const Duration _pendingTimeout = Duration(seconds: 60); // 1 minute timeout
@@ -229,8 +239,8 @@ class BitcoinzRustService {
           }
           
           // Use the full function with wallet directory with timeout
-          print('🔧 RUST_SERVICE DEBUG: About to call rust_api.initializeFromPhrase');
-          print('🔧 RUST_SERVICE DEBUG: Parameters:');
+          // Initializing from phrase
+          // Parameters set for initialization
           print('   serverUri: $serverUri');
           print('   seedPhrase length: ${seedPhrase.length}');
           print('   birthday: ${BigInt.from(birthdayToUse)}');
@@ -247,12 +257,12 @@ class BitcoinzRustService {
             const Duration(seconds: 30),
             onTimeout: () {
               if (kDebugMode) print('⏱️ Wallet restore timed out after 30 seconds');
-              print('🔧 RUST_SERVICE DEBUG: RUST FFI CALL TIMED OUT!');
+              // FFI call timed out
               return 'Error: Wallet restore timed out';
             },
           );
           
-          print('🔧 RUST_SERVICE DEBUG: rust_api.initializeFromPhrase returned: $result');
+          // Initialization result received
         } catch (e) {
           if (kDebugMode) print('⚠️ Restore with custom directory failed: $e');
           return false;
@@ -282,7 +292,7 @@ class BitcoinzRustService {
               onTimeout: () => 'Error: Wallet restore timed out',
             );
             
-            if (kDebugMode) print('🔧 RUST_SERVICE DEBUG: Retry result: $result');
+            // Retry attempt completed
           } catch (e) {
             if (kDebugMode) print('❌ Retry restoration failed: $e');
             return false;
@@ -611,9 +621,6 @@ class BitcoinzRustService {
       // Debug logging reduced for performance
       final data = jsonDecode(balanceJson);
       
-      // Debug logging reduced for performance
-      Logger.rust('Balance fetch completed');
-      
       // Get current block height for confirmation calculations
       final currentBlockHeight = await getCurrentBlockHeight();
       if (kDebugMode) print('📊 Current block height for spendable calculation: $currentBlockHeight');
@@ -631,13 +638,14 @@ class BitcoinzRustService {
       
       final txList = txListDecoded as List;
       
-      // Debug: Log first transaction to see structure
-      if (kDebugMode && txList.isNotEmpty) {
-        print('🔍 First transaction data:');
-        print('   Full tx: ${txList.first}');
-        print('   unconfirmed field: ${txList.first['unconfirmed']}');
-        print('   block_height field: ${txList.first['block_height']}');
-      }
+      // Debug: Log first transaction only when needed for specific debugging
+      // Commented out to reduce log spam in production
+      // if (kDebugMode && txList.isNotEmpty) {
+      //   print('🔍 First transaction data:');
+      //   print('   Full tx: ${txList.first}');
+      //   print('   unconfirmed field: ${txList.first['unconfirmed']}');
+      //   print('   block_height field: ${txList.first['block_height']}');
+      // }
       
       // TRUST the Rust backend's spendable amounts - they know the complex wallet state
       double rustSpendableTransparent = (data['spendable_tbalance'] ?? 0) / 100000000.0;
@@ -698,13 +706,8 @@ class BitcoinzRustService {
         }
       }
       
-      if (kDebugMode) {
-        print('💰 BALANCE BREAKDOWN AFTER SEPARATION:');
-        print('   📨 Pure Incoming (from others): ${pureIncomingBalance.toStringAsFixed(8)} BTCZ (${pureIncomingTransparent.toStringAsFixed(4)} T + ${pureIncomingShielded.toStringAsFixed(4)} Z)');
-        print('   🔄 Change Returning (our change): ${changeBalance.toStringAsFixed(8)} BTCZ (${changeTransparent.toStringAsFixed(4)} T + ${changeShielded.toStringAsFixed(4)} Z)');
-        print('   📊 Total Unconfirmed: ${(pureIncomingBalance + changeBalance).toStringAsFixed(8)} BTCZ');
-        print('   🎯 This separation fixes the "Incoming" display issue!');
-      }
+      // Verbose balance breakdown logging removed to reduce log spam
+      // Enable only for specific balance debugging if needed
       
       // Use native Rust spendable amounts directly - no manual tracking needed
       // The Rust backend handles all the complexity of change detection properly
@@ -775,6 +778,19 @@ class BitcoinzRustService {
         pendingChange: 0,
       );
       
+      // Create hash for change detection after balance is created
+      final balanceHash = '${balance.total}_${balance.transparent}_${balance.shielded}';
+      final balanceChanged = _lastBalanceHash != balanceHash;
+      
+      // Update cache
+      _lastBalanceFetch = DateTime.now();
+      _lastBalanceHash = balanceHash;
+      
+      // Only log if balance changed or first fetch
+      if (balanceChanged || _lastBalanceFetch == null) {
+        Logger.rust('Balance fetch completed');
+      }
+      
       // Validation: Ensure spendable never exceeds total
       final calculatedSpendable = actualSpendableTransparent + actualSpendableShielded;
       
@@ -792,7 +808,11 @@ class BitcoinzRustService {
       // Debug logging reduced for performance
       
       fnSetTotalBalance?.call(balance);
-      if (kDebugMode) print('✅ Balance fetched successfully');
+      
+      // Only log success if balance actually changed
+      if (balanceChanged || _lastBalanceFetch == null) {
+        if (kDebugMode) print('✅ Balance fetched successfully');
+      }
     } catch (e) {
       if (kDebugMode) print('❌ Fetch balance failed: $e');
     }
@@ -876,8 +896,18 @@ class BitcoinzRustService {
       
       final txList = txListDecoded as List;
       
-      // Debug logging reduced for performance
-      Logger.transaction('Fetched ${txList.length} transactions from Rust');
+      // Create hash for transaction deduplication
+      final txHash = '${txList.length}_${txList.take(3).map((tx) => tx['txid']).join('_')}';
+      final txChanged = _lastTransactionHash != txHash;
+      
+      // Update cache
+      _lastTransactionFetch = DateTime.now();
+      _lastTransactionHash = txHash;
+      
+      // Only log if transactions changed or first fetch
+      if (txChanged || _lastTransactionFetch == null) {
+        Logger.transaction('Fetched ${txList.length} transactions from Rust');
+      }
       
       // Get current block height for confirmation calculation
       final currentHeight = await getCurrentBlockHeight();
@@ -926,25 +956,15 @@ class BitcoinzRustService {
         } else if (blockHeight != null && blockHeight > 0 && currentHeight != null) {
           confirmations = currentHeight - blockHeight + 1;
           if (confirmations < 0) confirmations = 1; // Safety check
-          if (kDebugMode && index < 3) { // Log first 3 transactions
-            print('📊 TX ${(tx['txid'] as String).substring(0, 8)}...: blockHeight=$blockHeight, currentHeight=$currentHeight, confirmations=$confirmations');
-          }
+          // Verbose TX confirmation logging removed to reduce log spam
         } else {
           // Default to 1 if we can't calculate
           confirmations = 1;
-          if (kDebugMode && index < 3) { // Log first 3 transactions
-            print('⚠️ TX ${(tx['txid'] as String).substring(0, 8)}...: Cannot calculate confirmations (blockHeight=$blockHeight, currentHeight=$currentHeight)');
-          }
+          // TX confirmation calculation logging removed to reduce log spam
         }
         
-        // Log unconfirmed transactions
-        if (txUnconfirmed) {
-          if (kDebugMode) {
-            print('🔄 UNCONFIRMED TX via Rust: ${tx['txid']} - $type $amount BTCZ');
-            print('   unconfirmed flag: ${tx['unconfirmed']}');
-            print('   block_height: ${tx['block_height']}');
-          }
-        }
+        // Log unconfirmed transactions only when needed for debugging
+        // Verbose logging removed to reduce log spam
         
         final txid = tx['txid'] ?? '';
         final hasMemo = tx['memo'] != null && tx['memo'].toString().isNotEmpty;
@@ -1020,7 +1040,7 @@ class BitcoinzRustService {
         }
       }
       
-      if (kDebugMode) print('📋 Calling fnSetTransactionsList with ${transactions.length} transactions');
+      // Transaction count logging removed to reduce log spam
       fnSetTransactionsList?.call(transactions);
       
       if (fnSetTransactionsList == null && kDebugMode) {

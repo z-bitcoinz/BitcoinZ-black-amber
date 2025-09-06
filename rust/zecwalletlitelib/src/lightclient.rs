@@ -451,7 +451,7 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightClient<P> {
     }
 
     pub async fn do_balance(&self) -> JsonValue {
-        println!("🚨 DO_BALANCE: Starting balance calculation...");
+        // Debug logging removed to reduce log spam
         
         // Collect UA addresses
         let mut ua_addresses = vec![];
@@ -486,13 +486,8 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightClient<P> {
             });
         }
 
-        println!("🚨 DO_BALANCE: About to call tbalance(None)...");
         let tbalance_result = self.wallet.tbalance(None).await;
-        println!("🚨 DO_BALANCE: tbalance result: {}", tbalance_result);
-        
-        println!("🚨 DO_BALANCE: About to call spendable_tbalance(None)...");
         let spendable_tbalance_result = self.wallet.spendable_tbalance(None).await;
-        println!("🚨 DO_BALANCE: spendable_tbalance result: {}", spendable_tbalance_result);
 
         object! {
             "uabalance" => self.wallet.uabalance(None).await,

@@ -179,7 +179,7 @@ pub fn initialize_existing_with_birthday(server_uri: String, wallet_dir: Option<
 
     // Check if wallet file exists
     let wallet_path = config.get_wallet_path();
-    println!("🔍 Looking for wallet at: {:?}", wallet_path);
+    // Wallet path lookup completed
     
     if !wallet_path.exists() {
         println!("❌ Wallet file does not exist at: {:?}", wallet_path);
@@ -290,7 +290,10 @@ pub fn initialize_from_phrase(
 
 /// Execute a command (main wallet interface)
 pub fn execute(command: String, args: String) -> String {
-    println!("🚨 API.RS EXECUTE: command='{}', args='{}'", command, args);
+    // Debug logging only in debug builds to reduce log spam
+    #[cfg(debug_assertions)]
+    println!("🔧 API.RS EXECUTE: command='{}'", command);
+    
     let lightclient = LIGHTCLIENT.lock().unwrap().borrow().clone();
     
     let lightclient = match lightclient {
@@ -298,26 +301,17 @@ pub fn execute(command: String, args: String) -> String {
         None => return r#"{"error": "Wallet not initialized"}"#.to_string(),
     };
 
-    // Log unconfirmed transaction checks (disabled to reduce log spam)
-    // Only enable for debugging specific issues
-    // if command == "list" {
-    //     println!("🔍 Fetching transaction list (checking for unconfirmed)...");
-    // }
-
     let args_vec: Vec<&str> = if args.is_empty() {
         vec![]
     } else if command == "send" && args.starts_with('[') {
         // For send command with JSON format, pass as single argument
-        println!("🚨 API.RS: Detected JSON send command, passing as single argument");
         vec![&args]
     } else {
         // For other commands, use normal whitespace splitting
         args.split_whitespace().collect()
     };
     
-    println!("🚨 API.RS: About to call do_user_command with command='{}' and {} args", command, args_vec.len());
     let result = commands::do_user_command(&command, &args_vec, lightclient.as_ref());
-    println!("🚨 API.RS: do_user_command completed");
     result
 }
 
@@ -354,7 +348,7 @@ pub fn get_transactions() -> String {
 
 /// Send transaction
 pub async fn send_transaction(address: String, amount: i64, memo: Option<String>) -> String {
-    println!("🚨 RUST send_transaction called: address={}, amount={}, memo={:?}", address, amount, memo);
+    // Send transaction initiated
     
     // Get lightclient instance
     let lightclient = LIGHTCLIENT.lock().unwrap().borrow().clone();
@@ -375,16 +369,16 @@ pub async fn send_transaction(address: String, amount: i64, memo: Option<String>
     // Prepare the address, amount, memo tuple for do_send
     let addrs = vec![(&*address, amount_u64, memo)];
     
-    println!("🚨 RUST calling lightclient.do_send directly: address={}, amount={}, memo={:?}", address, amount_u64, addrs[0].2);
+    // Calling lightclient.do_send
     
     // Call lightclient.do_send() directly (already in async context)
     match lightclient.do_send(addrs).await {
         Ok(txid) => {
-            println!("🚨 RUST do_send success: txid={}", txid);
+            // Transaction sent successfully
             format!(r#"{{"txid": "{}"}}"#, txid)
         }
         Err(e) => {
-            println!("🚨 RUST do_send error: {}", e);
+            // Transaction send failed
             // Escape quotes in error message to prevent JSON issues
             let escaped_error = e.replace("\"", "\\\"");
             format!(r#"{{"error": "{}"}}"#, escaped_error)

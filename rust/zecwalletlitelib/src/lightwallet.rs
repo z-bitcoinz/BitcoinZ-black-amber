@@ -881,7 +881,7 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
 
     pub async fn tbalance(&self, addr: Option<String>) -> u64 {
         let utxos = self.get_utxos().await;
-        println!("💰 TBALANCE DEBUG: Total UTXOs = {}", utxos.len());
+        // Filtering UTXOs for balance calculation
         
         let filtered_utxos: Vec<_> = utxos
             .iter()
@@ -892,20 +892,20 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
             .collect();
             
         for utxo in &filtered_utxos {
-            println!("💰 TBALANCE UTXO: height={}, value={}, txid={:?}", utxo.height, utxo.value, utxo.txid);
+            // Processing UTXO
         }
         
         let total = filtered_utxos.iter().map(|utxo| utxo.value).sum::<u64>();
-        println!("💰 TBALANCE RESULT: {} zatoshis", total);
+        // Balance calculation completed
         total
     }
 
     pub async fn spendable_tbalance(&self, addr: Option<String>) -> u64 {
         let anchor_height = self.get_anchor_height().await;
-        println!("🎯 SPENDABLE_TBALANCE DEBUG: anchor_height = {}", anchor_height);
+        // Calculating spendable balance
         
         let utxos = self.get_utxos().await;
-        println!("🎯 SPENDABLE_TBALANCE: Total UTXOs = {}", utxos.len());
+        // Processing UTXOs for spendable balance
         
         let filtered_utxos: Vec<_> = utxos
             .iter()
@@ -914,27 +914,26 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
                 None => true,
             })
             .collect();
-        println!("🎯 After address filter: {} UTXOs", filtered_utxos.len());
+        // UTXOs filtered by address
         
         let not_spent: Vec<_> = filtered_utxos
             .iter()
             .filter(|utxo| utxo.spent.is_none() && utxo.unconfirmed_spent.is_none())
             .collect();
-        println!("🎯 After spent filter: {} UTXOs", not_spent.len());
+        // UTXOs filtered for spent status
         
         let height_filtered: Vec<_> = not_spent
             .iter()
             .filter(|utxo| {
                 let passes_height = utxo.height > 0 && utxo.height <= anchor_height as i32;
-                println!("🎯 UTXO height={}, anchor={}, passes_height={}, value={}, txid={:?}", 
-                    utxo.height, anchor_height, passes_height, utxo.value, utxo.txid);
+                // UTXO height validation
                 passes_height
             })
             .collect();
-        println!("🎯 After height filter: {} UTXOs", height_filtered.len());
+        // UTXOs filtered by height
         
         let total = height_filtered.iter().map(|utxo| utxo.value).sum::<u64>();
-        println!("🎯 SPENDABLE_TBALANCE RESULT: {} zatoshis", total);
+        // Spendable balance calculated
         total
     }
 
@@ -1421,9 +1420,9 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
             tos.len()
         );
         info!("Starting send_to_address_internal with {} recipients", tos.len());
-        println!("[DEBUG] send_to_address_internal called with {} recipients", tos.len());
+        // Send operation initiated
         for (i, to) in tos.iter().enumerate() {
-            println!("[DEBUG] Recipient {}: addr={}, amount={}, memo={:?}", i, to.0, to.1, to.2);
+            // Processing recipient
         }
 
         // Convert address (str) to RecepientAddress and value to Amount
@@ -1461,12 +1460,12 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
         
         let target_amount = (Amount::from_u64(total_value).unwrap() + DEFAULT_FEE).unwrap();
         info!("Target amount: {} zatoshis (including fee)", u64::from(target_amount));
-        println!("[DEBUG] Target amount with fee: {} zatoshis", u64::from(target_amount));
+        // Target amount calculated
         let target_height = match self.get_target_height().await {
             Some(h) => BlockHeight::from_u32(h),
             None => return Err("No blocks in wallet to target, please sync first".to_string()),
         };
-        println!("[DEBUG] Target height: {:?}", target_height);
+        // Target height determined
 
         let (progress_notifier, progress_notifier_rx) = mpsc::channel();
 
@@ -1651,16 +1650,16 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
 
         println!("{}: Building transaction", now() - start_time);
         info!("Building transaction with {} sapling notes, {} orchard notes, {} transparent inputs", s_notes.len(), o_notes.len(), utxos.len());
-        println!("[DEBUG] About to call builder.build() with prover");
+        // Building transaction
         let (tx, _) = match builder.build(&prover) {
             Ok(res) => {
-                println!("[DEBUG] builder.build() succeeded");
+                // Transaction build successful
                 res
             },
             Err(e) => {
                 let e = format!("Error creating transaction: {:?}", e);
                 error!("{}", e);
-                println!("[DEBUG] builder.build() failed with error: {}", e);
+                // Transaction build failed
                 self.send_progress.write().await.is_send_in_progress = false;
                 return Err(e);
             }

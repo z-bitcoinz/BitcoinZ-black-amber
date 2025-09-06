@@ -28,6 +28,11 @@ class AuthProvider with ChangeNotifier {
   final LocalAuthentication _localAuth = LocalAuthentication();
   // final CliWalletDetector _cliDetector = CliWalletDetector(); // Removed - CLI no longer used
 
+  // Caching for log reduction
+  DateTime? _lastDataLoad;
+  String? _lastLoadedDataHash;
+  static const Duration _cacheTimeout = Duration(seconds: 30);
+
   // Getters
   bool get isAuthenticated => _isAuthenticated;
   bool get hasWallet => _hasWallet;
@@ -322,7 +327,7 @@ class AuthProvider with ChangeNotifier {
   /// Force clear wallet data for debugging
   Future<void> forceResetForDebugging() async {
     if (kDebugMode) {
-      print('🛠️ FORCE RESET: Clearing all wallet data for debugging...');
+      // Force reset initiated for debugging
       await resetWallet();
       print('✅ All wallet data cleared. App will restart with fresh wallet creation.');
     }
@@ -386,22 +391,14 @@ class AuthProvider with ChangeNotifier {
       }
       
       final isAvailable = await _localAuth.canCheckBiometrics;
-      if (kDebugMode) {
-        print('🔒 Biometrics: Device capability check: $isAvailable');
-      }
+      // Biometric capability logging reduced to minimize log spam
       
       if (!isAvailable) return false;
 
       final availableBiometrics = await _localAuth.getAvailableBiometrics();
-      if (kDebugMode) {
-        print('🔒 Biometrics: Available types: $availableBiometrics');
-        if (Platform.isAndroid) {
-          print('🔒 Android: Supports fingerprint, face, iris recognition');
-        } else if (Platform.isIOS) {
-          print('🔒 iOS: Supports TouchID, FaceID');
-        } else if (Platform.isMacOS) {
-          print('🔒 macOS: Supports TouchID');
-        }
+      // Platform biometric type logging reduced to minimize log spam
+      if (kDebugMode && Platform.isMacOS) {
+        print('🔒 macOS: Supports TouchID');
       }
       
       return availableBiometrics.isNotEmpty;
@@ -495,23 +492,42 @@ class AuthProvider with ChangeNotifier {
 
   /// Load stored authentication data
   Future<void> _loadStoredData() async {
+    // Check if we have recent cached data
+    final now = DateTime.now();
+    if (_lastDataLoad != null && 
+        now.difference(_lastDataLoad!).compareTo(_cacheTimeout) < 0) {
+      // Data is still fresh, skip logging unless in debug mode
+      return;
+    }
+
     try {
-      if (kDebugMode) {
-        print('🔍 AuthProvider._loadStoredData() - Starting storage reads...');
-        print('  Keys to read: $_hasWalletKey, $_walletIdKey, $_biometricsEnabledKey, $_cliWalletImportedKey');
+      final shouldLog = _lastDataLoad == null || 
+                       (kDebugMode && now.difference(_lastDataLoad!).inMinutes >= 1);
+      
+      if (shouldLog) {
+        if (kDebugMode) {
+          print('🔍 AuthProvider._loadStoredData() - Starting storage reads...');
+          print('  Keys to read: $_hasWalletKey, $_walletIdKey, $_biometricsEnabledKey, $_cliWalletImportedKey');
+        }
       }
       
       final hasWalletStr = await StorageService.read(key: _hasWalletKey);
-      if (kDebugMode) print('  Read $_hasWalletKey: "$hasWalletStr"');
-      
       final walletId = await StorageService.read(key: _walletIdKey);
-      if (kDebugMode) print('  Read $_walletIdKey: "$walletId"');
-      
       final biometricsStr = await StorageService.read(key: _biometricsEnabledKey);
-      if (kDebugMode) print('  Read $_biometricsEnabledKey: "$biometricsStr"');
-      
       final cliImportedStr = await StorageService.read(key: _cliWalletImportedKey);
-      if (kDebugMode) print('  Read $_cliWalletImportedKey: "$cliImportedStr"');
+      
+      // Create hash of current data to detect changes
+      final currentDataHash = '${hasWalletStr}_${walletId}_${biometricsStr}_${cliImportedStr}';
+      final dataChanged = _lastLoadedDataHash != currentDataHash;
+      
+      if (shouldLog && dataChanged) {
+        if (kDebugMode) {
+          print('  Read $_hasWalletKey: "$hasWalletStr"');
+          print('  Read $_walletIdKey: "$walletId"');
+          print('  Read $_biometricsEnabledKey: "$biometricsStr"');
+          print('  Read $_cliWalletImportedKey: "$cliImportedStr"');
+        }
+      }
 
       _hasWallet = hasWalletStr == 'true';
       _walletId = walletId;
@@ -521,13 +537,19 @@ class AuthProvider with ChangeNotifier {
       // Don't auto-authenticate for security
       _isAuthenticated = false;
       
-      // Debug logging
-      if (kDebugMode) {
-        print('✅ AuthProvider._loadStoredData() completed:');
-        print('  _hasWallet: $_hasWallet (from "$hasWalletStr")');
-        print('  _walletId: $_walletId');
-        print('  needsSetup: $needsSetup');
-        print('  needsAuthentication: $needsAuthentication');
+      // Update cache
+      _lastDataLoad = now;
+      _lastLoadedDataHash = currentDataHash;
+      
+      // Debug logging only for changes or first load
+      if ((shouldLog && dataChanged) || _lastDataLoad == null) {
+        if (kDebugMode) {
+          print('✅ AuthProvider._loadStoredData() completed:');
+          print('  _hasWallet: $_hasWallet (from "$hasWalletStr")');
+          print('  _walletId: $_walletId');
+          print('  needsSetup: $needsSetup');
+          print('  needsAuthentication: $needsAuthentication');
+        }
       }
       
     } catch (e) {

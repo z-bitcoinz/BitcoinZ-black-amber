@@ -14,6 +14,11 @@ class NetworkProvider with ChangeNotifier {
   String? _connectionError;
   ServerInfo? _currentServerInfo;
   Timer? _refreshTimer;
+  
+  // Connection logging cache
+  DateTime? _lastConnectionLog;
+  String? _lastConnectionResult;
+  static const Duration _connectionLogCacheTimeout = Duration(minutes: 1);
 
   // Getters
   String get currentServerUrl => _currentServerUrl;
@@ -100,7 +105,18 @@ class NetworkProvider with ChangeNotifier {
     }
 
     try {
-      if (kDebugMode) print('🌐 Testing gRPC connection to: $serverUrl');
+      // Check if we should log this connection test
+      final now = DateTime.now();
+      final connectionKey = '${serverUrl}_test';
+      final shouldLog = _lastConnectionLog == null ||
+                       now.difference(_lastConnectionLog!).compareTo(_connectionLogCacheTimeout) > 0 ||
+                       _lastConnectionResult != connectionKey;
+      
+      if (kDebugMode && shouldLog) {
+        print('🌐 Testing gRPC connection to: $serverUrl');
+        _lastConnectionLog = now;
+        _lastConnectionResult = connectionKey;
+      }
       
       // Use Rust FFI to get server info via gRPC
       final result = await rust_api.getServerInfo(serverUri: serverUrl);
@@ -116,12 +132,17 @@ class NetworkProvider with ChangeNotifier {
           _connectionError = null;
         }
         
-        if (kDebugMode) {
+        // Only log success if we haven't logged recently or if server info changed
+        final serverInfoHash = '${serverInfo.name}_${serverInfo.latestBlockHeight}';
+        final infoChanged = _lastConnectionResult != serverInfoHash;
+        
+        if (kDebugMode && (shouldLog || infoChanged)) {
           print('✅ Server connection successful: ${serverInfo.name}');
           print('   Version: ${serverInfo.version}');
           print('   Vendor: ${serverInfo.vendor}');
           print('   Chain: ${serverInfo.chainName}');
           print('   Latest Block: ${serverInfo.latestBlockHeight}');
+          _lastConnectionResult = serverInfoHash;
           print('   Build: ${serverInfo.zcashdBuild}');
         }
         
