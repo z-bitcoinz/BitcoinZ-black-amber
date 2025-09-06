@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/wallet_provider.dart';
@@ -20,6 +22,12 @@ class _SyncStatusCardState extends State<SyncStatusCard>
   String _displayedETA = ''; // UI-only stable ETA tracking
   int _lastETAMinutes = 0; // Track ETA in minutes for monotonic decrease
 
+  // Delayed UI display to prevent flickering
+  Timer? _showDelayTimer;
+  bool _allowSyncUIDisplay = false;
+  bool _isAppStartup = true;
+  DateTime? _appStartTime;
+
   @override
   void initState() {
     super.initState();
@@ -34,12 +42,73 @@ class _SyncStatusCardState extends State<SyncStatusCard>
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
+
+    // Track app startup time for delay logic
+    _appStartTime = DateTime.now();
+    if (kDebugMode) print('🎯 SYNC UI: App startup detected at $_appStartTime');
   }
 
   @override
   void dispose() {
+    _showDelayTimer?.cancel();
     _animationController.dispose();
     super.dispose();
+  }
+
+  /// Start delay timer for sync UI display
+  void _startSyncUIDelay() {
+    if (_showDelayTimer?.isActive == true) return; // Already running
+
+    const delayDuration = Duration(seconds: 3); // 3 second delay
+    if (kDebugMode) print('🎯 SYNC UI: Starting ${delayDuration.inSeconds}s delay timer');
+
+    _showDelayTimer = Timer(delayDuration, () {
+      if (mounted) {
+        setState(() {
+          _allowSyncUIDisplay = true;
+          _isAppStartup = false;
+        });
+        if (kDebugMode) print('🎯 SYNC UI: Delay complete - allowing sync UI display');
+      }
+    });
+  }
+
+  /// Cancel sync UI delay timer
+  void _cancelSyncUIDelay() {
+    if (_showDelayTimer?.isActive == true) {
+      _showDelayTimer!.cancel();
+      if (kDebugMode) print('🎯 SYNC UI: Cancelled delay timer');
+    }
+    _showDelayTimer = null;
+  }
+
+  /// Check if we should show sync UI based on delay logic
+  bool _shouldShowSyncUI(WalletProvider provider) {
+    if (!provider.isSyncing) return false;
+
+    // Check if app has been running for more than 10 seconds (not startup anymore)
+    if (_appStartTime != null && DateTime.now().difference(_appStartTime!).inSeconds > 10) {
+      _isAppStartup = false;
+    }
+
+    // Always show immediately if not during app startup
+    if (!_isAppStartup) {
+      _allowSyncUIDisplay = true;
+      return true;
+    }
+
+    // During app startup, check if we have significant sync work
+    final blocksRemaining = provider.totalBlocks - provider.syncedBlocks;
+    final hasSignificantWork = blocksRemaining > 100 || provider.totalBlocks == 0;
+
+    // If significant work and we haven't started delay timer, start it
+    if (hasSignificantWork && !_allowSyncUIDisplay && _showDelayTimer?.isActive != true) {
+      _startSyncUIDelay();
+    }
+
+    // Only show if delay has completed or if this looks like a restoration
+    final isRestorationLike = provider.totalBatches > 0; // Has batch info = restoration
+    return _allowSyncUIDisplay || isRestorationLike;
   }
 
   /// Get monotonic progress for UI display - prevents backwards jumps
@@ -181,16 +250,27 @@ class _SyncStatusCardState extends State<SyncStatusCard>
   Widget build(BuildContext context) {
     return Consumer<WalletProvider>(
       builder: (context, provider, child) {
-        // Only show when actually syncing or disconnected
-        // Don't show "Ready" status - that's already in the header
+        // Smart sync UI display with delay to prevent flickering
         bool shouldShow = false;
-        
+
         if (!provider.isConnected) {
-          shouldShow = true; // Show when disconnected
+          shouldShow = true; // Always show when disconnected
+          if (kDebugMode) print('🎯 SYNC UI: Showing - disconnected');
         } else if (provider.isSyncing) {
-          shouldShow = true; // Show while syncing
+          // Use delayed display logic for sync UI
+          shouldShow = _shouldShowSyncUI(provider);
+          if (kDebugMode && shouldShow != provider.isSyncing) {
+            print('🎯 SYNC UI: ${shouldShow ? "Showing" : "Hiding"} sync UI (delay logic)');
+          }
+        } else {
+          // Not syncing - cancel any pending delay and reset state
+          _cancelSyncUIDelay();
+          if (_allowSyncUIDisplay) {
+            setState(() {
+              _allowSyncUIDisplay = false;
+            });
+          }
         }
-        // Removed the "show for 5 seconds after sync" - we don't need to show "Ready"
         
         if (!shouldShow) {
           return const SizedBox.shrink();
