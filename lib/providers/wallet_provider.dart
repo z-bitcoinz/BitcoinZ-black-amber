@@ -92,6 +92,7 @@ class WalletProvider with ChangeNotifier {
   String _sendingETA = '';
   int _lastSeenProgress = -1; // Track progress changes
   String? _completedTransactionId; // Store completed transaction ID for success state
+  bool _successShown = false; // Prevent duplicate success states
 
   // Comprehensive sync tracking with batch info and ETA
   DateTime? _lastSyncTime;
@@ -3309,8 +3310,9 @@ class WalletProvider with ChangeNotifier {
     if (txid != null && txid.isNotEmpty) {
       _completedTransactionId = txid;
     } else if (!sending) {
-      // Clear completed transaction ID when starting new transaction or clearing state
+      // Clear completed transaction ID and success flag when starting new transaction or clearing state
       _completedTransactionId = null;
+      _successShown = false;
     }
 
     // Smooth progress interpolation to avoid jumpy progress bar
@@ -3445,8 +3447,9 @@ class WalletProvider with ChangeNotifier {
               progress: progressPercent,
               status: statusMessage
             );
-          } else if (status == 'completed' && txid != null && txid.toString().isNotEmpty) {
-            // Transaction completed successfully - transform dialog to success state
+          } else if (status == 'completed' && txid != null && txid.toString().isNotEmpty && !_successShown) {
+            // Transaction completed successfully - transform dialog to success state (first time only)
+            _successShown = true;
             _setSendingProgress(true, progress: 1.0, status: 'success', txid: txid);
             if (kDebugMode) print('📤 STREAM COMPLETE: Transaction sent with TXID: $txid');
             _cancelSendProgressMonitoring();
@@ -3455,8 +3458,9 @@ class WalletProvider with ChangeNotifier {
             _setSendingProgress(false, progress: 0.0, status: 'Transaction failed: $error');
             if (kDebugMode) print('📤 STREAM FAILED: $error');
             _cancelSendProgressMonitoring();
-          } else if (txid != null && txid.toString().isNotEmpty && !isInProgress) {
-            // Transaction completed (fallback detection) - transform dialog to success state
+          } else if (txid != null && txid.toString().isNotEmpty && !isInProgress && !_successShown) {
+            // Transaction completed (fallback detection) - transform dialog to success state (first time only)
+            _successShown = true;
             _setSendingProgress(true, progress: 1.0, status: 'success', txid: txid);
             if (kDebugMode) print('📤 STREAM COMPLETE: Transaction complete with TXID: $txid');
             _cancelSendProgressMonitoring();

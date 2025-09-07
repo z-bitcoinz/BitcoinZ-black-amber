@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'dart:async';
 
 class SendingProgressOverlay extends StatefulWidget {
   final String status;
@@ -40,6 +42,9 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
   late Animation<double> _outerRotationAnimation;
   late Animation<double> _pulseAnimation;
   late Animation<double> _checkmarkAnimation;
+
+  Timer? _autoCloseTimer;
+  int _countdownSeconds = 3;
 
   @override
   void initState() {
@@ -131,6 +136,8 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
       _innerRotationController.stop();
       _outerRotationController.stop();
       _checkmarkController.forward();
+      // Start 3-second countdown timer
+      _startAutoCloseCountdown();
     }
   }
 
@@ -141,6 +148,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
     _outerRotationController.dispose();
     _pulseController.dispose();
     _checkmarkController.dispose();
+    _autoCloseTimer?.cancel();
     super.dispose();
   }
 
@@ -496,38 +504,53 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
         
         // Transaction ID (if provided)
         if (widget.completedTxid != null) ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Colors.grey.withOpacity(0.3),
-                width: 1,
+          GestureDetector(
+            onTap: () => _copyToClipboard(widget.completedTxid!),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.grey.withOpacity(0.3),
+                  width: 1,
+                ),
               ),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  'TX ID',
-                  style: TextStyle(
-                    color: Colors.grey.withOpacity(0.8),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'TX ID',
+                          style: TextStyle(
+                            color: Colors.grey.withOpacity(0.8),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.completedTxid!.length > 16 
+                              ? '${widget.completedTxid!.substring(0, 8)}...${widget.completedTxid!.substring(widget.completedTxid!.length - 8)}'
+                              : widget.completedTxid!,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.completedTxid!.length > 16 
-                      ? '${widget.completedTxid!.substring(0, 8)}...${widget.completedTxid!.substring(widget.completedTxid!.length - 8)}'
-                      : widget.completedTxid!,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 12,
-                    fontFamily: 'monospace',
+                  Icon(
+                    Icons.copy,
+                    color: Colors.grey.withOpacity(0.6),
+                    size: 16,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -556,7 +579,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
 
         const SizedBox(height: 24),
 
-        // Close button
+        // Close button with countdown
         ElevatedButton(
           onPressed: widget.onClose,
           style: ElevatedButton.styleFrom(
@@ -568,7 +591,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
             ),
           ),
           child: Text(
-            'Close',
+            _countdownSeconds > 0 ? 'Close ($_countdownSeconds)' : 'Close',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -577,6 +600,46 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
         ),
       ],
     );
+  }
+
+  /// Start 3-second countdown timer with auto-close
+  void _startAutoCloseCountdown() {
+    _autoCloseTimer?.cancel(); // Cancel any existing timer
+    _countdownSeconds = 3;
+    
+    _autoCloseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _countdownSeconds--;
+        });
+        
+        if (_countdownSeconds <= 0) {
+          timer.cancel();
+          // Auto-close the overlay
+          if (widget.onClose != null && mounted) {
+            widget.onClose!();
+          }
+        }
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  /// Copy transaction ID to clipboard
+  void _copyToClipboard(String txid) async {
+    await Clipboard.setData(ClipboardData(text: txid));
+    
+    // Show a brief feedback
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Transaction ID copied to clipboard'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 }
 
