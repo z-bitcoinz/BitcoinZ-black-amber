@@ -364,6 +364,10 @@ class BitcoinzRustService {
         print('   Birthday: $_birthday');
       }
       
+      // Initialize progress stream for real-time updates
+      final streamInitialized = await initializeProgressStream();
+      if (kDebugMode) print('📤 Progress stream initialized: $streamInitialized');
+      
       // Start update timers (like BitcoinZ Blue)
       startTimers();
       
@@ -1104,7 +1108,7 @@ class BitcoinzRustService {
     }
   }
   
-  /// Get send progress from Rust
+  /// Get send progress from Rust (legacy polling method - deprecated)
   Future<Map<String, dynamic>?> getSendProgress() async {
     if (!_initialized) return null;
 
@@ -1128,6 +1132,97 @@ class BitcoinzRustService {
       if (kDebugMode) print('⚠️ Failed to get send progress: $e');
       return null;
     }
+  }
+
+  /// Initialize progress stream for push-based updates
+  Future<bool> initializeProgressStream() async {
+    if (!_initialized) return false;
+
+    try {
+      final result = await rust_api.initProgressStream();
+      if (kDebugMode) print('📤 PROGRESS STREAM: Initialized - $result');
+      return result == 'OK';
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to initialize progress stream: $e');
+      return false;
+    }
+  }
+
+  /// Listen to progress updates via improved polling (replaces stream)
+  Stream<Map<String, dynamic>> listenToProgressUpdates() async* {
+    if (!_initialized) {
+      if (kDebugMode) print('⚠️ Progress stream: Not initialized');
+      return;
+    }
+
+    if (kDebugMode) print('📤 PROGRESS STREAM: Starting improved polling...');
+
+    // Use improved polling with change detection
+    Map<String, dynamic>? lastProgress;
+    int consecutiveNoChange = 0;
+
+    while (true) {
+      try {
+        // Small delay to allow Rust async tasks to complete
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        final progressJson = rust_api.getSendProgress();
+        if (kDebugMode) {
+          print('📤 PROGRESS STREAM: Polled: $progressJson');
+        }
+
+        try {
+          final progressData = jsonDecode(progressJson) as Map<String, dynamic>;
+
+          // Check if progress actually changed
+          final progressChanged = lastProgress == null ||
+                                !_mapsEqual(lastProgress!, progressData);
+
+          if (progressChanged) {
+            consecutiveNoChange = 0;
+            lastProgress = Map.from(progressData);
+            if (kDebugMode) {
+              print('📤 PROGRESS STREAM: Progress changed: $progressData');
+            }
+            yield progressData;
+          } else {
+            consecutiveNoChange++;
+          }
+
+          // Only end stream if we've seen sending=true before and now it's false
+          // This prevents ending on initial state where sending=false
+          if (progressData['sending'] == false && lastProgress != null && lastProgress!['sending'] == true) {
+            if (kDebugMode) print('📤 PROGRESS STREAM: Sending complete, ending stream');
+            break;
+          }
+
+          // Adaptive delay based on progress activity
+          final delay = consecutiveNoChange > 5
+              ? const Duration(seconds: 2)  // Slower when no changes
+              : const Duration(milliseconds: 500);  // Faster when active
+
+          await Future.delayed(delay);
+
+        } catch (e) {
+          if (kDebugMode) print('⚠️ Failed to parse progress update: $e');
+          await Future.delayed(const Duration(seconds: 1));
+        }
+      } catch (e) {
+        if (kDebugMode) print('⚠️ Progress poll error: $e');
+        await Future.delayed(const Duration(seconds: 1));
+      }
+    }
+
+    if (kDebugMode) print('📤 PROGRESS STREAM: Stream ended');
+  }
+
+  /// Helper to compare maps for equality
+  bool _mapsEqual(Map<String, dynamic> map1, Map<String, dynamic> map2) {
+    if (map1.length != map2.length) return false;
+    for (final key in map1.keys) {
+      if (map1[key] != map2[key]) return false;
+    }
+    return true;
   }
 
   /// Send transaction

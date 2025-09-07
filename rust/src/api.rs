@@ -4,16 +4,24 @@ use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 use std::path::Path;
 use tokio::runtime::Runtime;
+use tokio::sync::broadcast;
+use tokio::time::{sleep, Duration};
+use futures::Stream;
 use serde_json;
 use chrono;
 use zecwalletlitelib::{commands, lightclient::LightClient, MainNetwork};
 use zecwalletlitelib::lightclient::lightclient_config::LightClientConfig;
 use zecwalletlitelib::grpc_connector::GrpcConnector;
 
+// Global reference to progress sender for use from zecwalletlitelib
+static mut GLOBAL_PROGRESS_SENDER: Option<broadcast::Sender<String>> = None;
+
 // Global LightClient instance (same as BitcoinZ Blue)
 lazy_static! {
     static ref LIGHTCLIENT: Mutex<RefCell<Option<Arc<LightClient<MainNetwork>>>>> =
         Mutex::new(RefCell::new(None));
+    static ref PROGRESS_SENDER: Mutex<Option<broadcast::Sender<String>>> =
+        Mutex::new(None);
 }
 
 /// Check if a wallet exists
@@ -350,36 +358,53 @@ pub fn get_transactions() -> String {
 
 /// Send transaction
 pub async fn send_transaction(address: String, amount: i64, memo: Option<String>) -> String {
-    // Send transaction initiated
-    
+    println!("PROGRESS STREAM: Send transaction initiated");
+
+    // Emit initial progress
+    let _ = send_progress_update("{\"status\": \"sending\", \"progress\": 0, \"total\": 100, \"error\": null, \"txid\": null}".to_string());
+
     // Get lightclient instance
     let lightclient = LIGHTCLIENT.lock().unwrap().borrow().clone();
     let lightclient = match lightclient {
         Some(l) => l,
         None => {
+            let _ = send_progress_update("{\"status\": \"error\", \"progress\": 0, \"total\": 100, \"error\": \"Wallet not initialized\", \"txid\": null}".to_string());
             return r#"{"error": "Wallet not initialized"}"#.to_string();
         }
     };
-    
+
     // Convert amount to u64 (do_send expects u64)
     let amount_u64 = if amount < 0 {
+        let _ = send_progress_update("{\"status\": \"error\", \"progress\": 0, \"total\": 100, \"error\": \"Invalid amount\", \"txid\": null}".to_string());
         return r#"{"error": "Invalid amount: cannot be negative"}"#.to_string();
     } else {
         amount as u64
     };
-    
+
     // Prepare the address, amount, memo tuple for do_send
     let addrs = vec![(&*address, amount_u64, memo)];
-    
-    // Calling lightclient.do_send
-    
+
+    println!("PROGRESS STREAM: Starting transaction build");
+    let _ = send_progress_update("{\"status\": \"sending\", \"progress\": 10, \"total\": 100, \"error\": null, \"txid\": null}".to_string());
+
     // Call lightclient.do_send() directly (already in async context)
     match lightclient.do_send(addrs).await {
         Ok(txid) => {
+            println!("PROGRESS STREAM: Transaction sent successfully");
+            let _ = send_progress_update("{\"status\": \"sending\", \"progress\": 90, \"total\": 100, \"error\": null, \"txid\": null}".to_string());
+
+            // Small delay to show broadcasting message
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+            let _ = send_progress_update(format!("{{\"status\": \"completed\", \"progress\": 100, \"total\": 100, \"error\": null, \"txid\": \"{}\"}}", txid));
+
             // Transaction sent successfully
             format!(r#"{{"txid": "{}"}}"#, txid)
         }
         Err(e) => {
+            println!("PROGRESS STREAM: Transaction send failed: {}", e);
+            let _ = send_progress_update(format!("{{\"status\": \"error\", \"progress\": 0, \"total\": 100, \"error\": \"{}\", \"txid\": null}}", e.replace("\"", "\\\"")));
+
             // Transaction send failed
             // Escape quotes in error message to prevent JSON issues
             let escaped_error = e.replace("\"", "\\\"");
@@ -473,6 +498,118 @@ pub async fn get_server_info(server_uri: String) -> String {
                 "details": "Please check server URL and network connectivity",
                 "timestamp": chrono::Utc::now().timestamp()
             }).to_string()
+        }
+    }
+}
+
+/// Get send progress (synchronous version for polling)
+#[frb(sync)]
+pub fn get_send_progress() -> String {
+    execute("sendprogress".to_string(), "".to_string())
+}
+
+/// Initialize progress stream
+pub fn init_progress_stream() -> String {
+    let (tx, _rx) = broadcast::channel(100);
+    
+    // Store the sender globally
+    if let Ok(mut sender) = PROGRESS_SENDER.lock() {
+        *sender = Some(tx);
+        println!("PROGRESS STREAM: Initialized broadcast channel");
+        "OK".to_string()
+    } else {
+        "Error: Failed to initialize progress stream".to_string()
+    }
+}
+
+/// Get next progress update (for stream-like polling)
+pub async fn get_next_progress_update() -> String {
+    println!("PROGRESS STREAM: Client requesting next progress update");
+
+    // Get a receiver from the global sender
+    let receiver = if let Ok(sender_guard) = PROGRESS_SENDER.lock() {
+        if let Some(sender) = sender_guard.as_ref() {
+            println!("PROGRESS STREAM: Creating receiver from existing sender");
+            Some(sender.subscribe())
+        } else {
+            println!("PROGRESS STREAM: No sender available, initializing");
+            None
+        }
+    } else {
+        println!("PROGRESS STREAM: Failed to lock sender");
+        None
+    };
+
+    // If no sender exists, create one
+    let mut rx = if let Some(recv) = receiver {
+        recv
+    } else {
+        // Initialize if not already done
+        let (tx, rx) = broadcast::channel(100);
+        if let Ok(mut sender) = PROGRESS_SENDER.lock() {
+            *sender = Some(tx);
+        }
+        rx
+    };
+
+    // Wait for next progress update
+    match rx.recv().await {
+        Ok(progress_data) => {
+            println!("PROGRESS STREAM: Received progress: {}", progress_data);
+            progress_data
+        }
+        Err(e) => {
+            println!("PROGRESS STREAM: Receive failed: {}", e);
+            format!("{{\"error\": \"{}\"}}", e)
+        }
+    }
+}
+
+/// Send progress update (called from transaction building)
+pub fn send_progress_update(progress_data: String) -> String {
+    println!("PROGRESS STREAM: Sending progress update: {}", progress_data);
+    
+    if let Ok(sender_guard) = PROGRESS_SENDER.lock() {
+        if let Some(sender) = sender_guard.as_ref() {
+            match sender.send(progress_data.clone()) {
+                Ok(subscriber_count) => {
+                    println!("PROGRESS STREAM: Sent to {} subscribers", subscriber_count);
+                    "OK".to_string()
+                }
+                Err(e) => {
+                    println!("PROGRESS STREAM: Send failed: {}", e);
+                    format!("Error: {}", e)
+                }
+            }
+        } else {
+            println!("PROGRESS STREAM: No sender available");
+            "Error: No sender initialized".to_string()
+        }
+    } else {
+        println!("PROGRESS STREAM: Failed to lock sender");
+        "Error: Failed to lock sender".to_string()
+    }
+}
+
+/// Export C-compatible function for zecwalletlitelib to call
+/// This allows the fallback progress system to emit stream events
+#[no_mangle]
+pub extern "C" fn emit_progress_update(progress: u32, total: u32) {
+    let progress_json = format!(r#"{{"progress": {}, "total": {}, "status": "processing"}}"#, progress, total);
+    println!("PROGRESS STREAM: C bridge emitting: {}", progress_json);
+    let _ = send_progress_update(progress_json);
+}
+
+/// Initialization function to set up global progress sender for C bridge
+#[no_mangle]
+pub extern "C" fn init_progress_bridge() {
+    unsafe {
+        if let Ok(sender_guard) = PROGRESS_SENDER.lock() {
+            if let Some(sender) = sender_guard.as_ref() {
+                // Create a new sender for the global static
+                GLOBAL_PROGRESS_SENDER = Some(sender.clone());
+                println!("PROGRESS STREAM: Global progress sender initialized");
+            }
         }
     }
 }

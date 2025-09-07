@@ -87,7 +87,7 @@ class WalletProvider with ChangeNotifier {
   bool _isSendingTransaction = false;
   double _sendingProgress = 0.0;
   String _sendingStatus = '';
-  Timer? _sendProgressTimer;
+  StreamSubscription<Map<String, dynamic>>? _progressStreamSubscription;
   DateTime? _sendStartTime;
   String _sendingETA = '';
   int _lastSeenProgress = -1; // Track progress changes
@@ -3341,38 +3341,32 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Start monitoring transaction sending progress
+  /// Start monitoring transaction sending progress via stream
   void _startSendProgressMonitoring() {
     _cancelSendProgressMonitoring();
 
-    if (kDebugMode) print('📤 Starting send progress monitoring...');
+    if (kDebugMode) print('📤 Starting send progress monitoring via stream...');
 
-    _sendProgressTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      try {
-        // Add small delay to allow Rust async task to update progress
-        await Future.delayed(const Duration(milliseconds: 100));
-
-        // Get send progress from Rust service
-        final progressData = await _rustService.getSendProgress();
-
-        if (kDebugMode) {
-          print('📤 SEND PROGRESS RAW DATA: $progressData');
-        }
-
-        if (progressData != null) {
-          // Debug: Print all keys in the response
+    _progressStreamSubscription = _rustService.listenToProgressUpdates().listen(
+      (progressData) {
+        try {
           if (kDebugMode) {
-            print('📤 SEND PROGRESS KEYS: ${progressData.keys.toList()}');
+            print('📤 PROGRESS STREAM: Received data: $progressData');
           }
 
-          final isInProgress = progressData['sending'] == true;
-          final progress = progressData['progress'] ?? 0;
-          final total = progressData['total'] ?? 100;
-          final error = progressData['error'];
-          final txid = progressData['txid'];
+          // Parse progress data from stream
+          final status = progressData['status'] as String? ?? 'processing';
+          final progress = progressData['progress'] as int? ?? 0;
+          final total = progressData['total'] as int? ?? 100;
+          final error = progressData['error'] as String?;
+          final txid = progressData['txid'] as String?;
 
+          // Check if this is a sending progress update
+          final isInProgress = status == 'processing' || status == 'sending';
+          
           if (kDebugMode) {
-            print('📤 SEND PROGRESS PARSED:');
+            print('📤 PROGRESS STREAM PARSED:');
+            print('   status: $status');
             print('   isInProgress: $isInProgress');
             print('   progress: $progress');
             print('   total: $total');
@@ -3394,32 +3388,39 @@ class WalletProvider with ChangeNotifier {
           } else if (txid != null && txid.toString().isNotEmpty) {
             // Transaction completed successfully
             _setSendingProgress(false, progress: 1.0, status: 'Transaction sent!');
-            if (kDebugMode) print('📤 SEND COMPLETE: Transaction sent with TXID: $txid');
-            timer.cancel();
+            if (kDebugMode) print('📤 STREAM COMPLETE: Transaction sent with TXID: $txid');
+            _cancelSendProgressMonitoring();
           } else if (error != null && error.toString().isNotEmpty) {
             // Transaction failed
             _setSendingProgress(false, progress: 0.0, status: 'Transaction failed: $error');
-            if (kDebugMode) print('📤 SEND FAILED: $error');
-            timer.cancel();
-          } else if (!isInProgress && progress >= total && total > 0) {
+            if (kDebugMode) print('📤 STREAM FAILED: $error');
+            _cancelSendProgressMonitoring();
+          } else if (status == 'completed' || (!isInProgress && progress >= total && total > 0)) {
             // Transaction completed (progress >= total and not sending)
             _setSendingProgress(false, progress: 1.0, status: 'Transaction completed!');
-            if (kDebugMode) print('📤 SEND COMPLETE: Progress complete ($progress/$total)');
-            timer.cancel();
+            if (kDebugMode) print('📤 STREAM COMPLETE: Progress complete ($progress/$total)');
+            _cancelSendProgressMonitoring();
           }
-        } else {
-          if (kDebugMode) print('📤 SEND PROGRESS: No data returned from Rust');
+        } catch (e) {
+          if (kDebugMode) print('⚠️ Progress stream processing error: $e');
         }
-      } catch (e) {
-        if (kDebugMode) print('⚠️ Send progress monitoring error: $e');
-      }
-    });
+      },
+      onError: (error) {
+        if (kDebugMode) print('⚠️ Progress stream error: $error');
+        _setSendingProgress(false, progress: 0.0, status: 'Progress monitoring failed');
+        _cancelSendProgressMonitoring();
+      },
+      onDone: () {
+        if (kDebugMode) print('📤 Progress stream completed');
+        _cancelSendProgressMonitoring();
+      },
+    );
   }
 
   /// Cancel send progress monitoring
   void _cancelSendProgressMonitoring() {
-    _sendProgressTimer?.cancel();
-    _sendProgressTimer = null;
+    _progressStreamSubscription?.cancel();
+    _progressStreamSubscription = null;
   }
 
   void _setError(String error) {

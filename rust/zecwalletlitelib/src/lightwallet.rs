@@ -9,6 +9,11 @@ use crate::{
         walletzkey::{WalletZKey, WalletZKeyType},
     },
 };
+
+// External C function to emit progress updates to the stream
+extern "C" {
+    fn emit_progress_update(progress: u32, total: u32);
+}
 use incrementalmerkletree::{bridgetree::BridgeTree, Position, Tree};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
@@ -1626,19 +1631,92 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
         // Use a separate thread to handle sending from std::mpsc to tokio::sync::mpsc
         let (tx2, mut rx2) = tokio::sync::mpsc::unbounded_channel();
         std::thread::spawn(move || {
+            println!("PROGRESS DEBUG: Starting progress notification receiver thread");
             while let Ok(r) = progress_notifier_rx.recv() {
+                println!("PROGRESS DEBUG: Received progress notification: {}", r.cur());
                 tx2.send(r.cur()).unwrap();
             }
+            println!("PROGRESS DEBUG: Progress notification receiver thread ended");
+        });
+
+        // Create a separate task for fallback progress updates
+        let progress_fallback = self.send_progress.clone();
+        let total_steps = s_notes.len() as u32 + total_z_recepients + total_o_recepients;
+        
+        // Use a cancellation token to stop the fallback when transaction completes
+        let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel::<()>();
+        
+        let fallback_handle = tokio::spawn(async move {
+            println!("PROGRESS DEBUG: Starting fallback progress task for {} steps", total_steps);
+            if total_steps > 0 {
+                // Wait a moment to see if real progress notifications come through
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                
+                // Start sending fallback progress updates
+                for i in 1..=total_steps {
+                    // Check if we should cancel
+                    if cancel_rx.try_recv().is_ok() {
+                        println!("PROGRESS DEBUG: Fallback progress task cancelled");
+                        return;
+                    }
+                    
+                    {
+                        let current_progress = progress_fallback.read().await.progress;
+                        if current_progress < i {
+                            println!("PROGRESS DEBUG: Fallback updating progress to {}/{}", i, total_steps);
+                            progress_fallback.write().await.progress = i;
+                            
+                            // Emit progress update to stream via C bridge
+                            unsafe {
+                                emit_progress_update(i, total_steps);
+                            }
+                            println!("PROGRESS DEBUG: Emitted stream update via C bridge: {}/{}", i, total_steps);
+                        }
+                    }
+                    
+                    // Slower updates for more steps, faster for fewer steps
+                    let delay_ms = if total_steps > 50 { 100 } else if total_steps > 10 { 200 } else { 500 };
+                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                }
+            }
+            println!("PROGRESS DEBUG: Fallback progress task completed");
         });
 
         let progress_handle = tokio::spawn(async move {
-            while let Some(r) = rx2.recv().await {
-                println!("Progress: {}", r);
-                progress.write().await.progress = r;
-                // Small delay to ensure progress is persisted before next poll
-                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            println!("PROGRESS DEBUG: Starting progress handler task");
+            let mut last_progress = 0u32;
+            let mut timeout_count = 0;
+            
+            loop {
+                // Wait for progress with timeout
+                let result = tokio::time::timeout(
+                    tokio::time::Duration::from_millis(200), 
+                    rx2.recv()
+                ).await;
+                
+                match result {
+                    Ok(Some(r)) => {
+                        println!("PROGRESS DEBUG: Processing progress update: {} (was: {})", r, last_progress);
+                        progress.write().await.progress = r;
+                        last_progress = r;
+                        timeout_count = 0; // Reset timeout counter
+                    }
+                    Ok(None) => {
+                        println!("PROGRESS DEBUG: Progress channel closed");
+                        break;
+                    }
+                    Err(_) => {
+                        // Timeout - this is expected if no real progress notifications
+                        timeout_count += 1;
+                        if timeout_count > 20 { // After 4 seconds of no updates, give up
+                            println!("PROGRESS DEBUG: Progress handler timed out, relying on fallback");
+                            break;
+                        }
+                    }
+                }
             }
-
+            
+            println!("PROGRESS DEBUG: Progress handler task ending");
             progress.write().await.is_send_in_progress = false;
         });
 
@@ -1648,27 +1726,46 @@ impl<P: consensus::Parameters + Send + Sync + 'static> LightWallet<P> {
             p.is_send_in_progress = true;
             p.progress = 0;
             p.total = s_notes.len() as u32 + total_z_recepients + total_o_recepients;
+            println!("PROGRESS DEBUG: Set up progress tracking - total: {}, sapling notes: {}, z recipients: {}, o recipients: {}", 
+                p.total, s_notes.len(), total_z_recepients, total_o_recepients);
         }
 
         println!("{}: Building transaction", now() - start_time);
         info!("Building transaction with {} sapling notes, {} orchard notes, {} transparent inputs", s_notes.len(), o_notes.len(), utxos.len());
-        // Building transaction
+        
+        // Building transaction with detailed progress logging
+        println!("PROGRESS DEBUG: Starting transaction build with {} total progress steps", s_notes.len() as u32 + total_z_recepients + total_o_recepients);
         let (tx, _) = match builder.build(&prover) {
             Ok(res) => {
-                // Transaction build successful
+                println!("PROGRESS DEBUG: Transaction build successful, cancelling fallback progress");
+                // Cancel the fallback progress task since build completed
+                let _ = cancel_tx.send(());
                 res
             },
             Err(e) => {
                 let e = format!("Error creating transaction: {:?}", e);
                 error!("{}", e);
-                // Transaction build failed
+                // Transaction build failed, cancel fallback and mark as not in progress
+                let _ = cancel_tx.send(());
                 self.send_progress.write().await.is_send_in_progress = false;
                 return Err(e);
             }
         };
 
+        // Set progress to complete immediately after successful build
+        {
+            let mut p = self.send_progress.write().await;
+            p.progress = p.total;  // Set to 100%
+            println!("PROGRESS DEBUG: Set progress to complete: {}/{}", p.progress, p.total);
+        }
+
         // Wait for all the progress to be updated
-        progress_handle.await.unwrap();
+        println!("PROGRESS DEBUG: Waiting for progress handlers to complete");
+        
+        // Wait for both the real progress handler and fallback to complete
+        let (_, _) = tokio::join!(progress_handle, fallback_handle);
+        
+        println!("PROGRESS DEBUG: All progress handlers completed");
 
         println!("{}: Transaction created", now() - start_time);
         println!("Transaction ID: {}", tx.txid());

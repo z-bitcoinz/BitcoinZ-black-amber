@@ -6,8 +6,8 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `LIGHTCLIENT`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref`, `initialize`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `LIGHTCLIENT`, `PROGRESS_SENDER`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref`, `deref`, `initialize`, `initialize`
 
 /// Check if a wallet exists
 Future<bool> walletExists({String? walletDir}) =>
@@ -102,3 +102,28 @@ String getInfo() => RustLib.instance.api.crateApiGetInfo();
 /// Returns JSON string with complete server details or error information
 Future<String> getServerInfo({required String serverUri}) =>
     RustLib.instance.api.crateApiGetServerInfo(serverUri: serverUri);
+
+/// Get send progress (synchronous version for polling)
+String getSendProgress() => RustLib.instance.api.crateApiGetSendProgress();
+
+/// Initialize progress stream
+Future<String> initProgressStream() =>
+    RustLib.instance.api.crateApiInitProgressStream();
+
+/// Get next progress update (for stream-like polling)
+Future<String> getNextProgressUpdate() =>
+    RustLib.instance.api.crateApiGetNextProgressUpdate();
+
+/// Send progress update (called from transaction building)
+Future<String> sendProgressUpdate({required String progressData}) =>
+    RustLib.instance.api.crateApiSendProgressUpdate(progressData: progressData);
+
+/// Export C-compatible function for zecwalletlitelib to call
+/// This allows the fallback progress system to emit stream events
+Future<void> emitProgressUpdate({required int progress, required int total}) =>
+    RustLib.instance.api
+        .crateApiEmitProgressUpdate(progress: progress, total: total);
+
+/// Initialization function to set up global progress sender for C bridge
+Future<void> initProgressBridge() =>
+    RustLib.instance.api.crateApiInitProgressBridge();
