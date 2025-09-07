@@ -2494,7 +2494,7 @@ class WalletProvider with ChangeNotifier {
       _cancelSendProgressMonitoring();
 
       // Clear sending progress after a delay to show completion
-      Timer(const Duration(seconds: 2), () {
+      Timer(const Duration(seconds: 5), () {
         _setSendingProgress(false, progress: 0.0, status: '');
       });
     }

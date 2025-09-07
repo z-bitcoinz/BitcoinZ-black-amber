@@ -6,7 +6,6 @@ import '../../providers/wallet_provider.dart';
 import '../../providers/currency_provider.dart';
 import '../../providers/contact_provider.dart';
 import '../../models/contact_model.dart';
-import '../../widgets/transaction_success_dialog.dart';
 import '../../widgets/transaction_confirmation_dialog.dart';
 import '../../widgets/sending_progress_overlay.dart';
 import '../../widgets/animated_progress_dots.dart';
@@ -511,12 +510,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
 
       if (txid != null && mounted) {
         // Success! The SendingProgressOverlay will show the success state automatically
-        // Clear fields after successful send
-        if (mounted) {
-          _addressController.clear();
-          _amountController.clear();
-          _memoController.clear();
-        }
+        // Form fields will be cleared when the overlay closes
       } else {
         setState(() {
           _errorMessage = 'Transaction failed. Please try again.';
@@ -1479,15 +1473,23 @@ class _SendScreenModernState extends State<SendScreenModern> {
     ),
     // Sending Progress Overlay
     SendingProgressOverlay(
-      status: walletProvider.isSendingTransaction ? walletProvider.sendingStatus : '',
+      status: walletProvider.sendingStatus,
       progress: walletProvider.isSendingTransaction ? walletProvider.sendingProgress : 0,
       eta: walletProvider.isSendingTransaction ? walletProvider.sendingETA : '',
-      isVisible: walletProvider.isSendingTransaction,
+      isVisible: walletProvider.isSendingTransaction || walletProvider.sendingStatus == 'success',
       completedTxid: walletProvider.completedTransactionId,
-      sentAmount: walletProvider.isSendingTransaction && _amountController.text.isNotEmpty 
+      sentAmount: (_amountController.text.isNotEmpty || walletProvider.completedTransactionId != null) 
           ? _getAmountValue() 
           : null,
-      onClose: () => walletProvider.closeSendingSuccess(),
+      onClose: () {
+        walletProvider.closeSendingSuccess();
+        // Clear form fields after overlay closes
+        if (mounted) {
+          _addressController.clear();
+          _amountController.clear();
+          _memoController.clear();
+        }
+      },
     ),
   ],
 );

@@ -44,7 +44,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
   late Animation<double> _checkmarkAnimation;
 
   Timer? _autoCloseTimer;
-  int _countdownSeconds = 3;
+  int _countdownSeconds = 8;
 
   @override
   void initState() {
@@ -602,10 +602,10 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
     );
   }
 
-  /// Start 3-second countdown timer with auto-close
+  /// Start 8-second countdown timer with auto-close
   void _startAutoCloseCountdown() {
     _autoCloseTimer?.cancel(); // Cancel any existing timer
-    _countdownSeconds = 3;
+    _countdownSeconds = 8;
     
     _autoCloseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
