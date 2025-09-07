@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import '../utils/formatters.dart';
 
 class TransactionConfirmationDialog extends StatefulWidget {
   final String toAddress;
@@ -188,7 +189,7 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                                 _buildDetailRow(
                                   context,
                                   'AMOUNT',
-                                  '${widget.amount.toStringAsFixed(8)} BTCZ',
+                                  Formatters.formatBtczTrim(widget.amount),
                                   Icons.monetization_on_outlined,
                                   isAmount: true,
                                   subtitle: widget.fiatAmount != null && widget.currencyCode != null
@@ -202,7 +203,7 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                                 _buildDetailRow(
                                   context,
                                   'NETWORK FEE',
-                                  '${widget.fee.toStringAsFixed(8)} BTCZ',
+                                  Formatters.formatBtczTrim(widget.fee),
                                   Icons.speed_outlined,
                                   isSubtle: true,
                                 ),
@@ -228,7 +229,7 @@ class _TransactionConfirmationDialogState extends State<TransactionConfirmationD
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
                                         Text(
-                                          '${total.toStringAsFixed(8)} BTCZ',
+                                          Formatters.formatBtczTrim(total),
                                           style: TextStyle(
                                             color: Theme.of(context).colorScheme.primary,
                                             fontSize: 16,

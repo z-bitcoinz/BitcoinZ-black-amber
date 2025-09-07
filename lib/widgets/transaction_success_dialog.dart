@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui';
+import '../utils/formatters.dart';
 
 class TransactionSuccessDialog extends StatefulWidget {
   final String transactionId;
@@ -369,7 +370,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    '${widget.amount.toStringAsFixed(8)} BTCZ',
+                                    Formatters.formatBtczTrim(widget.amount),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 22,
@@ -446,7 +447,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog>
                                     _buildDetailRow(
                                       icon: Icons.speed_outlined,
                                       label: 'NETWORK FEE',
-                                      value: '${widget.fee!.toStringAsFixed(8)} BTCZ',
+                                      value: Formatters.formatBtczTrim(widget.fee!),
                                       onCopy: null,
                                     ),
                                   ],

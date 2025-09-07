@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../utils/formatters.dart';
 import 'dart:ui';
 import 'dart:async';
 
@@ -507,7 +508,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${widget.sentAmount!.toStringAsFixed(8)} BTCZ',
+                  Formatters.formatBtczTrim(widget.sentAmount!),
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,

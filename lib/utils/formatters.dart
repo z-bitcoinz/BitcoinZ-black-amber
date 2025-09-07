@@ -25,6 +25,24 @@ class Formatters {
     return formatBtcz(btcz, showSymbol: showSymbol, decimals: decimals);
   }
 
+  /// Format BTCZ with trailing zeros trimmed (up to 8 decimals)
+  /// Examples:
+  /// - 1.000001000 -> 1.00001
+  /// - 0.100000000 -> 0.1
+  /// - 1.000000000 -> 1
+  /// - 0.000010000 -> 0.00001
+  static String formatBtczTrim(double amount, {bool showSymbol = true, int maxDecimals = 8, bool keepOneDecimalOnInteger = false}) {
+    String s = amount.toStringAsFixed(maxDecimals);
+    if (s.contains('.')) {
+      s = s.replaceAll(RegExp(r'0+$'), ''); // drop trailing zeros
+      s = s.replaceAll(RegExp(r'\.$'), ''); // drop trailing dot
+    }
+    if (keepOneDecimalOnInteger && !s.contains('.')) {
+      s = '$s.0';
+    }
+    return showSymbol ? '$s BTCZ' : s;
+  }
+
   /// Format large numbers in compact form (1.2K, 1.5M, etc.)
   static String formatCompactNumber(double number) {
     return _compactCurrencyFormat.format(number);
