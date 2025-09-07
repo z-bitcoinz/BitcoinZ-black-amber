@@ -654,9 +654,10 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                   );
                 },
                 backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white, // ensure high-contrast icon
                 child: Stack(
                   children: [
-                    const Icon(Icons.message),
+                    const Icon(Icons.message, color: Colors.white),
                     if (unreadCount > 0)
                       Positioned(
                         right: 0,
