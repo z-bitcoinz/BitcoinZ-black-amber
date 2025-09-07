@@ -3299,35 +3299,43 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Set transaction sending progress
+  /// Set transaction sending progress with smooth interpolation
   void _setSendingProgress(bool sending, {double progress = 0.0, String status = ''}) {
     _isSendingTransaction = sending;
-    _sendingProgress = progress;
+
+    // Smooth progress interpolation to avoid jumpy progress bar
+    if (sending && progress > _sendingProgress && progress - _sendingProgress < 0.1) {
+      // If progress jump is small (< 10%), animate smoothly
+      _animateProgressTo(progress);
+    } else {
+      // Large jumps or initial progress - set directly
+      _sendingProgress = progress;
+    }
+
     _sendingStatus = status;
 
-    // Calculate ETA if we're in progress
-    if (sending && progress > 0) {
+    // Don't calculate time-based ETA during note processing
+    // The C bridge provides more accurate progress information
+    // Only show ETA for very early stages (preparation/building)
+    if (sending && progress > 0 && progress < 0.5) {
       _sendStartTime ??= DateTime.now();
       final elapsed = DateTime.now().difference(_sendStartTime!);
-      final remainingProgress = 1.0 - progress;
+      final remainingProgress = 0.5 - progress; // Only estimate until note processing starts
 
-      if (remainingProgress > 0 && progress > 0.01) { // Avoid division by zero and very small progress
+      if (remainingProgress > 0 && progress > 0.01) {
         final estimatedTotalTime = elapsed.inMilliseconds / progress;
         final remainingTime = Duration(milliseconds: (estimatedTotalTime * remainingProgress).round());
 
-        if (remainingTime.inSeconds > 0) {
-          if (remainingTime.inMinutes > 0) {
-            _sendingETA = '${remainingTime.inMinutes}m ${remainingTime.inSeconds % 60}s remaining';
-          } else {
-            _sendingETA = '${remainingTime.inSeconds}s remaining';
-          }
+        if (remainingTime.inSeconds > 0 && remainingTime.inSeconds < 30) {
+          _sendingETA = '${remainingTime.inSeconds}s remaining';
         } else {
-          _sendingETA = 'Almost done...';
+          _sendingETA = 'Calculating...';
         }
       } else {
         _sendingETA = 'Calculating...';
       }
     } else {
+      // Clear ETA during note processing (50%+) to avoid confusion
       _sendingETA = '';
       if (!sending) {
         _sendStartTime = null; // Reset for next transaction
@@ -3339,6 +3347,27 @@ class WalletProvider with ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  /// Animate progress smoothly to target value
+  void _animateProgressTo(double targetProgress) {
+    const animationDuration = Duration(milliseconds: 300);
+    const steps = 10;
+    final stepDuration = Duration(milliseconds: animationDuration.inMilliseconds ~/ steps);
+    final progressDiff = targetProgress - _sendingProgress;
+    final stepSize = progressDiff / steps;
+
+    int currentStep = 0;
+    Timer.periodic(stepDuration, (timer) {
+      currentStep++;
+      if (currentStep >= steps) {
+        _sendingProgress = targetProgress;
+        timer.cancel();
+      } else {
+        _sendingProgress += stepSize;
+      }
+      notifyListeners();
+    });
   }
 
   /// Start monitoring transaction sending progress via stream
@@ -3354,15 +3383,16 @@ class WalletProvider with ChangeNotifier {
             print('📤 PROGRESS STREAM: Received data: $progressData');
           }
 
-          // Parse progress data from stream
-          final status = progressData['status'] as String? ?? 'processing';
+          // Parse progress data from stream (new format)
+          final status = progressData['status'] as String? ?? 'idle';
           final progress = progressData['progress'] as int? ?? 0;
           final total = progressData['total'] as int? ?? 100;
           final error = progressData['error'] as String?;
           final txid = progressData['txid'] as String?;
+          final sending = progressData['sending'] as bool? ?? false;
 
           // Check if this is a sending progress update
-          final isInProgress = status == 'processing' || status == 'sending';
+          final isInProgress = sending || status == 'sending' || status == 'processing';
           
           if (kDebugMode) {
             print('📤 PROGRESS STREAM PARSED:');
@@ -3381,24 +3411,37 @@ class WalletProvider with ChangeNotifier {
 
           if (isInProgress && total > 0) {
             final progressPercent = (progress / total).clamp(0.0, 1.0);
+
+            // Create better status message based on progress
+            String statusMessage;
+            if (progressPercent < 0.1) {
+              statusMessage = 'Preparing transaction...';
+            } else if (progressPercent < 0.5) {
+              statusMessage = 'Building transaction...';
+            } else if (progressPercent < 0.9) {
+              statusMessage = 'Processing notes...';
+            } else {
+              statusMessage = 'Broadcasting transaction...';
+            }
+
             _setSendingProgress(true,
               progress: progressPercent,
-              status: 'Processing note $progress of $total...'
+              status: statusMessage
             );
-          } else if (txid != null && txid.toString().isNotEmpty) {
+          } else if (status == 'completed' && txid != null && txid.toString().isNotEmpty) {
             // Transaction completed successfully
             _setSendingProgress(false, progress: 1.0, status: 'Transaction sent!');
             if (kDebugMode) print('📤 STREAM COMPLETE: Transaction sent with TXID: $txid');
             _cancelSendProgressMonitoring();
-          } else if (error != null && error.toString().isNotEmpty) {
+          } else if (status == 'error' && error != null && error.toString().isNotEmpty) {
             // Transaction failed
             _setSendingProgress(false, progress: 0.0, status: 'Transaction failed: $error');
             if (kDebugMode) print('📤 STREAM FAILED: $error');
             _cancelSendProgressMonitoring();
-          } else if (status == 'completed' || (!isInProgress && progress >= total && total > 0)) {
-            // Transaction completed (progress >= total and not sending)
+          } else if (txid != null && txid.toString().isNotEmpty && !isInProgress) {
+            // Transaction completed (fallback detection)
             _setSendingProgress(false, progress: 1.0, status: 'Transaction completed!');
-            if (kDebugMode) print('📤 STREAM COMPLETE: Progress complete ($progress/$total)');
+            if (kDebugMode) print('📤 STREAM COMPLETE: Transaction complete with TXID: $txid');
             _cancelSendProgressMonitoring();
           }
         } catch (e) {

@@ -384,6 +384,12 @@ pub async fn send_transaction(address: String, amount: i64, memo: Option<String>
     // Prepare the address, amount, memo tuple for do_send
     let addrs = vec![(&*address, amount_u64, memo)];
 
+    println!("PROGRESS STREAM: Starting transaction preparation");
+    let _ = send_progress_update("{\"status\": \"sending\", \"progress\": 0, \"total\": 100, \"error\": null, \"txid\": null}".to_string());
+
+    // Small delay to show preparation message
+    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
     println!("PROGRESS STREAM: Starting transaction build");
     let _ = send_progress_update("{\"status\": \"sending\", \"progress\": 10, \"total\": 100, \"error\": null, \"txid\": null}".to_string());
 
@@ -595,8 +601,27 @@ pub fn send_progress_update(progress_data: String) -> String {
 /// This allows the fallback progress system to emit stream events
 #[no_mangle]
 pub extern "C" fn emit_progress_update(progress: u32, total: u32) {
-    let progress_json = format!(r#"{{"progress": {}, "total": {}, "status": "processing"}}"#, progress, total);
-    println!("PROGRESS STREAM: C bridge emitting: {}", progress_json);
+    // Clamp progress to not exceed total to prevent "3 of 2" issues
+    let clamped_progress = progress.min(total);
+
+    // Convert to percentage for consistent display
+    // Map note processing (which happens 50-90% of transaction) to that range
+    let progress_percent = if total > 0 {
+        let base_percent = (clamped_progress as f64 / total as f64) * 100.0;
+
+        // Map 0-100% note progress to 50-90% transaction progress
+        // This gives note processing 40% of the total progress bar
+        let mapped_percent = 50.0 + (base_percent * 0.4);
+        mapped_percent.min(90.0) as u32
+    } else {
+        50 // Start of note processing
+    };
+
+    let progress_json = format!(
+        r#"{{"status": "sending", "progress": {}, "total": 100, "error": null, "txid": null}}"#,
+        progress_percent
+    );
+    println!("PROGRESS STREAM: C bridge emitting: {}% (from note {}/{})", progress_percent, clamped_progress, total);
     let _ = send_progress_update(progress_json);
 }
 

@@ -1148,60 +1148,68 @@ class BitcoinzRustService {
     }
   }
 
-  /// Listen to progress updates via improved polling (replaces stream)
+  /// Listen to progress updates via new stream system
   Stream<Map<String, dynamic>> listenToProgressUpdates() async* {
     if (!_initialized) {
       if (kDebugMode) print('⚠️ Progress stream: Not initialized');
       return;
     }
 
-    if (kDebugMode) print('📤 PROGRESS STREAM: Starting improved polling...');
+    if (kDebugMode) print('📤 PROGRESS STREAM: Starting new stream system...');
 
-    // Use improved polling with change detection
-    Map<String, dynamic>? lastProgress;
-    int consecutiveNoChange = 0;
+    // Use the new stream-based progress system
+    bool hasSeenSending = false;
 
     while (true) {
       try {
-        // Small delay to allow Rust async tasks to complete
-        await Future.delayed(const Duration(milliseconds: 100));
-
-        final progressJson = rust_api.getSendProgress();
+        // Get next progress update from the stream
+        final progressJson = await rust_api.getNextProgressUpdate();
         if (kDebugMode) {
-          print('📤 PROGRESS STREAM: Polled: $progressJson');
+          print('📤 PROGRESS STREAM: Received: $progressJson');
         }
 
         try {
           final progressData = jsonDecode(progressJson) as Map<String, dynamic>;
 
-          // Check if progress actually changed
-          final progressChanged = lastProgress == null ||
-                                !_mapsEqual(lastProgress!, progressData);
+          // Convert new format to old format for compatibility
+          final status = progressData['status'] as String? ?? 'idle';
+          final progress = progressData['progress'] as int? ?? 0;
+          final total = progressData['total'] as int? ?? 100;
+          final error = progressData['error'] as String?;
+          final txid = progressData['txid'] as String?;
 
-          if (progressChanged) {
-            consecutiveNoChange = 0;
-            lastProgress = Map.from(progressData);
-            if (kDebugMode) {
-              print('📤 PROGRESS STREAM: Progress changed: $progressData');
-            }
-            yield progressData;
-          } else {
-            consecutiveNoChange++;
+          // Determine if sending is in progress
+          final isSending = status == 'sending' || status == 'processing';
+
+          if (isSending) {
+            hasSeenSending = true;
           }
 
-          // Only end stream if we've seen sending=true before and now it's false
-          // This prevents ending on initial state where sending=false
-          if (progressData['sending'] == false && lastProgress != null && lastProgress!['sending'] == true) {
-            if (kDebugMode) print('📤 PROGRESS STREAM: Sending complete, ending stream');
+          // Create compatible format for existing code
+          final compatibleData = {
+            'status': status,
+            'progress': progress,
+            'total': total,
+            'error': error,
+            'txid': txid,
+            'sending': isSending, // For compatibility with existing logic
+          };
+
+          if (kDebugMode) {
+            print('📤 PROGRESS STREAM: Converted: $compatibleData');
+          }
+
+          yield compatibleData;
+
+          // End stream when transaction completes or fails
+          if (status == 'completed' || status == 'error' ||
+              (hasSeenSending && !isSending && (txid != null || error != null))) {
+            if (kDebugMode) print('📤 PROGRESS STREAM: Transaction complete, ending stream');
             break;
           }
 
-          // Adaptive delay based on progress activity
-          final delay = consecutiveNoChange > 5
-              ? const Duration(seconds: 2)  // Slower when no changes
-              : const Duration(milliseconds: 500);  // Faster when active
-
-          await Future.delayed(delay);
+          // Small delay between stream polls
+          await Future.delayed(const Duration(milliseconds: 200));
 
         } catch (e) {
           if (kDebugMode) print('⚠️ Failed to parse progress update: $e');
