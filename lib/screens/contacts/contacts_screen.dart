@@ -289,7 +289,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _addContact,
         backgroundColor: Theme.of(context).colorScheme.primary,
-        child: const Icon(Icons.person_add),
+        foregroundColor: Colors.white, // high-contrast icon
+        child: const Icon(Icons.person_add, color: Colors.white),
       ),
     );
   }
