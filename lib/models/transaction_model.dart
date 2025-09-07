@@ -1,4 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
+import '../utils/formatters.dart';
+
 import '../utils/constants.dart';
 import 'transaction.dart';
 
@@ -38,7 +40,7 @@ class TransactionModel {
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) => _$TransactionModelFromJson(json);
-  
+
   Map<String, dynamic> toJson() => _$TransactionModelToJson(this);
 
   /// Check if transaction is sent
@@ -49,7 +51,7 @@ class TransactionModel {
 
   /// Check if transaction is confirming (0 confirmations)
   bool get isConfirming => (confirmations ?? 0) == 0;
-  
+
   /// Legacy getter for backwards compatibility - use isConfirming instead
   @Deprecated('Use isConfirming instead')
   bool get isPending => isConfirming;
@@ -70,9 +72,9 @@ class TransactionModel {
   int get feeZatoshis => fee != null ? (fee! * AppConstants.zatoshisPerBtcz).round() : 0;
 
   /// Format amount for display
-  String get formattedAmount => _formatAmount(amount);
-  String get formattedAbsoluteAmount => _formatAmount(absoluteAmount);
-  String get formattedFee => fee != null ? _formatAmount(fee!) : '0.00000000';
+  String get formattedAmount => Formatters.formatBtczTrim(amount, showSymbol: false);
+  String get formattedAbsoluteAmount => Formatters.formatBtczTrim(absoluteAmount, showSymbol: false);
+  String get formattedFee => fee != null ? Formatters.formatBtczTrim(fee!, showSymbol: false) : '0.00000000';
 
   /// Get display symbol based on transaction type
   String get displaySymbol => isSent ? '-' : '+';
@@ -84,7 +86,7 @@ class TransactionModel {
   bool get hasMemo => memo != null && memo!.isNotEmpty;
 
   /// Check if transaction involves shielded addresses
-  bool get isShielded => 
+  bool get isShielded =>
       (fromAddress?.startsWith(AppConstants.shieldedAddressPrefix) ?? false) ||
       (toAddress?.startsWith(AppConstants.shieldedAddressPrefix) ?? false);
 
@@ -98,7 +100,7 @@ class TransactionModel {
   String get formattedDate {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
-    
+
     if (difference.inDays == 0) {
       if (difference.inHours == 0) {
         if (difference.inMinutes == 0) {
@@ -198,19 +200,19 @@ class TransactionModel {
   /// Private helper to format amount
   String _formatAmount(double amount) {
     if (amount == 0) return '0.00000000';
-    
+
     // Show up to 8 decimal places, removing trailing zeros
     String formatted = amount.abs().toStringAsFixed(8);
     formatted = formatted.replaceAll(RegExp(r'0*$'), '');
     formatted = formatted.replaceAll(RegExp(r'\.$'), '');
-    
+
     return formatted;
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    
+
     return other is TransactionModel &&
         other.txid == txid &&
         other.amount == amount &&

@@ -13,6 +13,7 @@ import 'qr_scanner_screen.dart';
 import '../../services/send_prefill_bus.dart';
 import '../../services/image_helper_service.dart';
 
+import '../../utils/formatters.dart';
 class SendScreenModern extends StatefulWidget {
   final String? prefilledAddress;
   final String? contactName;
@@ -43,7 +44,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
   bool _isShieldedTransaction = false;
   final double _estimatedFee = 0.00001; // Standard BitcoinZ fee (much lower)
   bool _isFiatInput = false;
-  
+
   // Track if user manually cleared the form
   bool _wasManuallyCleared = false;
 
@@ -90,7 +91,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
     if (prefill != null) {
       // Reset manual clear flag when new prefill arrives
       _wasManuallyCleared = false;
-      
+
       if (prefill.address.isNotEmpty) {
         print('🎯 SendScreenModern: Applying bus prefill address: ${prefill.address}');
         _addressController.text = prefill.address;
@@ -117,13 +118,13 @@ class _SendScreenModernState extends State<SendScreenModern> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     // Don't apply prefill if user manually cleared the form
     if (_wasManuallyCleared) {
       print('🎯 SendScreenModern.didChangeDependencies: Skipping prefill - user manually cleared');
       return;
     }
-    
+
     // If there is a prefill waiting on the bus when we become active, apply it.
     final prefill = SendPrefillBus.current.value;
     if (prefill != null) {
@@ -217,13 +218,13 @@ class _SendScreenModernState extends State<SendScreenModern> {
       _isShieldedTransaction = false;
       _wasManuallyCleared = true; // Mark as manually cleared
     });
-    
+
     // Clear any error message
     _errorMessage = null;
-    
+
     // Clear the prefill bus to prevent auto-refill
     SendPrefillBus.clear();
-    
+
     HapticFeedback.lightImpact();
   }
 
@@ -579,7 +580,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                         CircleAvatar(
                           radius: 24,
                           backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                          backgroundImage: _selectedContactPhoto != null 
+                          backgroundImage: _selectedContactPhoto != null
                               ? ImageHelperService.getMemoryImage(_selectedContactPhoto)
                               : null,
                           child: _selectedContactPhoto == null
@@ -1166,7 +1167,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                             if (walletProvider.balance.total >= totalNeeded && walletProvider.balance.spendable < totalNeeded) {
                               return 'Funds need confirmations before spending';
                             }
-                            return 'Need ${totalNeeded.toStringAsFixed(8)} BTCZ (includes fee)';
+                            return 'Need ${Formatters.formatBtczTrim(totalNeeded, showSymbol: false)} BTCZ (includes fee)';
                           }
                           return null;
                         },
@@ -1198,7 +1199,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                   btczAmount = inputAmount / fallbackPrice;
                                 }
                                 if (btczAmount != null) {
-                                  conversionText = '≈ ${btczAmount.toStringAsFixed(8)} BTCZ';
+                                  conversionText = '≈ ${Formatters.formatBtczTrim(btczAmount, showSymbol: false)} BTCZ';
                                 }
                               } else {
                                 // Converting from BTCZ to fiat
@@ -1231,7 +1232,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                           ),
                         ] else const SizedBox(),
                         Text(
-                          'Fee: ~${_estimatedFee.toStringAsFixed(8)} BTCZ',
+                          'Fee: ~${Formatters.formatBtczTrim(_estimatedFee, showSymbol: false)} BTCZ',
                           style: TextStyle(
                             fontSize: 11,
                             color: Colors.white.withOpacity(0.4),
@@ -1272,7 +1273,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Need ${totalNeeded.toStringAsFixed(8)} BTCZ total (${amount.toStringAsFixed(8)} + ${_estimatedFee.toStringAsFixed(8)} fee)',
+                                              'Need ${Formatters.formatBtczTrim(totalNeeded, showSymbol: false)} BTCZ total (${Formatters.formatBtczTrim(amount, showSymbol: false)} + ${Formatters.formatBtczTrim(_estimatedFee, showSymbol: false)} fee)',
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 color: Colors.orange,
@@ -1283,7 +1284,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                               Padding(
                                                 padding: const EdgeInsets.only(top: 2),
                                                 child: Text(
-                                                  '${(walletProvider.balance.total - walletProvider.balance.spendable).toStringAsFixed(8)} BTCZ awaiting confirmations (typically 2-6 minutes)',
+                                                  '${Formatters.formatBtczTrim((walletProvider.balance.total - walletProvider.balance.spendable), showSymbol: false)} BTCZ awaiting confirmations (typically 2-6 minutes)',
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     color: Colors.orange.withOpacity(0.8),
@@ -1478,8 +1479,8 @@ class _SendScreenModernState extends State<SendScreenModern> {
       eta: walletProvider.isSendingTransaction ? walletProvider.sendingETA : '',
       isVisible: walletProvider.isSendingTransaction || walletProvider.sendingStatus == 'success',
       completedTxid: walletProvider.completedTransactionId,
-      sentAmount: (_amountController.text.isNotEmpty || walletProvider.completedTransactionId != null) 
-          ? _getAmountValue() 
+      sentAmount: (_amountController.text.isNotEmpty || walletProvider.completedTransactionId != null)
+          ? _getAmountValue()
           : null,
       onClose: () {
         walletProvider.closeSendingSuccess();

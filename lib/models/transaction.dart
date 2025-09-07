@@ -1,10 +1,12 @@
 /// Transaction model for BitcoinZ Mobile Wallet
-/// 
+///
 /// Represents a transaction with all necessary fields for display
 /// and processing in the mobile wallet interface.
+import '../utils/formatters.dart';
 class Transaction {
   final String txid;
   final double amount;
+
   final int? blockHeight;
   final DateTime timestamp;
   final String? memo;
@@ -64,7 +66,7 @@ class Transaction {
   /// Get formatted amount with proper sign
   String get formattedAmount {
     final sign = type == TransactionType.sent ? '-' : '+';
-    return '$sign${amount.toStringAsFixed(8)} BTCZ';
+    return '$sign${Formatters.formatBtczTrim(amount, showSymbol: false)} BTCZ';
   }
 
   /// Get short transaction ID for display

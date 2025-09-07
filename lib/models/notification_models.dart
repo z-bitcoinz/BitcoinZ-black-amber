@@ -1,4 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
+import '../utils/formatters.dart';
+
 
 part 'notification_models.g.dart';
 
@@ -98,10 +100,10 @@ class NotificationSettings {
   /// Check if notifications should be shown during quiet hours
   bool get isInQuietHours {
     if (!quietHoursEnabled) return false;
-    
+
     final now = DateTime.now();
     final currentHour = now.hour;
-    
+
     if (quietHoursStart <= quietHoursEnd) {
       // Same day quiet hours (e.g., 22:00 to 07:00 next day)
       return currentHour >= quietHoursStart || currentHour < quietHoursEnd;
@@ -190,7 +192,7 @@ class NotificationData {
   String get formattedTimestamp {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inHours < 1) {
@@ -234,12 +236,12 @@ class BalanceChangeNotificationData {
 
   String _formatAmount(double amount) {
     if (amount == 0) return '0.00000000';
-    
+
     // Show up to 8 decimal places, removing trailing zeros
     String formatted = amount.abs().toStringAsFixed(8);
     formatted = formatted.replaceAll(RegExp(r'0*$'), '');
     formatted = formatted.replaceAll(RegExp(r'\.$'), '');
-    
+
     return formatted;
   }
 }
@@ -267,17 +269,17 @@ class MessageNotificationData {
   Map<String, dynamic> toJson() => _$MessageNotificationDataToJson(this);
 
   String get formattedAmount {
-    return '+${_formatAmount(amount)} BTCZ';
+    return '+${Formatters.formatBtczTrim(amount, showSymbol: false)} BTCZ';
   }
 
   String _formatAmount(double amount) {
     if (amount == 0) return '0.00000000';
-    
+
     // Show up to 8 decimal places, removing trailing zeros
     String formatted = amount.abs().toStringAsFixed(8);
     formatted = formatted.replaceAll(RegExp(r'0*$'), '');
     formatted = formatted.replaceAll(RegExp(r'\.$'), '');
-    
+
     return formatted;
   }
 

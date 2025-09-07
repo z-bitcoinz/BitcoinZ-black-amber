@@ -8,6 +8,7 @@ import '../providers/currency_provider.dart';
 import '../utils/responsive.dart';
 import 'animated_confirming_text.dart';
 
+import '../utils/formatters.dart';
 class RecentTransactions extends StatefulWidget {
   final int limit;
 
@@ -30,14 +31,14 @@ class _RecentTransactionsState extends State<RecentTransactions> {
   /// Get current block height with caching
   Future<int?> _getCurrentBlockHeight() async {
     final now = DateTime.now();
-    
+
     // Return cached value if still valid
-    if (_cachedBlockHeight != null && 
-        _blockHeightCacheTime != null && 
+    if (_cachedBlockHeight != null &&
+        _blockHeightCacheTime != null &&
         now.difference(_blockHeightCacheTime!).compareTo(_blockHeightCacheDuration) < 0) {
       return _cachedBlockHeight;
     }
-    
+
     // Fetch new block height
     try {
       // CLI service removed - return null for now
@@ -72,7 +73,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
           if (walletProvider.isLoading || !walletProvider.hasWallet) {
             return _buildTransactionSkeleton();
           }
-          
+
           return ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: Container(
@@ -153,16 +154,16 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: transaction.isReceived 
+                        color: transaction.isReceived
                             ? Colors.green.withOpacity(0.1)
                             : Colors.orange.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Icon(
-                        transaction.isReceived 
+                        transaction.isReceived
                             ? Icons.arrow_downward
                             : Icons.arrow_upward,
-                        color: transaction.isReceived 
+                        color: transaction.isReceived
                             ? Colors.green
                             : Colors.orange,
                         size: 20,
@@ -174,10 +175,10 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                         builder: (context, walletProvider, _) {
                           // Get the actual memo read status from cache
                           final isRead = walletProvider.getTransactionMemoReadStatus(
-                            transaction.txid, 
+                            transaction.txid,
                             transaction.memoRead
                           );
-                          
+
                           return Positioned(
                             right: -2,
                             top: -2,
@@ -225,7 +226,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                   builder: (context, currencyProvider, _) {
                     final confirmations = transaction.confirmations ?? 0;
                     final isConfirming = confirmations == 0;
-                    
+
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -248,7 +249,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                               transaction.displayAmount,
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: transaction.isReceived 
+                                color: transaction.isReceived
                                     ? Colors.green
                                     : Colors.orange,
                               ),
@@ -281,7 +282,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
 
   String _getDisplayAddress(transaction) {
     String? address;
-    
+
     if (transaction.isReceived) {
       // For received transactions, show sender (from) address if available, otherwise our address
       address = transaction.fromAddress ?? transaction.toAddress;
@@ -289,11 +290,11 @@ class _RecentTransactionsState extends State<RecentTransactions> {
       // For sent transactions, show recipient (to) address
       address = transaction.toAddress;
     }
-    
+
     if (address == null || address.isEmpty) {
       return 'Unknown';
     }
-    
+
     return _formatAddress(address);
   }
 
@@ -304,7 +305,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
 
   Widget _buildStatusWidget(transaction, BuildContext context) {
     final confirmations = transaction.confirmations ?? 0;
-    
+
     if (confirmations == 0) {
       // 0 confirmations = Confirming (with progress circle)
       return Row(
@@ -339,18 +340,18 @@ class _RecentTransactionsState extends State<RecentTransactions> {
 
   void _showTransactionDetails(transaction) async {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    
+
     // Mark memo as read if it has one and is unread (check cached status)
     if (transaction.hasMemo) {
       final isRead = walletProvider.getTransactionMemoReadStatus(
-        transaction.txid, 
+        transaction.txid,
         transaction.memoRead
       );
       if (!isRead) {
         await walletProvider.markMemoAsRead(transaction.txid);
       }
     }
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -389,22 +390,22 @@ class _RecentTransactionsState extends State<RecentTransactions> {
               ),
             ),
           ),
-          
+
           Text(
             'Transaction Details',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           Expanded(
             child: ListView(
               controller: scrollController,
               children: [
                 // Basic info first
-                _buildDetailRow('Amount', '${transaction.amount.toStringAsFixed(8)} BTCZ'),
+                _buildDetailRow('Amount', '${Formatters.formatBtczTrim(transaction.amount, showSymbol: false)} BTCZ'),
                 // Show fiat value in details
                 Consumer<CurrencyProvider>(
                   builder: (context, currencyProvider, _) {
@@ -416,30 +417,30 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                   },
                 ),
                 _buildDetailRow('Type', transaction.isReceived ? 'Received' : 'Sent'),
-                
+
                 // Memo prominently displayed if exists
                 if (transaction.memo?.isNotEmpty == true)
                   _buildMemoCard(transaction.memo!),
-                
+
                 // Status and confirmations
                 _buildDetailRow('Status', transaction.confirmations == 0 ? 'Unconfirmed' : (transaction.confirmations < 6 ? 'Confirming' : 'Confirmed')),
                 _buildConfirmationRow(transaction),
-                
+
                 // Date and time
                 _buildDetailRow('Date', DateFormat('EEEE, MMMM dd, yyyy at HH:mm:ss').format(transaction.timestamp)),
-                
+
                 // Addresses
                 if (transaction.fromAddress != null)
                   _buildDetailRow('From', transaction.fromAddress!, copyable: true),
                 if (transaction.toAddress != null)
                   _buildDetailRow('To', transaction.toAddress!, copyable: true),
-                
+
                 // Additional details
                 if (transaction.fee != null)
-                  _buildDetailRow('Fee', '${transaction.fee!.toStringAsFixed(8)} BTCZ'),
+                  _buildDetailRow('Fee', '${Formatters.formatBtczTrim(transaction.fee!, showSymbol: false)} BTCZ'),
                 if (transaction.blockHeight != null)
                   _buildDetailRow('Block Height', transaction.blockHeight.toString()),
-                  
+
                 // Transaction ID at the bottom for reference
                 _buildDetailRow('Transaction ID', transaction.txid, copyable: true),
               ],
@@ -555,7 +556,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
           Builder(
             builder: (context) {
               final confirmations = transaction.confirmations ?? 0;
-              
+
               String confirmationText;
               if (confirmations == 0) {
                 confirmationText = 'Unconfirmed';
@@ -608,7 +609,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
             ),
           ),
           const SizedBox(width: 12),
-          
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -623,7 +624,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                // Skeleton date line  
+                // Skeleton date line
                 Container(
                   width: 80,
                   height: 12,
@@ -635,7 +636,7 @@ class _RecentTransactionsState extends State<RecentTransactions> {
               ],
             ),
           ),
-          
+
           // Skeleton status
           Container(
             width: 60,

@@ -13,6 +13,7 @@ import '../../widgets/transaction_category_chip.dart';
 import '../../screens/wallet/all_messages_screen.dart';
 import '../../utils/responsive.dart';
 // import '../../services/btcz_cli_service.dart'; // Removed - CLI no longer used
+import '../../utils/formatters.dart';
 
 enum TransactionFilter { all, sent, received, confirming }
 
@@ -27,10 +28,10 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  
+
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
-  
+
   String _searchQuery = '';
   TransactionFilter _currentFilter = TransactionFilter.all;
   bool _isRefreshing = false;
@@ -38,7 +39,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
   bool _filterUnreadMemos = false; // Filter for unread memos from notification
   TransactionCategoryType? _selectedCategoryFilter;
   bool _showMessagesOnly = false;
-  
+
   // Block height caching
   int? _cachedBlockHeight;
   DateTime? _blockHeightCacheTime;
@@ -48,12 +49,12 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
   @override
   void initState() {
     super.initState();
-    
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -63,10 +64,10 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
     ));
 
     _fadeController.forward();
-    
+
     // Setup scroll listener for pagination
     _scrollController.addListener(_onScroll);
-    
+
     // Check if we should filter for unread memos (from notification icon)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
@@ -103,33 +104,33 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
 
   Future<void> _loadInitialData() async {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    
+
     // Load transaction stats
     _transactionStats = await walletProvider.getTransactionStats();
-    
+
     // Don't call loadTransactionsPage - use BitcoinZ Blue approach
     // Transactions are already loaded by BitcoinZ Blue RPC system
     if (kDebugMode) print('📄 Using BitcoinZ Blue approach - transactions already loaded via RPC');
-    
+
     if (mounted) setState(() {});
   }
 
   Future<void> _refreshTransactions() async {
     if (_isRefreshing) return;
-    
+
     setState(() {
       _isRefreshing = true;
     });
 
     try {
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-      
+
       // BitcoinZ Blue approach: Let RPC system handle refresh automatically
       // Just refresh stats, don't interfere with live transaction data
       _transactionStats = await walletProvider.getTransactionStats();
-      
+
       if (kDebugMode) print('📄 Transaction refresh completed (BitcoinZ Blue RPC handles live updates)');
-      
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -153,10 +154,10 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
       setState(() {
         _searchQuery = query;
       });
-      
+
       // BitcoinZ Blue approach: Just update local filter, no database calls
       if (kDebugMode) print('📄 Search query updated: "$query" (filtering locally)');
-      
+
       // The build method will filter transactions locally based on _searchQuery
       // No need for database calls - much faster and simpler
     }
@@ -247,14 +248,14 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
   /// Get current block height with caching
   Future<int?> _getCurrentBlockHeight() async {
     final now = DateTime.now();
-    
+
     // Return cached value if still valid
-    if (_cachedBlockHeight != null && 
-        _blockHeightCacheTime != null && 
+    if (_cachedBlockHeight != null &&
+        _blockHeightCacheTime != null &&
         now.difference(_blockHeightCacheTime!).compareTo(_blockHeightCacheDuration) < 0) {
       return _cachedBlockHeight;
     }
-    
+
     // Fetch new block height
     try {
       // CLI service removed - return null for now
@@ -565,9 +566,9 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ),
-                        
+
                         SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 12 : 16),
-                        
+
                         // Filter Chips (hide when filtering unread memos)
                         if (!_filterUnreadMemos)
                           SingleChildScrollView(
@@ -576,7 +577,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                               children: TransactionFilter.values.map((filter) {
                                 final isSelected = _currentFilter == filter;
                                 final count = _getFilterCount(filter);
-                                
+
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: FilterChip(
@@ -586,8 +587,8 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                                     selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
                                     checkmarkColor: Theme.of(context).colorScheme.primary,
                                     labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                      color: isSelected 
-                                          ? Theme.of(context).colorScheme.primary 
+                                      color: isSelected
+                                          ? Theme.of(context).colorScheme.primary
                                           : Theme.of(context).colorScheme.onSurface,
                                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                                     ),
@@ -599,9 +600,9 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                       ],
                     ),
                   ),
-                  
+
                   SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 20),
-                  
+
                   // Transaction List
                   Expanded(
                     child: _buildTransactionList(walletProvider),
@@ -697,7 +698,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
   Widget _buildTransactionList(WalletProvider walletProvider) {
     // Filter transactions locally (BitcoinZ Blue approach)
     List<TransactionModel> filteredTransactions = walletProvider.transactions;
-    
+
     // Apply messages only filter
     if (_showMessagesOnly) {
       filteredTransactions = filteredTransactions.where((tx) => tx.hasMemo).toList();
@@ -739,7 +740,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
         }
       }).toList();
     }
-    
+
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
       filteredTransactions = filteredTransactions.where((tx) {
@@ -749,7 +750,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                (tx.memo?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
       }).toList();
     }
-    
+
     // Apply type filter (only if not filtering unread memos)
     if (!_filterUnreadMemos && _currentFilter != TransactionFilter.all) {
       filteredTransactions = filteredTransactions.where((tx) {
@@ -757,7 +758,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
           case TransactionFilter.sent:
             return tx.type == 'sent';
           case TransactionFilter.received:
-            return tx.type == 'received';  
+            return tx.type == 'received';
           case TransactionFilter.confirming:
             return tx.isConfirming;
           case TransactionFilter.all:
@@ -766,7 +767,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
         }
       }).toList();
     }
-    
+
     if (walletProvider.isLoading && filteredTransactions.isEmpty) {
       return const Center(
         child: Column(
@@ -897,10 +898,10 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                         builder: (context, walletProvider, _) {
                           // Get the actual memo read status from cache (same as transaction list)
                           final isRead = walletProvider.getTransactionMemoReadStatus(
-                            transaction.txid, 
+                            transaction.txid,
                             transaction.memoRead
                           );
-                          
+
                           return Positioned(
                             right: -2,
                             top: -2,
@@ -955,7 +956,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                 ),
 
                 SizedBox(width: ResponsiveUtils.isSmallMobile(context) ? 12 : 16),
-                
+
                 // Transaction Details
                 Expanded(
                   child: Column(
@@ -976,7 +977,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    '${isReceived ? '+' : '-'}${transaction.amount.toStringAsFixed(8)} BTCZ',
+                                    '${isReceived ? '+' : '-'}${Formatters.formatBtczTrim(transaction.amount, showSymbol: false)} BTCZ',
                                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                       color: _getTransactionColor(transaction),
                                       fontWeight: FontWeight.bold,
@@ -1001,9 +1002,9 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                           ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 4),
-                      
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1025,7 +1026,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                           ),
                         ],
                       ),
-                      
+
                       if ((transaction.confirmations ?? 0) == 0) ...[
                         const SizedBox(height: 4),
                         Row(
@@ -1095,18 +1096,18 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
 
   void _showTransactionDetails(TransactionModel transaction) async {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-    
+
     // Mark memo as read if it has one and is unread (check cached status)
     if (transaction.hasMemo) {
       final isRead = walletProvider.getTransactionMemoReadStatus(
-        transaction.txid, 
+        transaction.txid,
         transaction.memoRead
       );
       if (!isRead) {
         await walletProvider.markMemoAsRead(transaction.txid);
       }
     }
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1145,51 +1146,51 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
               ),
             ),
           ),
-          
+
           Text(
             'Transaction Details',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           Expanded(
             child: ListView(
               controller: scrollController,
               children: [
                 // Basic info first
-                _buildDetailRow('Amount', '${transaction.amount.toStringAsFixed(8)} BTCZ'),
+                _buildDetailRow('Amount', '${Formatters.formatBtczTrim(transaction.amount, showSymbol: false)} BTCZ'),
                 _buildDetailRow('Type', _getTransactionTitle(transaction)),
-                
+
                 // Memo prominently displayed if exists (same as main page)
                 if (transaction.memo?.isNotEmpty == true)
                   _buildMemoCard(transaction.memo!),
 
                 // Message labels section
                 _buildMessageLabelsSection(transaction),
-                
+
                 // Status and confirmations
                 _buildDetailRow('Status', transaction.isPending ? 'Confirming' : 'Confirmed'),
                 if (!transaction.isPending)
                   _buildConfirmationRow(transaction),
-                
+
                 // Date and time
                 _buildDetailRow('Date', DateFormat('EEEE, MMMM dd, yyyy at HH:mm:ss').format(transaction.timestamp)),
-                
+
                 // Addresses
                 if (transaction.fromAddress != null)
                   _buildDetailRow('From', transaction.fromAddress!, copyable: true),
                 if (transaction.toAddress != null)
                   _buildDetailRow('To', transaction.toAddress!, copyable: true),
-                
+
                 // Additional details
                 if (transaction.fee != null)
-                  _buildDetailRow('Fee', '${transaction.fee!.toStringAsFixed(8)} BTCZ'),
+                  _buildDetailRow('Fee', '${Formatters.formatBtczTrim(transaction.fee!, showSymbol: false)} BTCZ'),
                 if (transaction.blockHeight != null)
                   _buildDetailRow('Block Height', transaction.blockHeight.toString()),
-                
+
                 // Transaction ID at the bottom for reference
                 _buildDetailRow('Transaction ID', transaction.txid, copyable: true),
               ],
@@ -1440,7 +1441,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
           Builder(
             builder: (context) {
               final confirmations = transaction.confirmations ?? 0;
-              
+
               String confirmationText;
               if (confirmations == 0) {
                 confirmationText = 'Unconfirmed';
@@ -1479,7 +1480,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
     // Use live transaction data instead of database stats (BitcoinZ Blue approach)
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     final transactions = walletProvider.transactions;
-    
+
     switch (filter) {
       case TransactionFilter.all:
         return transactions.length;
@@ -1516,7 +1517,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
     if (address.length <= 20) return address;
     return '${address.substring(0, 10)}...${address.substring(address.length - 10)}';
   }
-  
+
   String _getConfirmationText(TransactionModel transaction) {
     final confirmations = transaction.confirmations ?? 0;
     if (confirmations >= 6) {

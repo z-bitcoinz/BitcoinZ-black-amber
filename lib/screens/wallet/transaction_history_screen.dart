@@ -7,6 +7,7 @@ import '../../providers/currency_provider.dart';
 import '../../models/transaction.dart';
 import '../../utils/responsive.dart';
 
+import '../../utils/formatters.dart';
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
 
@@ -18,7 +19,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  
+
   final _searchController = TextEditingController();
   String _searchQuery = '';
   TransactionFilter _currentFilter = TransactionFilter.all;
@@ -27,12 +28,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
   @override
   void initState() {
     super.initState();
-    
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -53,7 +54,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
 
   Future<void> _refreshTransactions() async {
     if (_isRefreshing) return;
-    
+
     setState(() {
       _isRefreshing = true;
     });
@@ -123,7 +124,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
   void _copyToClipboard(String text, String message) {
     Clipboard.setData(ClipboardData(text: text));
     HapticFeedback.lightImpact();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -144,7 +145,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: _isRefreshing 
+            icon: _isRefreshing
                 ? SizedBox(
                     width: 20,
                     height: 20,
@@ -166,7 +167,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
           builder: (context, walletProvider, child) {
             final allTransactions = walletProvider.transactions;
             final filteredTransactions = _filterTransactions(allTransactions.map((tx) => tx.toTransaction()).toList());
-            
+
             return Padding(
               padding: ResponsiveUtils.getScreenPadding(context),
               child: FadeTransition(
@@ -232,9 +233,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                         ],
                       ),
                     ),
-                    
+
                     SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 20),
-                    
+
                     // Filter Tabs
                     Container(
                       height: ResponsiveUtils.isSmallScreen(context) ? 48 : 56,
@@ -255,8 +256,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                               child: Container(
                                 margin: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
-                                  color: isSelected 
-                                      ? Theme.of(context).colorScheme.primary 
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.primary
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context) * 0.75),
                                 ),
@@ -264,8 +265,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                                   child: Text(
                                     filter.displayName,
                                     style: TextStyle(
-                                      color: isSelected 
-                                          ? Colors.white 
+                                      color: isSelected
+                                          ? Colors.white
                                           : Theme.of(context).colorScheme.onSurface,
                                       fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.9,
                                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
@@ -278,9 +279,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                         }).toList(),
                       ),
                     ),
-                    
+
                     SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 20),
-                    
+
                     // Transaction List
                     Expanded(
                       child: filteredTransactions.isEmpty
@@ -372,11 +373,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
   Widget _buildTransactionTile(Transaction transaction) {
     final isReceived = transaction.type == TransactionType.received;
     final amount = transaction.amount.abs();
-    final formattedAmount = '${isReceived ? '+' : '-'}${amount.toStringAsFixed(8)} BTCZ';
-    
+    final formattedAmount = '${isReceived ? '+' : '-'}${Formatters.formatBtczTrim(amount, showSymbol: false)} BTCZ';
+
     Color statusColor;
     IconData statusIcon;
-    
+
     switch (transaction.status) {
       case TransactionStatus.confirmed:
         statusColor = Colors.green;
@@ -421,9 +422,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                     size: ResponsiveUtils.getIconSize(context, base: 20),
                   ),
                 ),
-                
+
                 SizedBox(width: ResponsiveUtils.isSmallMobile(context) ? 12 : 16),
-                
+
                 // Transaction Details
                 Expanded(
                   child: Column(
@@ -471,9 +472,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                           ),
                         ],
                       ),
-                      
+
                       SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 4 : 6),
-                      
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -511,7 +512,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                 ),
               ],
             ),
-            
+
             // Memo preview for shielded transactions
             if (transaction.memo != null && transaction.memo!.isNotEmpty) ...[
               SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 8 : 12),
@@ -523,8 +524,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                   borderRadius: BorderRadius.circular(ResponsiveUtils.getCardBorderRadius(context) * 0.5),
                 ),
                 child: Text(
-                  transaction.memo!.length > 50 
-                      ? '${transaction.memo!.substring(0, 50)}...' 
+                  transaction.memo!.length > 50
+                      ? '${transaction.memo!.substring(0, 50)}...'
                       : transaction.memo!,
                   style: TextStyle(
                     fontSize: ResponsiveUtils.getBodyTextSize(context) * 0.85,
@@ -553,7 +554,7 @@ class TransactionDetailSheet extends StatelessWidget {
   void _copyToClipboard(BuildContext context, String text, String message) {
     Clipboard.setData(ClipboardData(text: text));
     HapticFeedback.lightImpact();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -568,7 +569,7 @@ class TransactionDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final isReceived = transaction.type == TransactionType.received;
     final amount = transaction.amount.abs();
-    
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
@@ -589,7 +590,7 @@ class TransactionDetailSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Padding(
             padding: ResponsiveUtils.getScreenPadding(context),
@@ -610,7 +611,7 @@ class TransactionDetailSheet extends StatelessWidget {
               ],
             ),
           ),
-          
+
           Expanded(
             child: SingleChildScrollView(
               padding: ResponsiveUtils.getScreenPadding(context),
@@ -622,7 +623,7 @@ class TransactionDetailSheet extends StatelessWidget {
                     child: Column(
                       children: [
                         Text(
-                          '${isReceived ? '+' : '-'}${amount.toStringAsFixed(8)}',
+                          '${isReceived ? '+' : '-'}${Formatters.formatBtczTrim(amount, showSymbol: false)}',
                           style: TextStyle(
                             fontSize: ResponsiveUtils.getTitleTextSize(context) * 1.5,
                             fontWeight: FontWeight.bold,
@@ -642,19 +643,19 @@ class TransactionDetailSheet extends StatelessWidget {
                       ],
                     ),
                   ),
-                  
+
                   SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 24 : 32),
-                  
+
                   // Transaction Info
                   _buildDetailRow(context, 'Type', isReceived ? 'Received' : 'Sent'),
                   _buildDetailRow(context, 'Status', transaction.status.displayName),
                   _buildDetailRow(context, 'Date', DateFormat('MMM dd, yyyy').format(transaction.timestamp)),
                   _buildDetailRow(context, 'Time', DateFormat('HH:mm:ss').format(transaction.timestamp)),
                   _buildDetailRow(context, 'Confirmations', '${transaction.confirmations}'),
-                  
+
                   if (transaction.fee != null && transaction.fee! > 0)
-                    _buildDetailRow(context, 'Network Fee', '${transaction.fee!.toStringAsFixed(8)} BTCZ'),
-                  
+                    _buildDetailRow(context, 'Network Fee', '${Formatters.formatBtczTrim(transaction.fee!, showSymbol: false)} BTCZ'),
+
                   // Transaction ID
                   SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 24),
                   Text(
@@ -700,7 +701,7 @@ class TransactionDetailSheet extends StatelessWidget {
                       ),
                     ),
                   ),
-                  
+
                   // Addresses
                   if (transaction.fromAddress != null) ...[
                     SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 24),
@@ -735,7 +736,7 @@ class TransactionDetailSheet extends StatelessWidget {
                       ),
                     ),
                   ],
-                  
+
                   if (transaction.toAddress != null) ...[
                     SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 24),
                     Text(
@@ -769,7 +770,7 @@ class TransactionDetailSheet extends StatelessWidget {
                       ),
                     ),
                   ],
-                  
+
                   // Memo
                   if (transaction.memo != null && transaction.memo!.isNotEmpty) ...[
                     SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 24),
@@ -798,7 +799,7 @@ class TransactionDetailSheet extends StatelessWidget {
                       ),
                     ),
                   ],
-                  
+
                   SizedBox(height: ResponsiveUtils.getVerticalPadding(context)),
                 ],
               ),
