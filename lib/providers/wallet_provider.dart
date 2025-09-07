@@ -91,6 +91,7 @@ class WalletProvider with ChangeNotifier {
   DateTime? _sendStartTime;
   String _sendingETA = '';
   int _lastSeenProgress = -1; // Track progress changes
+  String? _completedTransactionId; // Store completed transaction ID for success state
 
   // Comprehensive sync tracking with batch info and ETA
   DateTime? _lastSyncTime;
@@ -404,6 +405,7 @@ class WalletProvider with ChangeNotifier {
   double get sendingProgress => _sendingProgress;
   String get sendingStatus => _sendingStatus;
   String get sendingETA => _sendingETA;
+  String? get completedTransactionId => _completedTransactionId;
   DateTime? get lastConnectionCheck => _lastConnectionCheck;
   bool get autoSyncEnabled => _autoSyncEnabled;
 
@@ -3300,8 +3302,16 @@ class WalletProvider with ChangeNotifier {
   }
 
   /// Set transaction sending progress with smooth interpolation
-  void _setSendingProgress(bool sending, {double progress = 0.0, String status = ''}) {
+  void _setSendingProgress(bool sending, {double progress = 0.0, String status = '', String? txid}) {
     _isSendingTransaction = sending;
+    
+    // Store completed transaction ID when provided
+    if (txid != null && txid.isNotEmpty) {
+      _completedTransactionId = txid;
+    } else if (!sending) {
+      // Clear completed transaction ID when starting new transaction or clearing state
+      _completedTransactionId = null;
+    }
 
     // Smooth progress interpolation to avoid jumpy progress bar
     if (sending && progress > _sendingProgress && progress - _sendingProgress < 0.1) {
@@ -3347,6 +3357,13 @@ class WalletProvider with ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  /// Close the success overlay manually (called from UI)
+  void closeSendingSuccess() {
+    if (_isSendingTransaction && _sendingStatus == 'success') {
+      _setSendingProgress(false, progress: 0.0, status: '');
+    }
   }
 
   /// Animate progress smoothly to target value
@@ -3429,8 +3446,8 @@ class WalletProvider with ChangeNotifier {
               status: statusMessage
             );
           } else if (status == 'completed' && txid != null && txid.toString().isNotEmpty) {
-            // Transaction completed successfully
-            _setSendingProgress(false, progress: 1.0, status: 'Transaction sent!');
+            // Transaction completed successfully - transform dialog to success state
+            _setSendingProgress(true, progress: 1.0, status: 'success', txid: txid);
             if (kDebugMode) print('📤 STREAM COMPLETE: Transaction sent with TXID: $txid');
             _cancelSendProgressMonitoring();
           } else if (status == 'error' && error != null && error.toString().isNotEmpty) {
@@ -3439,8 +3456,8 @@ class WalletProvider with ChangeNotifier {
             if (kDebugMode) print('📤 STREAM FAILED: $error');
             _cancelSendProgressMonitoring();
           } else if (txid != null && txid.toString().isNotEmpty && !isInProgress) {
-            // Transaction completed (fallback detection)
-            _setSendingProgress(false, progress: 1.0, status: 'Transaction completed!');
+            // Transaction completed (fallback detection) - transform dialog to success state
+            _setSendingProgress(true, progress: 1.0, status: 'success', txid: txid);
             if (kDebugMode) print('📤 STREAM COMPLETE: Transaction complete with TXID: $txid');
             _cancelSendProgressMonitoring();
           }

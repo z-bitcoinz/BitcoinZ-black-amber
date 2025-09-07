@@ -510,29 +510,7 @@ class _SendScreenModernState extends State<SendScreenModern> {
       );
 
       if (txid != null && mounted) {
-        // Brief delay to show success message (wallet provider handles status)
-        await Future.delayed(const Duration(milliseconds: 800));
-
-        // Show success dialog
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) => TransactionSuccessDialog(
-            transactionId: txid,
-            amount: amount,
-            toAddress: address,
-            fiatAmount: fiatAmount,
-            currencyCode: currencyCode,
-            contactName: _selectedContactName,
-            onClose: () {
-              // Pop the dialog safely
-              if (mounted && Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
-              }
-            },
-          ),
-        );
-
+        // Success! The SendingProgressOverlay will show the success state automatically
         // Clear fields after successful send
         if (mounted) {
           _addressController.clear();
@@ -1505,6 +1483,11 @@ class _SendScreenModernState extends State<SendScreenModern> {
       progress: walletProvider.isSendingTransaction ? walletProvider.sendingProgress : 0,
       eta: walletProvider.isSendingTransaction ? walletProvider.sendingETA : '',
       isVisible: walletProvider.isSendingTransaction,
+      completedTxid: walletProvider.completedTransactionId,
+      sentAmount: walletProvider.isSendingTransaction && _amountController.text.isNotEmpty 
+          ? _getAmountValue() 
+          : null,
+      onClose: () => walletProvider.closeSendingSuccess(),
     ),
   ],
 );
