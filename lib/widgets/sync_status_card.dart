@@ -13,7 +13,7 @@ class SyncStatusCard extends StatefulWidget {
   State<SyncStatusCard> createState() => _SyncStatusCardState();
 }
 
-class _SyncStatusCardState extends State<SyncStatusCard> 
+class _SyncStatusCardState extends State<SyncStatusCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
@@ -276,10 +276,18 @@ class _SyncStatusCardState extends State<SyncStatusCard>
             });
           }
         }
-        
+
         if (!shouldShow) {
           return const SizedBox.shrink();
         }
+
+        // UI-only: hide the tile during initial "Starting sync..." phase (no progress/batch info)
+        if (provider.isSyncing &&
+            _getDisplayProgress(provider) <= 0 &&
+            provider.totalBatches == 0) {
+          return const SizedBox.shrink();
+        }
+
 
         // Start or stop pulse animation based on sync status
         if (provider.isSyncing && !_animationController.isAnimating) {
