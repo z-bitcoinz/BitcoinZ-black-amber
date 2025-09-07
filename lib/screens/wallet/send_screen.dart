@@ -518,13 +518,38 @@ class _SendScreenState extends State<SendScreen>
                                     color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
                                     size: 20,
                                   ),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      Icons.qr_code_scanner,
-                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
-                                      size: 22,
-                                    ),
-                                    onPressed: _scanQRCode,
+                                  suffixIcon: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.content_paste,
+                                          color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                          size: 20,
+                                        ),
+                                        onPressed: () async {
+                                          final data = await Clipboard.getData(Clipboard.kTextPlain);
+                                          final text = data?.text?.trim() ?? '';
+                                          if (text.isNotEmpty) {
+                                            setState(() {
+                                              _addressController.text = text;
+                                              _errorMessage = null;
+                                              _isShieldedTransaction = text.startsWith('zc') || text.startsWith('zs');
+                                            });
+                                          }
+                                        },
+                                        tooltip: 'Paste',
+                                      ),
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.qr_code_scanner,
+                                          color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                          size: 22,
+                                        ),
+                                        onPressed: _scanQRCode,
+                                        tooltip: 'Scan QR',
+                                      ),
+                                    ],
                                   ),
                                   border: InputBorder.none,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),

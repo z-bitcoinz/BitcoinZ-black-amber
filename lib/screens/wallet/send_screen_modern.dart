@@ -969,6 +969,25 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                 ),
                               IconButton(
                                 icon: Icon(
+                                  Icons.content_paste,
+                                  color: const Color(0xFFFF6B00),
+                                  size: 20,
+                                ),
+                                onPressed: () async {
+                                  final data = await Clipboard.getData(Clipboard.kTextPlain);
+                                  final text = data?.text?.trim() ?? '';
+                                  if (text.isNotEmpty) {
+                                    setState(() {
+                                      _addressController.text = text;
+                                      _errorMessage = null;
+                                      _isShieldedTransaction = text.startsWith('zc') || text.startsWith('zs');
+                                    });
+                                  }
+                                },
+                                tooltip: 'Paste',
+                              ),
+                              IconButton(
+                                icon: Icon(
                                   Icons.contacts,
                                   color: const Color(0xFFFF6B00),
                                   size: 20,
