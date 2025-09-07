@@ -33,15 +33,18 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _innerRotationController;
-  late AnimationController _outerRotationController;  
+  late AnimationController _outerRotationController;
   late AnimationController _pulseController;
   late AnimationController _checkmarkController;
-  
+
   late Animation<double> _fadeAnimation;
   late Animation<double> _innerRotationAnimation;
   late Animation<double> _outerRotationAnimation;
   late Animation<double> _pulseAnimation;
   late Animation<double> _checkmarkAnimation;
+
+  // Preserve last visible status so fade-out keeps the same visual state
+  String _lastVisibleStatus = '';
 
   Timer? _autoCloseTimer;
   int _countdownSeconds = 8;
@@ -49,37 +52,37 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
   @override
   void initState() {
     super.initState();
-    
+
     // Fade in/out controller
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     // Inner circle: Slower constant speed (6 seconds per rotation)
     _innerRotationController = AnimationController(
       duration: const Duration(seconds: 6), // Slower ring
       vsync: this,
     );
-    
+
     // Outer circle: Faster constant speed (4 seconds per rotation)
     _outerRotationController = AnimationController(
       duration: const Duration(seconds: 4), // Faster ring
       vsync: this,
     );
-    
+
     // Logo pulse: Remove pulsing for static professional look
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1), // Minimal, unused
       vsync: this,
     );
-    
+
     // Checkmark animation for success state
     _checkmarkController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -87,17 +90,17 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
       parent: _fadeController,
       curve: Curves.easeOut,
     ));
-    
+
     _innerRotationAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
     ).animate(_innerRotationController); // No curve - instant constant speed
-    
+
     _outerRotationAnimation = Tween<double>(
       begin: 0.0,
       end: -1.0, // Negative for counter-clockwise
     ).animate(_outerRotationController); // No curve - instant constant speed
-    
+
     _pulseAnimation = Tween<double>(
       begin: 1.0,
       end: 1.3,
@@ -105,7 +108,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
       parent: _pulseController,
       curve: Curves.easeInOut,
     ));
-    
+
     _checkmarkAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -128,13 +131,14 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
       _fadeController.reverse();
       // Stop all animations
       _innerRotationController.stop();
-      _outerRotationController.stop();  
+      _outerRotationController.stop();
       _pulseController.stop();
-      _checkmarkController.reset();
+      // Do NOT reset checkmark here to preserve success visuals during fade-out
     } else if (widget.status == 'success' && oldWidget.status != 'success') {
       // Transition to success state - stop spinning and show checkmark
       _innerRotationController.stop();
       _outerRotationController.stop();
+      _checkmarkController.reset();
       _checkmarkController.forward();
       // Start 3-second countdown timer
       _startAutoCloseCountdown();
@@ -163,6 +167,16 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
     if (!widget.isVisible && _fadeController.isDismissed) {
       return const SizedBox.shrink();
     }
+
+    // If overlay is visible, remember the last non-empty status to avoid
+    // showing fallback text on the final fade-out frame.
+    if (widget.isVisible && widget.status.isNotEmpty) {
+      _lastVisibleStatus = widget.status;
+    }
+
+    // Determine which status to render (preserve last visible one during fade-out)
+    final effectiveStatus =
+        widget.isVisible ? (widget.status.isNotEmpty ? widget.status : _lastVisibleStatus) : _lastVisibleStatus;
 
     return AnimatedBuilder(
       animation: _fadeAnimation,
@@ -212,20 +226,20 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
                           Container(
                             width: 80,
                             height: 80,
-                            child: widget.status == 'success' 
+                            child: effectiveStatus == 'success'
                                 ? _buildSuccessCheckmark()
                                 : _buildSpinningRings(),
                           ),
-                          
+
                           const SizedBox(height: 24),
-                          
+
                           // Status text - different content for success vs progress
-                          widget.status == 'success' 
+                          widget.status == 'success'
                               ? _buildSuccessContent()
-                              : _buildProgressContent(),
-                          
+                              : _buildProgressContent(statusOverride: effectiveStatus.isNotEmpty ? effectiveStatus : 'Processing...'),
+
                           // Show progress details only when not in success state
-                          if (widget.status != 'success') ...[
+                          if (effectiveStatus != 'success') ...[
                             const SizedBox(height: 16),
 
                             // Progress bar (only show if progress > 0)
@@ -275,8 +289,9 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
                             ],
 
                             // Subtext
+                            // Subtext (keep consistent wording; never revert to "Please wait")
                             Text(
-                              widget.progress > 0 ? 'Processing...' : 'Please wait...',
+                              'Processing...',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.5),
                                 fontSize: 12,
@@ -321,7 +336,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
             );
           },
         ),
-        
+
         // Inner Circle (Clockwise) - Break at 0° (top)
         AnimatedBuilder(
           animation: _innerRotationAnimation,
@@ -338,7 +353,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
             );
           },
         ),
-        
+
         // Static BitcoinZ Logo with Soft Elegant Glow
         Container(
           width: 48,
@@ -420,9 +435,12 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
   }
 
   /// Build progress content (normal status text)
-  Widget _buildProgressContent() {
+  Widget _buildProgressContent({String? statusOverride}) {
+    final text = (statusOverride ?? widget.status).isNotEmpty
+        ? (statusOverride ?? widget.status)
+        : 'Processing...';
     return Text(
-      widget.status,
+      text,
       textAlign: TextAlign.center,
       style: TextStyle(
         color: Colors.white.withOpacity(0.9),
@@ -449,9 +467,9 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
             height: 1.4,
           ),
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Amount sent (if provided)
         if (widget.sentAmount != null) ...[
           Container(
@@ -501,7 +519,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
           ),
           const SizedBox(height: 16),
         ],
-        
+
         // Transaction ID (if provided)
         if (widget.completedTxid != null) ...[
           GestureDetector(
@@ -532,7 +550,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          widget.completedTxid!.length > 16 
+                          widget.completedTxid!.length > 16
                               ? '${widget.completedTxid!.substring(0, 8)}...${widget.completedTxid!.substring(widget.completedTxid!.length - 8)}'
                               : widget.completedTxid!,
                           style: TextStyle(
@@ -606,13 +624,13 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
   void _startAutoCloseCountdown() {
     _autoCloseTimer?.cancel(); // Cancel any existing timer
     _countdownSeconds = 8;
-    
+
     _autoCloseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
           _countdownSeconds--;
         });
-        
+
         if (_countdownSeconds <= 0) {
           timer.cancel();
           // Auto-close the overlay
@@ -629,7 +647,7 @@ class _SendingProgressOverlayState extends State<SendingProgressOverlay>
   /// Copy transaction ID to clipboard
   void _copyToClipboard(String txid) async {
     await Clipboard.setData(ClipboardData(text: txid));
-    
+
     // Show a brief feedback
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -654,16 +672,16 @@ class SingleBreakCirclePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width / 2 - 5); // Identical size for both rings
-    
+
     // Ring properties - identical thickness for both rings
     final strokeWidth = 4.5; // Same thickness for perfect consistency
     final gapAngle = 0.7; // Same larger gap for both rings - ultra-smooth fade-out
-    final baseColor = isOuter 
+    final baseColor = isOuter
         ? const Color(0xFF995500) // Deeper amber for outer
         : const Color(0xFFCC5500); // Medium amber for inner
-    
+
     // Complementary break positions for visual harmony
-    final startAngle = isOuter 
+    final startAngle = isOuter
         ? -0.785398 // Outer ring: break at 135° (-π/4) for better balance
         : -1.5708;  // Inner ring: break at top (-π/2) as reference
     final arcAngle = (2 * 3.14159) - gapAngle; // Full circle minus gap
@@ -687,14 +705,14 @@ class SingleBreakCirclePainter extends CustomPainter {
 
     // Create fade-out effect only at gap endpoints for soft endings
     final gapFadeAngle = 0.3; // Small fade zone at gap ends
-    
+
     // Left gap fade
     final leftFadePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2.5);
-    
+
     final leftGradient = SweepGradient(
       colors: [
         baseColor.withOpacity(0.9),
@@ -704,9 +722,9 @@ class SingleBreakCirclePainter extends CustomPainter {
       startAngle: startAngle + arcAngle - gapFadeAngle,
       endAngle: startAngle + arcAngle,
     ).createShader(Rect.fromCircle(center: center, radius: radius));
-    
+
     leftFadePaint.shader = leftGradient;
-    
+
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       startAngle + arcAngle - gapFadeAngle,
@@ -714,14 +732,14 @@ class SingleBreakCirclePainter extends CustomPainter {
       false,
       leftFadePaint,
     );
-    
+
     // Right gap fade
     final rightFadePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2.5);
-    
+
     final rightGradient = SweepGradient(
       colors: [
         baseColor.withOpacity(0.0),
@@ -731,9 +749,9 @@ class SingleBreakCirclePainter extends CustomPainter {
       startAngle: startAngle,
       endAngle: startAngle + gapFadeAngle,
     ).createShader(Rect.fromCircle(center: center, radius: radius));
-    
+
     rightFadePaint.shader = rightGradient;
-    
+
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       startAngle,
@@ -743,8 +761,8 @@ class SingleBreakCirclePainter extends CustomPainter {
     );
 
     // Enhanced multi-layer glow system for ultra-soft rounded endings
-    
-    // Wide outer halo - ultra-soft 
+
+    // Wide outer halo - ultra-soft
     final outerHaloPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth + 6
@@ -759,7 +777,7 @@ class SingleBreakCirclePainter extends CustomPainter {
       false,
       outerHaloPaint,
     );
-    
+
     // Medium glow layer - enhanced blur
     final mediumGlowPaint = Paint()
       ..style = PaintingStyle.stroke
@@ -794,7 +812,7 @@ class SingleBreakCirclePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(SingleBreakCirclePainter oldDelegate) => 
+  bool shouldRepaint(SingleBreakCirclePainter oldDelegate) =>
       oldDelegate.progress != progress || oldDelegate.isOuter != isOuter;
 }
 
@@ -815,7 +833,7 @@ class _LoadingDotsState extends State<_LoadingDots>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat();
-    
+
     _animation = Tween<double>(
       begin: 0.0,
       end: 3.0,
