@@ -1088,6 +1088,9 @@ class _SendScreenState extends State<SendScreen>
     double letterSpacing = -0.5,
     Color color = Colors.white,
   }) {
+    final interfaceProvider = Provider.of<InterfaceProvider>(context, listen: false);
+    final showDecimals = interfaceProvider.showDecimals;
+
     String integerPart = amount;
     String fractionalPart = '';
     final dotIndex = amount.indexOf('.');
@@ -1108,7 +1111,7 @@ class _SendScreenState extends State<SendScreen>
         ),
         children: [
           TextSpan(text: integerPart),
-          if (fractionalPart.isNotEmpty)
+          if (showDecimals && fractionalPart.isNotEmpty)
             TextSpan(
               text: fractionalPart,
               style: TextStyle(

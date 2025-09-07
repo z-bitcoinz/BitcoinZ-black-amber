@@ -104,6 +104,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       interfaceProvider.toggleAnalyticsTabVisible();
                     },
                   ),
+                  _buildSettingsTile(
+                    context: context,
+                    icon: Icons.format_list_numbered,
+                    title: 'Show Decimals',
+                    subtitle: interfaceProvider.showDecimals
+                        ? 'Show digits after the decimal point'
+                        : 'Hide the fractional part (BTCZ)',
+                    trailing: Switch(
+                      value: interfaceProvider.showDecimals,
+                      onChanged: (value) {
+                        interfaceProvider.setShowDecimals(value);
+                      },
+                      activeColor: Theme.of(context).colorScheme.primary,
+                    ),
+                    onTap: () {
+                      interfaceProvider.toggleShowDecimals();
+                    },
+                  ),
                 ],
               ),
 

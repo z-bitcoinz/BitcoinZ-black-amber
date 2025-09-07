@@ -4,6 +4,8 @@ import 'dart:ui';
 import 'dart:io';
 import '../providers/wallet_provider.dart';
 import '../providers/currency_provider.dart';
+import '../providers/interface_provider.dart';
+
 import '../utils/responsive.dart';
 import 'animated_progress_dots.dart';
 import '../screens/settings/settings_screen.dart';
@@ -318,6 +320,9 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
     double letterSpacing = -0.5,
     Color color = Colors.white,
   }) {
+    final interfaceProvider = Provider.of<InterfaceProvider>(context, listen: false);
+    final showDecimals = interfaceProvider.showDecimals;
+
     // Split integer and fractional parts
     String integerPart = amount;
     String fractionalPart = '';
@@ -339,7 +344,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
         ),
         children: [
           TextSpan(text: integerPart),
-          if (fractionalPart.isNotEmpty)
+          if (showDecimals && fractionalPart.isNotEmpty)
             TextSpan(
               text: fractionalPart,
               style: TextStyle(

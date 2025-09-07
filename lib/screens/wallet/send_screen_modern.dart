@@ -14,6 +14,9 @@ import '../../services/send_prefill_bus.dart';
 import '../../services/image_helper_service.dart';
 
 import '../../utils/formatters.dart';
+import '../../providers/interface_provider.dart';
+import '../../screens/main_screen.dart';
+
 class SendScreenModern extends StatefulWidget {
   final String? prefilledAddress;
   final String? contactName;
@@ -1810,37 +1813,58 @@ Widget buildAmountTextSmall(
   Color color = Colors.white,
   TextAlign textAlign = TextAlign.start,
 }) {
-  String integerPart = amount;
-  String fractionalPart = '';
-  final dotIndex = amount.indexOf('.');
-  if (dotIndex != -1) {
-    integerPart = amount.substring(0, dotIndex);
-    fractionalPart = amount.substring(dotIndex);
-  }
+  // Read the interface provider to decide if decimals should show
+  try {
+    final interfaceProvider = Provider.of<InterfaceProvider>(MainScreen.navigatorKey.currentContext!, listen: false);
+    final showDecimals = interfaceProvider.showDecimals;
 
-  return RichText(
-    textAlign: textAlign,
-    text: TextSpan(
-      style: TextStyle(
-        color: color,
-        fontSize: fontSize,
-        fontWeight: fontWeight,
-        letterSpacing: letterSpacing,
-        height: height,
-      ),
-      children: [
-        TextSpan(text: integerPart),
-        if (fractionalPart.isNotEmpty)
-          TextSpan(
-            text: fractionalPart,
-            style: TextStyle(
-              fontSize: fontSize * 0.6,
-              fontWeight: fontWeight,
-              letterSpacing: letterSpacing,
+    String integerPart = amount;
+    String fractionalPart = '';
+    final dotIndex = amount.indexOf('.');
+    if (dotIndex != -1) {
+      integerPart = amount.substring(0, dotIndex);
+      fractionalPart = amount.substring(dotIndex);
+    }
+
+    return RichText(
+      textAlign: textAlign,
+      text: TextSpan(
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        ),
+        children: [
+          TextSpan(text: integerPart),
+          if (showDecimals && fractionalPart.isNotEmpty)
+            TextSpan(
+              text: fractionalPart,
+              style: TextStyle(
+                fontSize: fontSize * 0.6,
+                fontWeight: fontWeight,
+                letterSpacing: letterSpacing,
+              ),
             ),
-          ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  } catch (_) {
+    // Fallback if provider/context is unavailable very early
+    return RichText(
+      textAlign: textAlign,
+      text: TextSpan(
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        ),
+        text: amount,
+      ),
+    );
+  }
 }
 
