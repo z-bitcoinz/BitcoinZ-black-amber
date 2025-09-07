@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class InterfaceProvider extends ChangeNotifier {
   static const String _analyticsTabVisibleKey = 'analytics_tab_visible';
   
-  bool _analyticsTabVisible = true;
+  bool _analyticsTabVisible = false;
   bool _isInitialized = false;
 
   /// Whether the analytics tab should be visible in the main navigation
@@ -20,7 +20,7 @@ class InterfaceProvider extends ChangeNotifier {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      _analyticsTabVisible = prefs.getBool(_analyticsTabVisibleKey) ?? true; // Default to visible
+      _analyticsTabVisible = prefs.getBool(_analyticsTabVisibleKey) ?? false; // Default to hidden
       _isInitialized = true;
       
       if (kDebugMode) {
@@ -33,7 +33,7 @@ class InterfaceProvider extends ChangeNotifier {
         print('❌ Failed to load interface preferences: $e');
       }
       // Use defaults if loading fails
-      _analyticsTabVisible = true;
+      _analyticsTabVisible = false;
       _isInitialized = true;
       notifyListeners();
     }
@@ -72,7 +72,7 @@ class InterfaceProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_analyticsTabVisibleKey);
       
-      _analyticsTabVisible = true;
+      _analyticsTabVisible = false;
       
       if (kDebugMode) {
         print('🎨 Interface preferences reset to defaults');
