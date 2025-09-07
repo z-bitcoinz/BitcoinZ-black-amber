@@ -671,13 +671,12 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
+                                buildAmountTextSmall(
                                   walletProvider.balance.formattedSpendable,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  fontSize: 36,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                                 if (currencyProvider.currentPrice != null)
                                   Text(
@@ -711,13 +710,12 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                     fontSize: 10,
                                   ),
                                 ),
-                                Text(
+                                buildAmountTextSmall(
                                   walletProvider.balance.formattedTotal,
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  fontSize: 18,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withOpacity(0.9),
                                 ),
                               ],
                             ),
@@ -789,13 +787,12 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                       ),
                                     ],
                                   ),
-                                  Text(
+                                  buildAmountTextSmall(
                                     walletProvider.balance.formattedSpendable,
-                                    style: const TextStyle(
-                                      color: Color(0xFF4CAF50),
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    fontSize: 15,
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF4CAF50),
                                   ),
                                 ],
                               ),
@@ -826,13 +823,12 @@ class _SendScreenModernState extends State<SendScreenModern> {
                                         ),
                                       ],
                                     ),
-                                    Text(
+                                    buildAmountTextSmall(
                                       walletProvider.balance.formattedPureIncoming,
-                                      style: const TextStyle(
-                                        color: Colors.blue,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                      fontSize: 15,
+                                      height: 1.1,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.blue,
                                     ),
                                   ],
                                 ),
@@ -1758,5 +1754,93 @@ class _ContactPickerDialogState extends State<_ContactPickerDialog> {
       ),
     );
   }
+
+  /// Builds a RichText where the decimal part is rendered smaller
+  Widget _buildAmountText(
+    String amount, {
+    required double fontSize,
+    required double height,
+    FontWeight fontWeight = FontWeight.w600,
+    double letterSpacing = -0.5,
+    Color color = Colors.white,
+  }) {
+    String integerPart = amount;
+    String fractionalPart = '';
+    final dotIndex = amount.indexOf('.');
+    if (dotIndex != -1) {
+      integerPart = amount.substring(0, dotIndex);
+      fractionalPart = amount.substring(dotIndex);
+    }
+
+    return RichText(
+      textAlign: TextAlign.start,
+      text: TextSpan(
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        ),
+        children: [
+          TextSpan(text: integerPart),
+          if (fractionalPart.isNotEmpty)
+            TextSpan(
+              text: fractionalPart,
+              style: TextStyle(
+                fontSize: fontSize * 0.6,
+                fontWeight: fontWeight,
+                letterSpacing: letterSpacing,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+
+// Top-level helper: render amount with smaller decimals
+Widget buildAmountTextSmall(
+  String amount, {
+  required double fontSize,
+  required double height,
+  FontWeight fontWeight = FontWeight.w600,
+  double letterSpacing = -0.5,
+  Color color = Colors.white,
+  TextAlign textAlign = TextAlign.start,
+}) {
+  String integerPart = amount;
+  String fractionalPart = '';
+  final dotIndex = amount.indexOf('.');
+  if (dotIndex != -1) {
+    integerPart = amount.substring(0, dotIndex);
+    fractionalPart = amount.substring(dotIndex);
+  }
+
+  return RichText(
+    textAlign: textAlign,
+    text: TextSpan(
+      style: TextStyle(
+        color: color,
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        letterSpacing: letterSpacing,
+        height: height,
+      ),
+      children: [
+        TextSpan(text: integerPart),
+        if (fractionalPart.isNotEmpty)
+          TextSpan(
+            text: fractionalPart,
+            style: TextStyle(
+              fontSize: fontSize * 0.6,
+              fontWeight: fontWeight,
+              letterSpacing: letterSpacing,
+            ),
+          ),
+      ],
+    ),
+  );
 }
 

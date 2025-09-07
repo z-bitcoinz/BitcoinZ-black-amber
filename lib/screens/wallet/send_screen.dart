@@ -22,33 +22,33 @@ class _SendScreenState extends State<SendScreen>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  
+
   final _formKey = GlobalKey<FormState>();
   final _addressController = TextEditingController();
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
-  
+
   bool _isSending = false;
   String? _errorMessage;
   bool _isShieldedTransaction = false;
   double _estimatedFee = 0.001; // Default fee
   bool _isFiatInput = false; // Toggle for fiat/BTCZ input
-  
+
   // Transaction progress states
   String _sendingStatus = '';
   double _sendingProgress = 0.0;
   late AnimationController _buttonAnimationController;
   late Animation<double> _buttonScaleAnimation;
-  
+
   @override
   void initState() {
     super.initState();
-    
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -56,12 +56,12 @@ class _SendScreenState extends State<SendScreen>
       parent: _fadeController,
       curve: Curves.easeInOut,
     ));
-    
+
     _buttonAnimationController = AnimationController(
       duration: const Duration(milliseconds: 150),
       vsync: this,
     );
-    
+
     _buttonScaleAnimation = Tween<double>(
       begin: 1.0,
       end: 0.95,
@@ -86,12 +86,12 @@ class _SendScreenState extends State<SendScreen>
   bool _isValidBitcoinZAddress(String address) {
     // Basic validation for BitcoinZ addresses
     if (address.isEmpty) return false;
-    
+
     // Transparent addresses start with 't1' or 'R'
     if (address.startsWith('t1') && address.length >= 34) {
       return true;
     }
-    
+
     // Shielded addresses start with 'zc' or 'zs'
     if ((address.startsWith('zc') || address.startsWith('zs')) && address.length >= 60) {
       setState(() {
@@ -99,7 +99,7 @@ class _SendScreenState extends State<SendScreen>
       });
       return true;
     }
-    
+
     return false;
   }
 
@@ -108,7 +108,7 @@ class _SendScreenState extends State<SendScreen>
     if (text.isEmpty) return null;
     final parsed = double.tryParse(text);
     if (parsed == null) return null;
-    
+
     // Convert fiat to BTCZ if in fiat mode
     if (_isFiatInput) {
       final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
@@ -168,21 +168,21 @@ class _SendScreenState extends State<SendScreen>
 
   Future<void> _sendTransaction() async {
     if (!_formKey.currentState!.validate() || _isSending) return;
-    
+
     // Animate button press
     _buttonAnimationController.forward().then((_) {
       _buttonAnimationController.reverse();
     });
-    
+
     // Get transaction details
     final amount = _getAmountValue()!;
     final address = _addressController.text.trim();
-    
+
     // Get fiat amount if available
     final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
     double? fiatAmount;
     String? currencyCode;
-    
+
     if (currencyProvider.currentPrice != null) {
       if (_isFiatInput) {
         // User entered fiat, so parse the text directly for fiat amount
@@ -193,7 +193,7 @@ class _SendScreenState extends State<SendScreen>
       }
       currencyCode = currencyProvider.selectedCurrency.code;
     }
-    
+
     // Show confirmation dialog first
     showDialog(
       context: context,
@@ -211,7 +211,7 @@ class _SendScreenState extends State<SendScreen>
       ),
     );
   }
-  
+
   Future<void> _processSendTransaction(double amount, String address, [double? fiatAmount, String? currencyCode]) async {
     setState(() {
       _isSending = true;
@@ -222,15 +222,15 @@ class _SendScreenState extends State<SendScreen>
 
     try {
       final memo = _memoController.text.trim();
-      
+
       // Let wallet provider handle real progress - no hardcoded values
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-      
+
       // Let wallet provider handle all progress updates
       await Future.delayed(const Duration(milliseconds: 300));
-      
+
       final result = await walletProvider.sendTransaction(
         toAddress: address,
         amount: amount,
@@ -242,10 +242,10 @@ class _SendScreenState extends State<SendScreen>
           _sendingStatus = 'Transaction sent!';
           _sendingProgress = 1.0;
         });
-        
+
         // Short delay to show completion
         await Future.delayed(const Duration(milliseconds: 500));
-        
+
         // Show custom success dialog
         showDialog(
           context: context,
@@ -273,13 +273,13 @@ class _SendScreenState extends State<SendScreen>
           _sendingStatus = '';
           _sendingProgress = 0.0;
         });
-        
+
         // Show error with animation
         _showErrorAnimation();
       }
     }
   }
-  
+
   void _showErrorAnimation() {
     // Shake animation for error
     _buttonAnimationController.forward().then((_) {
@@ -341,7 +341,7 @@ class _SendScreenState extends State<SendScreen>
                 const SliverToBoxAdapter(
                   child: SizedBox(height: 20),
                 ),
-                
+
                 // Balance Card Section - EXACT copy from home page structure
                 SliverToBoxAdapter(
                   child: Padding(
@@ -416,18 +416,16 @@ class _SendScreenState extends State<SendScreen>
                                       ),
                                     ),
                                     const SizedBox(height: 4),
-                                    
-                                    Text(
+
+                                    _buildAmountText(
                                       walletProvider.balance.formattedSpendable,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: -1,
-                                        height: 1.2,
-                                      ),
+                                      fontSize: 32,
+                                      height: 1.2,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: -1,
+                                      color: Colors.white,
                                     ),
-                                    
+
                                     // Show fiat value if available
                                     if (currencyProvider.currentPrice != null) ...[
                                       const SizedBox(height: 4),
@@ -440,7 +438,7 @@ class _SendScreenState extends State<SendScreen>
                                         ),
                                       ),
                                     ],
-                                    
+
                                     // Removed redundant "Confirming:" display from send screen
                                     // This is already shown on the main dashboard
                                   ],
@@ -453,7 +451,7 @@ class _SendScreenState extends State<SendScreen>
                     ),
                   ),
                 ),
-                
+
                 // Form Section with Input Fields
                 SliverToBoxAdapter(
                   child: Padding(
@@ -550,9 +548,9 @@ class _SendScreenState extends State<SendScreen>
                             ),
                           ],
                         ),
-                        
+
                         const SizedBox(height: 24),
-                        
+
                         // Amount - Modern Glass Input
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -587,7 +585,7 @@ class _SendScreenState extends State<SendScreen>
                                                 child: Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                                   decoration: BoxDecoration(
-                                                    color: !_isFiatInput 
+                                                    color: !_isFiatInput
                                                         ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
                                                         : Colors.transparent,
                                                     borderRadius: BorderRadius.circular(6),
@@ -595,7 +593,7 @@ class _SendScreenState extends State<SendScreen>
                                                   child: Text(
                                                     'BTCZ',
                                                     style: TextStyle(
-                                                      color: !_isFiatInput 
+                                                      color: !_isFiatInput
                                                           ? Theme.of(context).colorScheme.primary
                                                           : Colors.white.withOpacity(0.5),
                                                       fontSize: 11,
@@ -609,7 +607,7 @@ class _SendScreenState extends State<SendScreen>
                                                 child: Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                                   decoration: BoxDecoration(
-                                                    color: _isFiatInput 
+                                                    color: _isFiatInput
                                                         ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
                                                         : Colors.transparent,
                                                     borderRadius: BorderRadius.circular(6),
@@ -617,7 +615,7 @@ class _SendScreenState extends State<SendScreen>
                                                   child: Text(
                                                     currencyProvider.selectedCurrency.code,
                                                     style: TextStyle(
-                                                      color: _isFiatInput 
+                                                      color: _isFiatInput
                                                           ? Theme.of(context).colorScheme.primary
                                                           : Colors.white.withOpacity(0.5),
                                                       fontSize: 11,
@@ -698,8 +696,8 @@ class _SendScreenState extends State<SendScreen>
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
                                   ),
-                                  suffixText: _isFiatInput 
-                                      ? currencyProvider.selectedCurrency.code 
+                                  suffixText: _isFiatInput
+                                      ? currencyProvider.selectedCurrency.code
                                       : 'BTCZ',
                                   suffixStyle: TextStyle(
                                     fontSize: 16,
@@ -717,7 +715,7 @@ class _SendScreenState extends State<SendScreen>
                                   if (parsed == null || parsed <= 0) {
                                     return 'Please enter a valid amount';
                                   }
-                                  
+
                                   // Convert to BTCZ for validation
                                   double btczAmount = parsed;
                                   if (_isFiatInput) {
@@ -748,7 +746,7 @@ class _SendScreenState extends State<SendScreen>
                             ),
                           ],
                         ),
-                        
+
                         // Show conversion amount
                         if (currencyProvider.currentPrice != null) ...[
                           const SizedBox(height: 8),
@@ -760,7 +758,7 @@ class _SendScreenState extends State<SendScreen>
                                 if (text.isEmpty) return const SizedBox.shrink();
                                 final parsed = double.tryParse(text);
                                 if (parsed == null || parsed <= 0) return const SizedBox.shrink();
-                                
+
                                 String conversionText = '';
                                 if (_isFiatInput) {
                                   final btczAmount = currencyProvider.convertFiatToBtcz(parsed);
@@ -773,9 +771,9 @@ class _SendScreenState extends State<SendScreen>
                                     conversionText = '≈ ${currencyProvider.formatWithSymbol(fiatAmount)}';
                                   }
                                 }
-                                
+
                                 if (conversionText.isEmpty) return const SizedBox.shrink();
-                                
+
                                 return Text(
                                   conversionText,
                                   style: TextStyle(
@@ -788,7 +786,7 @@ class _SendScreenState extends State<SendScreen>
                             ),
                           ),
                         ],
-                        
+
                         // Network Fee - Subtle
                         const SizedBox(height: 8),
                         Padding(
@@ -812,11 +810,11 @@ class _SendScreenState extends State<SendScreen>
                             ],
                           ),
                         ),
-                        
+
                         // Memo (for shielded transactions)
                         if (_isShieldedTransaction) ...[
                           SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 20 : 24),
-                          
+
                           Text(
                             'Memo (Optional)',
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -825,7 +823,7 @@ class _SendScreenState extends State<SendScreen>
                             ),
                           ),
                           SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 8 : 12),
-                          
+
                           TextFormField(
                             controller: _memoController,
                             maxLines: 3,
@@ -844,7 +842,7 @@ class _SendScreenState extends State<SendScreen>
                             ),
                           ),
                         ],
-                        
+
                         // Error Message with animation
                         if (_errorMessage != null) ...[
                           SizedBox(height: ResponsiveUtils.isSmallScreen(context) ? 16 : 24),
@@ -915,10 +913,10 @@ class _SendScreenState extends State<SendScreen>
                             ),
                           ),
                         ],
-                        
+
                         // Send Button - Modern Gradient Style
                         const SizedBox(height: 40),
-                        
+
                         AnimatedBuilder(
                           animation: _buttonScaleAnimation,
                           builder: (context, child) {
@@ -1030,8 +1028,8 @@ class _SendScreenState extends State<SendScreen>
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w700, // Sharper font weight
                                                     letterSpacing: 1.0, // More spacing
-                                                    color: _canSend(walletProvider) 
-                                                        ? Colors.white 
+                                                    color: _canSend(walletProvider)
+                                                        ? Colors.white
                                                         : Colors.white.withOpacity(0.3),
                                                   ),
                                                 ),
@@ -1044,14 +1042,14 @@ class _SendScreenState extends State<SendScreen>
                             );
                           },
                         ),
-                        
+
                         const SizedBox(height: 80),
                       ],
                     ),
                   ),
                 ),
                 ),
-                
+
                 // Bottom spacing
                 const SliverToBoxAdapter(
                   child: SizedBox(height: 20),
@@ -1079,5 +1077,49 @@ class _SendScreenState extends State<SendScreen>
     },
   ),
 );
+}
+
+  /// Builds a RichText where the decimal part is smaller to save space
+  Widget _buildAmountText(
+    String amount, {
+    required double fontSize,
+    required double height,
+    FontWeight fontWeight = FontWeight.w600,
+    double letterSpacing = -0.5,
+    Color color = Colors.white,
+  }) {
+    String integerPart = amount;
+    String fractionalPart = '';
+    final dotIndex = amount.indexOf('.');
+    if (dotIndex != -1) {
+      integerPart = amount.substring(0, dotIndex);
+      fractionalPart = amount.substring(dotIndex);
+    }
+
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        ),
+        children: [
+          TextSpan(text: integerPart),
+          if (fractionalPart.isNotEmpty)
+            TextSpan(
+              text: fractionalPart,
+              style: TextStyle(
+                fontSize: fontSize * 0.6,
+                fontWeight: fontWeight,
+                letterSpacing: letterSpacing,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 }

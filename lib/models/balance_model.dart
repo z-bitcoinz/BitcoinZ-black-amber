@@ -230,32 +230,16 @@ class BalanceModel {
   }
 
   /// Private helper to format balance
+  /// Show full precision up to 8 decimals and trim trailing zeros (no asterisks)
   String _formatBalance(double balance) {
     if (balance == 0) return '0';
-    
-    // Check if there are significant digits beyond 3 decimal places
-    String fullPrecision = balance.toStringAsFixed(8);
-    String threePrecision = balance.toStringAsFixed(3);
-    
-    // Format to 3 decimal places
-    String formatted = threePrecision;
-    
-    // Remove trailing zeros after decimal point
+
+    // Format to 8 decimals (BTCZ precision), then trim trailing zeros and decimal point
+    String formatted = balance.toStringAsFixed(8);
     if (formatted.contains('.')) {
       formatted = formatted.replaceAll(RegExp(r'0*$'), '');
       formatted = formatted.replaceAll(RegExp(r'\.$'), '');
     }
-    
-    // Only add ** if there are actually more significant digits beyond what we're showing
-    // Compare the full precision with 3 decimal places to see if we're hiding information
-    double roundedToThree = double.parse(threePrecision);
-    double difference = (balance - roundedToThree).abs();
-    
-    // If the difference is greater than 0.0001 (4th decimal place), show **
-    if (difference > 0.0001) {
-      formatted = '$formatted**';
-    }
-    
     return formatted;
   }
 

@@ -70,9 +70,9 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
               // Main card with clean glassmorphism - NO BackdropFilter!
               Container(
                   padding: EdgeInsets.fromLTRB(
-                    24, 
-                    ResponsiveUtils.getBalanceTopPadding(context), 
-                    24, 
+                    24,
+                    ResponsiveUtils.getBalanceTopPadding(context),
+                    24,
                     24
                   ),
                   decoration: BoxDecoration(
@@ -125,25 +125,21 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                         ),
                       ),
                       const SizedBox(height: 4),
-                      
+
                       // Simplified balance text with explicit height - NO COMPLEX EFFECTS!
                       Container(
                         height: ResponsiveUtils.getBalanceContainerHeight(context),
                         child: Center(
-                          child: Text(
+                          child: _buildAmountText(
                             walletProvider.balance.formattedTotal,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: ResponsiveUtils.getBalanceTextSize(context),
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: Platform.isIOS || Platform.isAndroid ? -0.5 : -1, // Less aggressive on mobile
-                              height: ResponsiveUtils.getBalanceTextHeight(context),
-                            ),
+                            fontSize: ResponsiveUtils.getBalanceTextSize(context),
+                            height: ResponsiveUtils.getBalanceTextHeight(context),
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: Platform.isIOS || Platform.isAndroid ? -0.5 : -1,
                           ),
                         ),
                       ),
-                    
+
                     // Show fiat value if available
                     if (walletProvider.hasWallet && currencyProvider.currentPrice != null) ...[
                       const SizedBox(height: 8),
@@ -165,9 +161,9 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                         ),
                       ),
                     ],
-                    
+
                     const SizedBox(height: 20),
-                    
+
                     // Divider
                     Container(
                       height: 1,
@@ -181,9 +177,9 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 20),
-                    
+
                     // Transparent vs Shielded breakdown
                     Row(
                       children: [
@@ -210,7 +206,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                         ),
                       ],
                     ),
-                    
+
                     // Removed redundant "Confirming:" display from balance card
                     // This is already shown on the main dashboard
                   ],
@@ -258,18 +254,18 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
       },
     );
   }
-  
+
   Widget _buildBalanceColumn(BuildContext context, String label, String amount, IconData icon) {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     final isTransparent = label == 'Transparent';
     // Only show dots for incoming unconfirmed transactions (not outgoing)
-    final hasUnconfirmed = isTransparent 
+    final hasUnconfirmed = isTransparent
         ? walletProvider.balance.hasIncomingUnconfirmedTransparentBalance
         : walletProvider.balance.hasIncomingUnconfirmedShieldedBalance;
     final unconfirmedAmount = isTransparent
         ? walletProvider.balance.formattedUnconfirmedTransparent
         : walletProvider.balance.formattedUnconfirmedShielded;
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
@@ -294,14 +290,12 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
             ],
           ),
           const SizedBox(height: 6),
-          Text(
+          _buildAmountText(
             amount,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.5,
-            ),
+            fontSize: 24,
+            height: 1.2,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.5,
           ),
           // Show progress dots when this balance type has unconfirmed transactions
           if (hasUnconfirmed || walletProvider.isLoading || walletProvider.isSyncing) ...[
@@ -310,6 +304,50 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
           ],
           // Removed redundant "Confirming:" display from balance columns
           // This is already shown on the main dashboard
+        ],
+      ),
+    );
+  }
+
+  /// Builds a RichText where the decimal part is rendered smaller
+  Widget _buildAmountText(
+    String amount, {
+    required double fontSize,
+    required double height,
+    FontWeight fontWeight = FontWeight.w600,
+    double letterSpacing = -0.5,
+    Color color = Colors.white,
+  }) {
+    // Split integer and fractional parts
+    String integerPart = amount;
+    String fractionalPart = '';
+    final dotIndex = amount.indexOf('.');
+    if (dotIndex != -1) {
+      integerPart = amount.substring(0, dotIndex);
+      fractionalPart = amount.substring(dotIndex); // keep the dot with decimals
+    }
+
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        ),
+        children: [
+          TextSpan(text: integerPart),
+          if (fractionalPart.isNotEmpty)
+            TextSpan(
+              text: fractionalPart,
+              style: TextStyle(
+                fontSize: fontSize * 0.6, // smaller decimals
+                fontWeight: fontWeight,
+                letterSpacing: letterSpacing,
+              ),
+            ),
         ],
       ),
     );
