@@ -912,7 +912,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                               decoration: BoxDecoration(
                                 color: isRead
                                     ? Theme.of(context).colorScheme.surfaceVariant
-                                    : Theme.of(context).colorScheme.primary,
+                                    : Colors.red,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: Theme.of(context).colorScheme.surface,
@@ -924,7 +924,7 @@ class _PaginatedTransactionHistoryScreenState extends State<PaginatedTransaction
                                 size: 10,
                                 color: isRead
                                     ? Theme.of(context).colorScheme.onSurfaceVariant
-                                    : Theme.of(context).colorScheme.onPrimary,
+                                    : Colors.white,
                               ),
                             ),
                           );
