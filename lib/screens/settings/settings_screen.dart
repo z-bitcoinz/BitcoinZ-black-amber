@@ -8,6 +8,7 @@ import 'help_screen.dart';
 import 'analytics_help_screen.dart';
 import 'network_settings_screen.dart';
 import 'notification_settings_screen.dart';
+import 'background_power_settings_screen.dart';
 import '../analytics/financial_analytics_screen.dart';
 import 'contacts_backup_screen.dart';
 import '../../providers/currency_provider.dart';
@@ -125,6 +126,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
 
+              // Power & Background
+              if (Platform.isAndroid)
+                _buildSettingsSection(
+                  title: 'Background & Power',
+                  children: [
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.battery_saver,
+                      title: 'Background Operation',
+                      subtitle: 'Keep wallet syncing in background',
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const BackgroundPowerSettingsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+
+
               const SizedBox(height: 24),
 
               // Network settings
@@ -191,8 +216,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               width: 8,
                               height: 8,
                               decoration: BoxDecoration(
-                                color: notificationProvider.settings.enabled 
-                                    ? Colors.green 
+                                color: notificationProvider.settings.enabled
+                                    ? Colors.green
                                     : Colors.red,
                                 shape: BoxShape.circle,
                               ),

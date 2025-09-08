@@ -113,6 +113,11 @@ class WalletProvider with ChangeNotifier {
   String _syncETA = '';
   double _batchProgress = 0.0;
 
+  // Completion latch to avoid churn right after finishing sync
+  bool _syncCompletionLatched = false;
+  DateTime? _syncCompletionLatchedAt;
+  static const Duration _syncCompletionLatchWindow = Duration(seconds: 20);
+
   // Simple blockchain tip tracking
   int? _blockchainTip;
   DateTime? _blockchainTipCacheTime;
@@ -1780,11 +1785,22 @@ class WalletProvider with ChangeNotifier {
     _isUpdatingSyncStatus = true;
 
     try {
-      // Use the ACTUAL sync state from Rust service instead of unreliable syncstatus command
-      final bool actuallyInProgress = _rustService.isActuallySyncing;
+      // Prefer Rust-reported in_progress when available; fallback to local flag
+      Map<String, dynamic>? statusSnapshot;
+      bool actuallyInProgress = _rustService.isActuallySyncing;
+      try {
+        statusSnapshot = await _rustService.getSyncStatus();
+        if (statusSnapshot != null && statusSnapshot.containsKey('in_progress')) {
+          actuallyInProgress = statusSnapshot['in_progress'] == true;
+        }
+      } catch (_) {}
 
-      // Debug logging reduced for performance
       Logger.sync('Rust service sync state: $actuallyInProgress');
+
+      // Latch active shortly after completion to ignore tiny follow-up scans
+      final bool latchActive = _syncCompletionLatched &&
+          _syncCompletionLatchedAt != null &&
+          DateTime.now().difference(_syncCompletionLatchedAt!) < _syncCompletionLatchWindow;
 
       // If Rust service says it's syncing, try to get detailed progress
       int syncedBlocks = 0;
@@ -1796,14 +1812,14 @@ class WalletProvider with ChangeNotifier {
 
       if (actuallyInProgress) {
         try {
-          final status = await _rustService.getSyncStatus();
+          // Use snapshot if available to avoid redundant call
+          final status = statusSnapshot ?? await _rustService.getSyncStatus();
           if (status != null) {
             syncedBlocks = status['synced_blocks'] ?? 0;
             totalBlocks = status['total_blocks'] ?? 0;
             currentBatch = status['batch_num'] ?? 0;
             totalBatches = status['batch_total'] ?? 0;
 
-            // Debug logging reduced for performance
             Logger.sync('Progress: $syncedBlocks/$totalBlocks blocks, batch: $currentBatch/$totalBatches');
 
             // WORKAROUND: If we get stale data (all zeros) but sync is actually active,
@@ -1840,6 +1856,14 @@ class WalletProvider with ChangeNotifier {
       }
 
       if (actuallyInProgress) {
+        // If latch is active and no meaningful progress, keep UI hidden during latch window
+        if (latchActive && (syncedBlocks == 0 && totalBlocks == 0)) {
+          if (kDebugMode) print('⏸️ Latch active - ignoring tiny scan without progress');
+          notifyListeners();
+          _isUpdatingSyncStatus = false;
+          return;
+        }
+
         // ACTUAL sync in progress - trust the Rust service!
         _lastActiveSyncDetected = DateTime.now();
         _consecutiveInactivePolls = 0;
@@ -1977,6 +2001,10 @@ class WalletProvider with ChangeNotifier {
           // ALL conditions met - sync is truly complete
           // Debug logging reduced for performance
           Logger.sync(isInstantHide ? 'Instant hide for synced wallet' : 'Hiding sync UI - all conditions met');
+
+          // Latch completion to prevent small follow-up scans from reopening UI
+          _syncCompletionLatched = true;
+          _syncCompletionLatchedAt = DateTime.now();
 
           _setSyncing(false);
           _syncProgress = 100.0;

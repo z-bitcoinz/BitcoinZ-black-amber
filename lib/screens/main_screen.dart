@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/wallet_provider.dart';
@@ -15,6 +14,7 @@ import 'contacts/contacts_screen.dart';
 import '../providers/contact_provider.dart';
 import '../providers/notification_provider.dart';
 import '../services/send_prefill_bus.dart';
+import '../services/battery_optimization_prompt.dart';
 import '../widgets/notification_badge.dart';
 // import '../demo/cli_demo_page.dart'; // Removed - CLI demo no longer used
 
@@ -48,6 +48,7 @@ class MainScreen extends StatefulWidget {
 
   // Global method to navigate to specific tab (for notifications)
   static void navigateToTab(int tabIndex) {
+
     if (kDebugMode) print('🔔 MainScreen.navigateToTab called with index: $tabIndex');
     if (_currentInstance != null) {
       _currentInstance!._navigateToTabFromNotification(tabIndex);
@@ -62,7 +63,7 @@ class _MainScreenState extends State<MainScreen>
   int _currentIndex = 0;
   late PageController _pageController;
   late AnimationController _animationController;
-  
+
   // Contact data for sending
   String? _prefilledAddress;
   String? _contactName;
@@ -153,11 +154,13 @@ class _MainScreenState extends State<MainScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     // Start initial sync and initialize contacts
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeWallet();
       _initializeContacts();
+      // Prompt Android users to disable battery optimization
+      BatteryOptimizationPrompt.maybePrompt(context);
     });
   }
 
@@ -174,16 +177,16 @@ class _MainScreenState extends State<MainScreen>
       if (kDebugMode) print('🚀 MainScreen._initializeWallet() starting...');
       final walletProvider = Provider.of<WalletProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Set the notification context for showing memo notifications
       walletProvider.setNotificationContext(context);
-      
+
       // Check if wallet is already initialized (from PIN setup or background initialization)
       if (walletProvider.hasWallet) {
         if (kDebugMode) print('   Wallet already loaded, skipping initialization');
         return;
       }
-      
+
       // Check if background initialization is in progress
       if (walletProvider.isLoading) {
         if (kDebugMode) print('   Background initialization in progress, waiting...');
@@ -196,7 +199,7 @@ class _MainScreenState extends State<MainScreen>
         }
         if (kDebugMode) print('   Background initialization still in progress, continuing with restoration...');
       }
-      
+
       // If we're on MainScreen, user must be authenticated
       // Try to restore wallet from stored data
       bool restored = false;
@@ -209,7 +212,7 @@ class _MainScreenState extends State<MainScreen>
         restored = await walletProvider.restoreFromStoredData(authProvider);
         if (kDebugMode) print('   Wallet restored: $restored');
       }
-      
+
       // If restoration failed or no stored data, just sync if we have a wallet
       if (!restored && walletProvider.hasWallet) {
         if (kDebugMode) print('   Starting wallet sync...');

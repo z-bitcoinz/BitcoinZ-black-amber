@@ -7,12 +7,16 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Notification permissions -->
+    <!-- Notification and background permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Optional granular foreground service permissions for newer Android versions -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <application
         android:label="BitcoinZ Wallet"
         android:name="${applicationName}"
@@ -56,6 +60,24 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="financial_notifications" />
+
+        <!-- Foreground service for wallet sync and monitoring -->
+        <service
+            android:name=".WalletSyncForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Receiver to restart background operations after device boot -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
 
         <!-- Boot receiver for scheduled notifications -->
         <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"

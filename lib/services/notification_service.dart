@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'foreground_sync_manager.dart';
+
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -308,7 +310,7 @@ class NotificationService with WidgetsBindingObserver {
       print('🔊 Creating notification for channel: $channelId (category: $category)');
       print('   Sound enabled: ${_settings.soundEnabled}');
     }
-    
+
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       channelId,
       _getAndroidChannelName(category),
@@ -615,7 +617,7 @@ class NotificationService with WidgetsBindingObserver {
     // No minimum threshold - notify for all changes
 
     final String title = isIncoming ? 'Funds Received' : 'Funds Sent';
-    
+
     // Create balance change notification data to get proper formatting
     final balanceData = BalanceChangeNotificationData(
       previousBalance: previousBalance,
@@ -747,6 +749,11 @@ class NotificationService with WidgetsBindingObserver {
   void _handleAppResumed() {
     if (kDebugMode) print('🔔 App resumed - processing pending notifications');
 
+    // Stop foreground service when user returns
+    try {
+      ForegroundSyncManager.onAppResumed();
+    } catch (_) {}
+
     // Process any pending notifications that were queued while app was in background
     if (_pendingNotifications.isNotEmpty) {
       for (final notification in _pendingNotifications) {
@@ -759,6 +766,10 @@ class NotificationService with WidgetsBindingObserver {
   /// Handle app paused (went to background)
   void _handleAppPaused() {
     if (kDebugMode) print('🔔 App paused - notifications will be shown as system notifications');
+    // Start foreground service to keep sync stable
+    try {
+      ForegroundSyncManager.onAppPaused();
+    } catch (_) {}
   }
 
   /// Handle app detached (being terminated)

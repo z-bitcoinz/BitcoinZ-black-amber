@@ -1471,17 +1471,13 @@ class BitcoinzRustService {
       // Use direct FRB binding instead of the generic 'execute' command to
       // avoid SSE/codec issues and improve reliability during restoration
       final statusStr = await Future<String>(() => rust_api.getSyncStatus()).timeout(
-        timeout,
+        const Duration(milliseconds: 1200),
         onTimeout: () {
-          if (kDebugMode) print('⏱️ Syncstatus command timed out after ${timeout.inSeconds}s');
-          // When timeout occurs during active sync, assume sync is still in progress
-          // This is especially important for genesis sync which takes a long time
-          if (_isSyncing) {
-            return '{"sync_id": 1, "in_progress": true, "last_error": null}';
-          } else {
-            // Only return false if we know we're not syncing
-            return '{"sync_id": 1, "in_progress": false, "last_error": null}';
-          }
+          if (kDebugMode) print('⏱️ Syncstatus command timed out after 1.2s');
+          // On timeout, keep UI responsive. Assume current local state but don't block.
+          return _isSyncing
+              ? '{"sync_id": 1, "in_progress": true}'
+              : '{"sync_id": 1, "in_progress": false}';
         },
       );
       
@@ -1581,8 +1577,9 @@ class BitcoinzRustService {
   /// Get raw sync status string - may contain text format with real-time data
   Future<String?> getRawSyncStatus() async {
     try {
-      // Try to get the raw status string directly
-      final statusStr = await rust_api.getSyncStatus();
+      // Try to get the raw status string directly (short timeout to avoid UI stalls)
+      final statusStr = await Future<String>(() => rust_api.getSyncStatus())
+          .timeout(const Duration(milliseconds: 1000), onTimeout: () => '');
       return statusStr;
     } catch (e) {
       if (kDebugMode) print('❌ Failed to get raw sync status: $e');
