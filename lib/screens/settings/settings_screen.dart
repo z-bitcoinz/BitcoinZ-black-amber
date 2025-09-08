@@ -9,6 +9,7 @@ import 'analytics_help_screen.dart';
 import 'network_settings_screen.dart';
 import 'notification_settings_screen.dart';
 import 'background_power_settings_screen.dart';
+import 'about_screen.dart';
 import '../analytics/financial_analytics_screen.dart';
 import 'contacts_backup_screen.dart';
 import '../../providers/currency_provider.dart';
@@ -435,8 +436,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildSettingsTile(
                     context: context,
                     icon: Icons.info,
+                    title: 'About BitcoinZ Wallet',
+                    subtitle: 'Your Keys, Your Coins, Your Freedom',
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AboutScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, color: Colors.white24),
+                  _buildSettingsTile(
+                    context: context,
+                    icon: Icons.verified,
                     title: 'App Version',
-                    subtitle: '1.0.0',
+                    subtitle: 'v0.8.1',
                     onTap: null,
                   ),
                 ],
