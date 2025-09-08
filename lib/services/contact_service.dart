@@ -78,7 +78,7 @@ class ContactService {
   String _determineAddressType(String address) {
     if (address.startsWith('t1')) {
       return 'transparent';
-    } else if (address.startsWith('zc') || address.startsWith('zs')) {
+    } else if (address.startsWith('zs')) {
       return 'shielded';
     }
     return 'transparent'; // Default to transparent
@@ -236,17 +236,17 @@ class ContactService {
   // Address validation
   bool isValidBitcoinZAddress(String address) {
     if (address.isEmpty) return false;
-    
+
     // Transparent addresses
     if (address.startsWith('t1') && address.length >= 34) {
       return true;
     }
-    
-    // Shielded addresses
-    if ((address.startsWith('zc') || address.startsWith('zs')) && address.length >= 60) {
+
+    // Shielded addresses (zs only)
+    if (address.startsWith('zs') && address.length >= 60) {
       return true;
     }
-    
+
     return false;
   }
 

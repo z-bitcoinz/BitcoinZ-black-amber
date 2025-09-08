@@ -448,7 +448,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
               controller: _addressController,
               decoration: InputDecoration(
                 labelText: 'Address *',
-                hintText: 't1... or zc...',
+                hintText: 't1... or zs...',
                 prefixIcon: const Icon(Icons.account_balance_wallet),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.qr_code_scanner),
@@ -575,7 +575,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
                   const SizedBox(height: 8),
                   const Text(
                     '• Transparent addresses (t1...)\n'
-                    '• Shielded addresses (zc... or zs...)\n'
+                    '• Shielded addresses (zs...)\n'
                     '• Use QR scanner for quick address entry',
                     style: TextStyle(
                       color: Colors.blue,
