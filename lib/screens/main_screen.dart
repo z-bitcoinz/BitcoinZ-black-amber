@@ -12,10 +12,9 @@ import 'analytics/financial_analytics_screen.dart';
 import 'settings/settings_screen.dart';
 import 'contacts/contacts_screen.dart';
 import '../providers/contact_provider.dart';
-import '../providers/notification_provider.dart';
+
 import '../services/send_prefill_bus.dart';
 import '../services/battery_optimization_prompt.dart';
-import '../widgets/notification_badge.dart';
 // import '../demo/cli_demo_page.dart'; // Removed - CLI demo no longer used
 
 class MainScreen extends StatefulWidget {
@@ -115,15 +114,9 @@ class _MainScreenState extends State<MainScreen>
         activeIcon: Icon(Icons.qr_code),
         label: 'Receive',
       ),
-      BottomNavigationBarItem(
-        icon: NotificationBadge(
-          showOnlyMemos: true, // Only show memo count on history tab
-          child: const Icon(Icons.history),
-        ),
-        activeIcon: NotificationBadge(
-          showOnlyMemos: true,
-          child: const Icon(Icons.history),
-        ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.history),
+        activeIcon: Icon(Icons.history),
         label: 'History',
       ),
     ];
