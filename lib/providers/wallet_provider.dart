@@ -105,6 +105,10 @@ class WalletProvider with ChangeNotifier {
   int _consecutiveCompletePolls = 0; // Count consecutive polls showing completion evidence
   DateTime? _lastSyncUIHideTime; // Track when we should hide sync UI (with grace period)
 
+  // Android-only: hold sync tile visible for a few seconds after start to avoid flicker
+  DateTime? _syncStartHoldUntil; // when non-null and in future, keep sync UI visible
+  static const Duration _androidSyncStartHold = Duration(seconds: 7);
+
   // Detailed batch and ETA tracking
   int _currentBatch = 0;
   int _totalBatches = 0;
@@ -1952,9 +1956,12 @@ class WalletProvider with ChangeNotifier {
           }
         }
 
-        // Check if grace period has expired
+        // Check if grace period has expired (but keep visible during Android start-hold)
         final now = DateTime.now();
-        final shouldHideUI = _lastSyncUIHideTime != null && now.isAfter(_lastSyncUIHideTime!);
+        final bool androidStartHoldActive = Platform.isAndroid &&
+            _syncStartHoldUntil != null && now.isBefore(_syncStartHoldUntil!);
+        final shouldHideUI = !androidStartHoldActive &&
+            _lastSyncUIHideTime != null && now.isAfter(_lastSyncUIHideTime!);
 
         // 🎯 BULLETPROOF HIDING CONDITIONS: Only hide UI when we're 100% CERTAIN sync is truly complete
         final bool hasCompletionEvidence = _checkSyncCompletionEvidence(
@@ -2345,12 +2352,42 @@ class WalletProvider with ChangeNotifier {
     }
   }
 
-  /// Set connection status
+  /// Set connection status (UI-debounced for brief disconnects)
+  Timer? _disconnectDebounce;
+  static const Duration _disconnectDebounceWindow = Duration(seconds: 4);
+
   void _setConnectionStatus(bool connected, String status) {
-    _isConnected = connected;
-    _connectionStatus = status;
-    _lastConnectionCheck = DateTime.now();
-    notifyListeners();
+    // If connected, clear any pending debounce and update immediately
+    if (connected) {
+      _disconnectDebounce?.cancel();
+      _disconnectDebounce = null;
+      _isConnected = true;
+      _connectionStatus = status;
+      _lastConnectionCheck = DateTime.now();
+      notifyListeners();
+      return;
+    }
+
+    // If we're in the completion latch window, suppress disconnect display
+    final bool latchActive = _syncCompletionLatched &&
+        _syncCompletionLatchedAt != null &&
+        DateTime.now().difference(_syncCompletionLatchedAt!) < _syncCompletionLatchWindow;
+    if (latchActive) {
+      // Track internally but don't flip UI immediately
+      _isConnected = false; // keep internal state accurate
+      _lastConnectionCheck = DateTime.now();
+      // do not notify UI; let latch window pass
+      return;
+    }
+
+    // Debounce disconnect display to avoid brief 1–2s blips
+    _disconnectDebounce?.cancel();
+    _disconnectDebounce = Timer(_disconnectDebounceWindow, () {
+      _isConnected = false;
+      _connectionStatus = status;
+      _lastConnectionCheck = DateTime.now();
+      notifyListeners();
+    });
   }
 
   /// Update last successful operation timestamp only
@@ -3327,6 +3364,15 @@ class WalletProvider with ChangeNotifier {
 
   void _setSyncing(bool syncing) {
     _isSyncing = syncing;
+
+    // When sync starts, set Android-only hold to avoid brief flicker of the tile
+    if (syncing && Platform.isAndroid) {
+      _syncStartHoldUntil = DateTime.now().add(_androidSyncStartHold);
+    }
+    if (!syncing) {
+      _syncStartHoldUntil = null;
+    }
+
     notifyListeners();
   }
 
