@@ -141,11 +141,12 @@ class AboutScreen extends StatelessWidget {
                 ),
                 SizedBox(height: 12),
                 Text(
-                  'First release. Unlimited potential. The best is yet to come!',
+                  'BitcoinZ Black Amber v0.8.1 - First production release. Unlimited potential. The best is yet to come!',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
                     height: 1.5,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
