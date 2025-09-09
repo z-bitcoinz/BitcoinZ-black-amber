@@ -68,7 +68,7 @@ class AppConstants {
   
   // App Information
   static const String appName = 'BitcoinZ Mobile Wallet';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = 'v0.8.1';
   static const String supportEmail = 'support@bitcoinz.global';
   static const String githubUrl = 'https://github.com/z-bitcoinz/BitcoinZ-Mobile-Wallet';
   static const String websiteUrl = 'https://bitcoinz.global';

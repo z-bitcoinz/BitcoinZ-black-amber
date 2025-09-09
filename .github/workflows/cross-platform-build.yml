@@ -1,0 +1,221 @@
+name: Cross-platform Flutter Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, develop, feat/** ]
+    paths:
+      - 'lib/**'
+      - 'android/**'
+      - 'ios/**'
+      - 'macos/**'
+      - 'linux/**'
+      - 'windows/**'
+      - 'web/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android (APK arm64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components (platforms, build-tools, NDK)
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;27.0.12077973"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build release APK (arm64)
+        run: flutter build apk --release --target-platform=android-arm64
+
+      - name: Rename artifact
+        run: |
+          mkdir -p artifacts/android
+          cp build/app/outputs/flutter-apk/app-release.apk artifacts/android/Bitcoinz-black-amber-8.0.1-beta-arm64.apk
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-arm64
+          path: artifacts/android/Bitcoinz-black-amber-8.0.1-beta-arm64.apk
+
+  ios:
+    name: iOS (no-codesign .app)
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
+
+      - name: Install CocoaPods
+        run: |
+          sudo gem install cocoapods --no-document
+          pod repo update
+        working-directory: ios
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build iOS (no codesign)
+        run: |
+          flutter build ios --release --no-codesign
+
+      - name: Zip Runner.app
+        run: |
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          mkdir -p artifacts/ios
+          cd $(dirname "$APP_PATH")
+          zip -r ../../artifacts/ios/Bitcoinz-black-amber-8.0.1-beta-iOS-Runner.app.zip $(basename "$APP_PATH")
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app
+          path: artifacts/ios/Bitcoinz-black-amber-8.0.1-beta-iOS-Runner.app.zip
+
+  macos:
+    name: macOS app
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          cache: true
+
+      - name: Enable macOS desktop
+        run: flutter config --enable-macos-desktop
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build macOS
+        run: flutter build macos --release
+
+      - name: Zip .app bundle
+        run: |
+          PRODUCT_DIR="build/macos/Build/Products/Release"
+          APP_FILE=$(ls "$PRODUCT_DIR"/*.app | head -n 1)
+          mkdir -p artifacts/macos
+          cd "$PRODUCT_DIR"
+          zip -r ../../../../artifacts/macos/Bitcoinz-black-amber-8.0.1-beta-macOS.app.zip "$(basename "$APP_FILE")"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: artifacts/macos/Bitcoinz-black-amber-8.0.1-beta-macOS.app.zip
+
+  windows:
+    name: Windows app
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          cache: true
+
+      - name: Enable Windows desktop
+        shell: bash
+        run: flutter config --enable-windows-desktop
+
+      - name: Flutter pub get
+        shell: bash
+        run: flutter pub get
+
+      - name: Build Windows
+        shell: bash
+        run: flutter build windows --release
+
+      - name: Zip Windows build
+        shell: bash
+        run: |
+          mkdir -p artifacts/windows
+          cd build/windows/x64/runner/Release
+          7z a ../../../../artifacts/windows/Bitcoinz-black-amber-8.0.1-beta-Windows.zip *
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
+          path: artifacts/windows/Bitcoinz-black-amber-8.0.1-beta-Windows.zip
+
+  linux:
+    name: Linux app
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          cache: true
+
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build Linux
+        run: flutter build linux --release
+
+      - name: Tar Linux bundle
+        run: |
+          mkdir -p artifacts/linux
+          tar -C build/linux/x64/release -czf artifacts/linux/Bitcoinz-black-amber-8.0.1-beta-Linux.tar.gz bundle
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-app
+          path: artifacts/linux/Bitcoinz-black-amber-8.0.1-beta-Linux.tar.gz
+

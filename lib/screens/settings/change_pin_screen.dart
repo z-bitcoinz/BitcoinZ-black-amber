@@ -403,39 +403,35 @@ class _ChangePinScreenState extends State<ChangePinScreen>
                               maxWidth: ResponsiveUtils.getPinKeypadWidth(context),
                             ),
                             child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               // Numbers 1-3
-                              Row(
-                                children: [
-                                  _buildPinButton('1'),
-                                  _buildPinButton('2'),
-                                  _buildPinButton('3'),
-                                ],
-                              ),
+                              Row(children: [
+                                _buildPinButton('1'),
+                                _buildPinButton('2'),
+                                _buildPinButton('3'),
+                              ]),
+                              SizedBox(height: ResponsiveUtils.getPinVerticalSpacing(context) / 2),
                               // Numbers 4-6
-                              Row(
-                                children: [
-                                  _buildPinButton('4'),
-                                  _buildPinButton('5'),
-                                  _buildPinButton('6'),
-                                ],
-                              ),
+                              Row(children: [
+                                _buildPinButton('4'),
+                                _buildPinButton('5'),
+                                _buildPinButton('6'),
+                              ]),
+                              SizedBox(height: ResponsiveUtils.getPinVerticalSpacing(context) / 2),
                               // Numbers 7-9
-                              Row(
-                                children: [
-                                  _buildPinButton('7'),
-                                  _buildPinButton('8'),
-                                  _buildPinButton('9'),
-                                ],
-                              ),
+                              Row(children: [
+                                _buildPinButton('7'),
+                                _buildPinButton('8'),
+                                _buildPinButton('9'),
+                              ]),
+                              SizedBox(height: ResponsiveUtils.getPinVerticalSpacing(context) / 2),
                               // Bottom row
-                              Row(
-                                children: [
-                                  _buildEmptyButton(),
-                                  _buildPinButton('0'),
-                                  _buildDeleteButton(),
-                                ],
-                              ),
+                              Row(children: [
+                                _buildEmptyButton(),
+                                _buildPinButton('0'),
+                                _buildDeleteButton(),
+                              ]),
                             ],
                             ),
                           ),

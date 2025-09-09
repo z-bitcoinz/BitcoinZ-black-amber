@@ -175,14 +175,22 @@ class ResponsiveUtils {
 
   // PIN-specific responsive sizing
   static double getPinButtonPadding(BuildContext context) {
-    // Tighter padding for all platforms for smaller overall button size
+    // Slightly tighter padding on limited-height screens to avoid vertical overflow
+    if (isLimitedHeight(context)) return 2.0;
     return 3.0;
   }
 
   static double getPinKeypadWidth(BuildContext context) {
+    // Desktop/laptop sizing first
     if (isRegularDesktop(context)) return 240.0;
     if (isSmallDesktop(context)) return 220.0;
     if (isDesktop(context)) return 250.0;
+
+    // Mobile/tablet: scale down on short screens to prevent vertical overflow
+    final height = MediaQuery.of(context).size.height;
+    if (height < 580.0) return 180.0; // Very small height devices
+    if (height < 640.0) return 200.0;
+    if (height < 720.0) return 220.0;
     return 240.0;
   }
 
@@ -190,7 +198,13 @@ class ResponsiveUtils {
     // Much smaller buttons for desktop, appropriate sizes for mobile
     if (isRegularDesktop(context)) return 28.0;  // Large desktops (MacBook Pro, iMac)
     if (isSmallDesktop(context)) return 30.0;    // Small desktops (MacBook Air)
-    if (isMobile(context)) return 36.0;          // Mobile devices need larger touch targets
+    if (isMobile(context)) {
+      // On short screens, allow slightly smaller touch targets to avoid overflow
+      final height = MediaQuery.of(context).size.height;
+      if (height < 580.0) return 28.0;
+      if (height < 640.0) return 32.0;
+      return 36.0;
+    }
     return 32.0;  // Tablet fallback
   }
 

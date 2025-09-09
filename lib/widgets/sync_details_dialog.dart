@@ -27,6 +27,7 @@ class SyncDetailsDialog extends StatelessWidget {
             ),
             padding: const EdgeInsets.all(24),
             constraints: const BoxConstraints(maxWidth: 380),
+            width: double.infinity,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,6 +191,7 @@ class SyncDetailsDialog extends StatelessWidget {
     Color? valueColor,
   }) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
           icon,
@@ -197,20 +199,28 @@ class SyncDetailsDialog extends StatelessWidget {
           color: Colors.white.withOpacity(0.6),
         ),
         const SizedBox(width: 12),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.white70,
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.white70,
+            ),
           ),
         ),
-        const Spacer(),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: valueColor ?? Colors.white,
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+            softWrap: true,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: valueColor ?? Colors.white,
+            ),
           ),
         ),
       ],

@@ -1,16 +1,61 @@
-# flutter_app
+# Bitcoinz black amber 8.0.1 beta
 
-A new Flutter project.
+Fast, cross‑platform BitcoinZ wallet built with Flutter and Rust FFI.
 
-## Getting Started
+- Platforms: Android, iOS, macOS, Windows, Linux, Web
+- Rust backend for high‑performance sync and transactions
+- Clean UI with enhanced sync feedback and message-aware notifications
 
-This project is a starting point for a Flutter application.
+## Quick start (developers)
 
-A few resources to get you started if this is your first Flutter project:
+Prerequisites:
+- Flutter (stable channel)
+- For Android: Java 17, Android SDK/NDK (ndk 27.0.12077973 recommended)
+- For iOS/macOS: Xcode + CocoaPods
+- For Linux: clang, cmake, ninja, pkg-config, libgtk-3-dev
+- For Windows: Visual Studio C++ build tools
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Install deps and run:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter run
+```
+
+## Building locally
+
+Android (arm64):
+```bash
+flutter build apk --release --target-platform=android-arm64
+```
+
+iOS (no codesign):
+```bash
+flutter build ios --release --no-codesign
+```
+
+macOS:
+```bash
+flutter build macos --release
+```
+
+Windows:
+```bash
+flutter build windows --release
+```
+
+Linux:
+```bash
+flutter build linux --release
+```
+
+## CI/CD
+
+GitHub Actions workflow builds all platforms and uploads artifacts on push and on demand:
+- .github/workflows/cross-platform-build.yml
+
+## Naming
+The application label is set to: `Bitcoinz black amber 8.0.1 beta` (AndroidManifest.xml).
+
+## License
+MIT
