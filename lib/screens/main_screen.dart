@@ -432,10 +432,7 @@ class _MainScreenState extends State<MainScreen>
               ],
             ),
             child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
+              borderRadius: BorderRadius.zero,
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
