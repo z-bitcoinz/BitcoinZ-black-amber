@@ -205,13 +205,13 @@ class BitcoinzRustService {
           }
           
           if (kDebugMode) {
-            print('✅ New wallet created');
+            Logger.info('New wallet created', category: 'rust');
             print('   Seed phrase: ${_seedPhrase!.split(' ').length} words');
             print('   Birthday block: $_birthday');
           }
         } catch (e) {
           if (kDebugMode) {
-            print('❌ Failed to parse wallet creation response: $e');
+            Logger.error('Failed to parse wallet creation response: $e', category: 'rust');
             print('   Error type: ${e.runtimeType}');
             print('   Stack trace:');
             print(StackTrace.current);
@@ -220,7 +220,7 @@ class BitcoinzRustService {
         }
       } else if (seedPhrase != null) {
         // Restore from seed
-        if (kDebugMode) print('🔄 Restoring wallet from seed...');
+        Logger.debug('Restoring wallet from seed...', category: 'rust');
         
         // Use Black Amber's wallet directory for restoration
         String result;
@@ -305,7 +305,7 @@ class BitcoinzRustService {
         }
         _seedPhrase = seedPhrase;
         _birthday = birthdayHeight ?? 0; // Store the birthday height
-        if (kDebugMode) print('✅ Wallet restored with birthday: ${birthdayHeight ?? 0}');
+        Logger.info('Wallet restored with birthday: ${birthdayHeight ?? 0}', category: 'rust');
       } else {
         // Load existing wallet
         if (kDebugMode) print('📂 Loading existing wallet...');
@@ -353,13 +353,13 @@ class BitcoinzRustService {
           }
         }
         
-        if (kDebugMode) print('✅ Existing wallet loaded');
+        Logger.info('Existing wallet loaded', category: 'rust');
       }
       
       _initialized = true;
       
       if (kDebugMode) {
-        print('✅ Rust service marked as initialized');
+        Logger.info('Rust service marked as initialized', category: 'rust');
         print('   Seed available: ${_seedPhrase != null}');
         print('   Birthday: $_birthday');
       }
@@ -505,7 +505,7 @@ class BitcoinzRustService {
   Future<void> refresh() async {
     if (!_initialized) return;
     
-    if (kDebugMode) print('🔄 Full refresh via Rust...');
+    Logger.debug('Full refresh via Rust...', category: 'rust');
     
     try {
       // Decide if we actually need a sync before calling it
@@ -542,7 +542,7 @@ class BitcoinzRustService {
       // Save wallet
       await save();
 
-      if (kDebugMode) print('✅ Full refresh complete');
+      Logger.debug('Full refresh complete', category: 'rust');
     } catch (e) {
       if (kDebugMode) print('❌ Full refresh failed: $e');
     }
@@ -561,7 +561,7 @@ class BitcoinzRustService {
     _isSyncing = true;
     
     try {
-      if (kDebugMode) print('🔄 Syncing with network via Rust...');
+      Logger.debug('Syncing with network via Rust...', category: 'rust');
       // For full sync from genesis (birthday 0), we need much longer timeout
       // Regular sync: 15 seconds, Genesis sync: no timeout (let it complete)
       final isGenesisSync = _birthday == 0;
@@ -799,10 +799,7 @@ class BitcoinzRustService {
       final calculatedSpendable = actualSpendableTransparent + actualSpendableShielded;
       
       if (calculatedSpendable > totalBalance) {
-        if (kDebugMode) {
-          print('🚨 VALIDATION ERROR: Spendable ($calculatedSpendable) > Total ($totalBalance)');
-          print('   This should never happen! Using total balance as max spendable.');
-        }
+        Logger.error('VALIDATION ERROR: Spendable ($calculatedSpendable) > Total ($totalBalance). This should never happen! Using total balance as max spendable.', category: 'rust');
         // Cap spendable at total balance and proportionally reduce each type
         final ratio = totalBalance / calculatedSpendable;
         actualSpendableTransparent *= ratio;
@@ -815,10 +812,10 @@ class BitcoinzRustService {
       
       // Only log success if balance actually changed
       if (balanceChanged || _lastBalanceFetch == null) {
-        if (kDebugMode) print('✅ Balance fetched successfully');
+        Logger.debug('Balance fetched successfully', category: 'rust');
       }
     } catch (e) {
-      if (kDebugMode) print('❌ Fetch balance failed: $e');
+      Logger.error('Fetch balance failed: $e', category: 'rust');
     }
   }
   
@@ -838,10 +835,8 @@ class BitcoinzRustService {
       final infoJson = await rust_api.execute(command: 'info', args: '');
       final info = jsonDecode(infoJson);
       
-      if (kDebugMode) {
-        print('📊 Info response keys: ${info.keys.toList()}');
-        print('📊 Full info: $info');
-      }
+      Logger.debug('Info response keys: ${info.keys.toList()}', category: 'rust');
+      Logger.debug('Full info: $info', category: 'rust');
       
       // Check multiple possible field names for block height
       dynamic heightValue = info['latest_block_height'] ??  // This is the correct field!
@@ -856,9 +851,7 @@ class BitcoinzRustService {
         _currentBlockHeight = heightValue is int ? heightValue : int.tryParse(heightValue.toString());
         if (_currentBlockHeight != null) {
           _blockHeightLastFetch = now;
-          if (kDebugMode) {
-            print('📊 Current block height: $_currentBlockHeight (from field: ${info.keys.where((k) => info[k] == heightValue).first})');
-          }
+          Logger.debug('Current block height: $_currentBlockHeight (from field: ${info.keys.where((k) => info[k] == heightValue).first})', category: 'rust');
           return _currentBlockHeight!;
         }
       }

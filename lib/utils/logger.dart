@@ -1,24 +1,36 @@
 import 'package:flutter/foundation.dart';
 
 /// Centralized logging utility for the BitcoinZ wallet app
+/// Optimized for battery life by reducing excessive debug output
 class Logger {
+  // Production-safe log configuration
+  static LogProfile _currentProfile = kDebugMode ? LogProfile.development : LogProfile.production;
+  
   // Log categories for fine-grained control
-  static bool enableWalletLogs = kDebugMode;
-  static bool enableNetworkLogs = kDebugMode;
-  static bool enableNotificationLogs = kDebugMode;
-  static bool enableDatabaseLogs = kDebugMode;
-  static bool enableAuthLogs = kDebugMode;
-  static bool enableSyncLogs = kDebugMode;
-  static bool enableTransactionLogs = kDebugMode;
-  static bool enableRustLogs = kDebugMode;
-  static bool enableStorageLogs = kDebugMode;
-  static bool enableContactLogs = kDebugMode;
+  static bool enableWalletLogs = false;
+  static bool enableNetworkLogs = false;
+  static bool enableNotificationLogs = false;
+  static bool enableDatabaseLogs = false;
+  static bool enableAuthLogs = false;
+  static bool enableSyncLogs = false;
+  static bool enableTransactionLogs = false;
+  static bool enableRustLogs = false;
+  static bool enableStorageLogs = false;
+  static bool enableContactLogs = false;
   
   // Global log level control
-  static bool enableDebugLogs = kDebugMode;
-  static bool enableInfoLogs = true;
+  static bool enableDebugLogs = false;
+  static bool enableInfoLogs = false;
   static bool enableWarningLogs = true;
   static bool enableErrorLogs = true;
+  
+  // Initialize with appropriate profile
+  static void initialize({LogProfile? profile}) {
+    if (profile != null) {
+      _currentProfile = profile;
+    }
+    _applyProfile(_currentProfile);
+  }
 
   // Log level methods
   static void debug(String message, {String? category}) {
@@ -162,6 +174,79 @@ class Logger {
     enableWarningLogs = true;
     enableErrorLogs = true;
   }
+
+  // Apply log profile configuration
+  static void _applyProfile(LogProfile profile) {
+    switch (profile) {
+      case LogProfile.production:
+        // Production: Only errors and critical warnings
+        enableDebugLogs = false;
+        enableInfoLogs = false;
+        enableWarningLogs = true;
+        enableErrorLogs = true;
+        
+        // Disable all battery-draining categories
+        enableWalletLogs = false;
+        enableNetworkLogs = false;
+        enableNotificationLogs = false;
+        enableDatabaseLogs = false;
+        enableAuthLogs = false;
+        enableSyncLogs = false;
+        enableTransactionLogs = false;
+        enableRustLogs = false;
+        enableStorageLogs = false;
+        enableContactLogs = false;
+        break;
+        
+      case LogProfile.development:
+        // Development: Enable selective logging
+        enableDebugLogs = true;
+        enableInfoLogs = true;
+        enableWarningLogs = true;
+        enableErrorLogs = true;
+        
+        // Enable only critical categories to reduce noise
+        enableWalletLogs = false; // Still too verbose
+        enableNetworkLogs = false; // Very battery draining
+        enableNotificationLogs = true;
+        enableDatabaseLogs = false; // Too verbose
+        enableAuthLogs = true;
+        enableSyncLogs = false; // Very battery draining
+        enableTransactionLogs = true;
+        enableRustLogs = false; // Too verbose
+        enableStorageLogs = false;
+        enableContactLogs = true;
+        break;
+        
+      case LogProfile.verbose:
+        // Verbose: Enable all logging (for debugging only)
+        enableDebugLogs = true;
+        enableInfoLogs = true;
+        enableWarningLogs = true;
+        enableErrorLogs = true;
+        
+        enableWalletLogs = true;
+        enableNetworkLogs = true;
+        enableNotificationLogs = true;
+        enableDatabaseLogs = true;
+        enableAuthLogs = true;
+        enableSyncLogs = true;
+        enableTransactionLogs = true;
+        enableRustLogs = true;
+        enableStorageLogs = true;
+        enableContactLogs = true;
+        break;
+    }
+  }
+  
+  // Get current profile
+  static LogProfile get currentProfile => _currentProfile;
+  
+  // Set profile at runtime
+  static void setProfile(LogProfile profile) {
+    _currentProfile = profile;
+    _applyProfile(profile);
+  }
 }
 
 enum LogLevel {
@@ -169,4 +254,10 @@ enum LogLevel {
   info,
   warning,
   error,
+}
+
+enum LogProfile {
+  production,   // Minimal logging for battery optimization
+  development,  // Selective logging for development
+  verbose,      // Full logging for debugging
 }

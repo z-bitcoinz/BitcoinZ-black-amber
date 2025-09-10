@@ -16,6 +16,7 @@ import 'services/background_notification_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_screen.dart';
 import 'utils/constants.dart';
+import 'utils/logger.dart' as app_logger;
 import 'services/bitcoinz_service.dart';
 import 'services/storage_service.dart';
 import 'services/database_service.dart';
@@ -23,6 +24,10 @@ import 'src/rust/frb_generated.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize optimized logging for battery life
+  app_logger.Logger.initialize();
+  app_logger.Logger.info('🚀 BitcoinZ Black Amber starting with ${app_logger.Logger.currentProfile} log profile');
   
   // Configure window size for desktop platforms
   if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {

@@ -843,7 +843,7 @@ class WalletProvider with ChangeNotifier {
 
     try {
       if (kDebugMode) {
-        print('🔄 WalletProvider: Loading CLI wallet data...');
+        Logger.debug('WalletProvider: Loading CLI wallet data...', category: 'wallet');
       }
 
       // Create a basic wallet model for CLI wallet FIRST (before checking connection)
@@ -870,7 +870,7 @@ class WalletProvider with ChangeNotifier {
       startAutoSync();
 
       if (kDebugMode) {
-        print('✅ CLI wallet loaded successfully');
+        Logger.info('CLI wallet loaded successfully', category: 'wallet');
         print('   Balance: ${_balance.total} BTCZ');
         print('   Addresses: ${totalAddresses}');
       }
@@ -890,7 +890,7 @@ class WalletProvider with ChangeNotifier {
     if (!authProvider.hasWallet) return;
 
     if (kDebugMode) {
-      print('🔄 WalletProvider.startBackgroundInitialization() starting...');
+      Logger.debug('WalletProvider.startBackgroundInitialization() starting...', category: 'wallet');
       print('   This allows sync during PIN entry for better UX');
     }
 
@@ -919,7 +919,7 @@ class WalletProvider with ChangeNotifier {
         notifyListeners();
 
         if (kDebugMode) {
-          print('✅ Background initialization started successfully');
+          Logger.info('Background initialization started successfully', category: 'wallet');
           print('   Wallet will continue syncing while PIN is entered');
           print('🔄 Started sync status polling from background init path');
         }
@@ -950,7 +950,7 @@ class WalletProvider with ChangeNotifier {
 
     try {
       if (kDebugMode) {
-        print('🔄 WalletProvider.restoreFromStoredData() starting...');
+        Logger.debug('WalletProvider.restoreFromStoredData() starting...', category: 'wallet');
         final platform = Platform.isAndroid ? "Android" : Platform.isIOS ? "iOS" : Platform.isMacOS ? "macOS" : "Other";
         print('   📱 Platform: $platform');
         print('   AuthProvider hasWallet: ${authProvider.hasWallet}');
@@ -1046,7 +1046,7 @@ class WalletProvider with ChangeNotifier {
           );
 
           if (kDebugMode) {
-            print('✅ Wallet model created successfully!');
+            Logger.info('Wallet model created successfully!', category: 'wallet');
             print('   hasWallet: $hasWallet');
             print('   birthdayHeight: ${_wallet!.birthdayHeight}');
           }
@@ -1262,7 +1262,7 @@ class WalletProvider with ChangeNotifier {
         });
 
         if (kDebugMode) {
-          print('✅ Wallet restored with Rust Bridge addresses:');
+          Logger.info('Wallet restored with Rust Bridge addresses:', category: 'wallet');
           print('  transparent addresses: ${_addresses['transparent']!.length}');
           if (_addresses['transparent']!.isNotEmpty) {
             print('  first t-address: ${_addresses['transparent']!.first}');
